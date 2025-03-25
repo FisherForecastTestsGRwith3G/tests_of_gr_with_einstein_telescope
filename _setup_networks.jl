@@ -75,7 +75,7 @@ function getNetwork(network_name)
         return [ET]
     elseif network_name == "network_0_15km"
         return [ETLS_15km, ETLMR_0_15km]
-    elseif netwoek_name == "network_45_15km"
+    elseif network_name == "network_45_15km"
         return [ETLS_15km, ETLMR_45_15km]
     end 
 end 

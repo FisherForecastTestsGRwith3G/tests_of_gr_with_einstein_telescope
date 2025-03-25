@@ -8,24 +8,30 @@ using GW
 # include required scripts 
 include("_setup_networks.jl")
 include("_setup_gr_deviations.jl")
+include(".paths.jl")
 
 ################################################################################
 ## Specify simulation specs in this part of the script
 # ||||||||
 # vvvvvvvv
 
+PhD = "Andrea"
+path_catalog, path_output = whoIsThere(PhD)
+needToRun = false # set to true if you want to run the simulation
+HM = false # set to true if you want to run the simulation with the HM waveform
+
 # how is this simulation called
-simulation_tag = "test"
+simulation_tag = "BGR"
 
 # network specs
 network_names = ["ETS"]
-
+                #["ETS", "network_0_15km", "network_45_15km"]
 # specs of catalog
-n_events      = 1000
+n_events      = 10000
 source_type   = "BBH"
 catalog_name  = "BGR_TIGER_10k.h5"
-pn_orders =  ["0", "0.5", "1"] 
-          #  ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders =  #["0", "0.5", "1"] 
+            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
 # snr threshold
 snr_thresh = 12.
@@ -34,7 +40,8 @@ snr_thresh = 12.
 # ||||||||
 ## Specify simulation specs in this part of the script
 ################################################################################
-output_folder_name = "output/"*simulation_tag*"/"
+
+output_folder_name = path_output*"output/"*simulation_tag*"/"
 
 pn_order_dic = Dict(
     "-1"       => (-1.0    ,"minus_one"),
@@ -125,8 +132,7 @@ for nn in keys(networks)
         
         pno_name = "pn_"*pn_order_dic[pno][2]
         println("\nProcessing: "*pno_name)
-
-        folder_name = output_folder_name * "data/" * nn * "/" * pno_name *"/"
+        
         println("Storing results into:")
         println(folder_name)
         mkpath(folder_name)
@@ -146,28 +152,39 @@ for nn in keys(networks)
         delta_pn = gr_deviation_dict[pno]
 
         #calculate fisher
-        wf = PhenomD_TIGER(pn_order_dic[pno][1])
+        wf = nothing 
+
+        if HM
+            wf = PhenomHM_TIGER(pn_order_dic[pno][1])
+        else
+            wf = PhenomD_TIGER(pn_order_dic[pno][1])
+        end
+
         network = networks[nn]
 
-        @time fisher_matrices, snrs = FisherMatrix(
-            wf,
-            network,
-            mc, 
-            η, 
-            χ_1, 
-            χ_2, 
-            dL, 
-            θ, 
-            ϕ, 
-            iota, 
-            ψ, 
-            tcoal, 
-            Φ_coal, 
-            delta_pn, 
-            auto_save=false, 
-            return_SNR=true, 
-            useEarthMotion=true
-        )
+        if needToRun
+            @time fisher_matrices, snrs = FisherMatrix(
+                wf,
+                network,
+                mc, 
+                η, 
+                χ_1, 
+                χ_2, 
+                dL, 
+                θ, 
+                ϕ, 
+                iota, 
+                ψ, 
+                tcoal, 
+                Φ_coal, 
+                delta_pn, 
+                auto_save=false, 
+                return_SNR=true, 
+                useEarthMotion=true
+            )
+        else
+            fisher_matrices, snrs = _read_Fishers_SNRs(output_path*"Fishers_SNRs.h5", SNR=true)
+        end
 
         ### postprocessing #########################################################
 
