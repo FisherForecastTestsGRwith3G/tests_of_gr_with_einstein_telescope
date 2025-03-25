@@ -2,10 +2,15 @@ using HDF5
 using Plots
 import Contour
 using Trapz
+using LaTeXStrings
+using KernelDensity, Statistics
+using Serialization
 
 # include required scripts 
 include("_hierarchical_dist.jl")
 include("_hierarchical_plotting_utils.jl")
+include(".paths.jl")
+include("_setup_MCMC.jl")
 
 ################################################################################
 ## Specify simulation specs in this part of the script
@@ -13,16 +18,21 @@ include("_hierarchical_plotting_utils.jl")
 # vvvvvvvv
 
 # specify where the data is stored
-simulation_tag = "test"
+simulation_tag = "BGR"
 
 # network specs
 network_names = ["ETS"]
 
 # specify the pn-orders we want to analze
-pn_orders =  ["0", "0.5", "1"] 
+pn_orders =  ["0"]#, "0.5", "1"] 
            # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
-# secify where to save the plots
+MCMC = true
+chain_file_name = "MCMC_chain.jls"
+
+PhD = "Andrea"
+path_catalog, path_output = whoIsThere(PhD)
+# specify where to save the plots
 figure_dir = "output/"*simulation_tag*"/plots/"
 
 ### plot specifiers
@@ -83,7 +93,7 @@ val_injected_dict = Dict(
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = "output/"*simulation_tag*"/data/"
+output_folder_name = path_output*"output/"*simulation_tag*"/data/"
 
 pn_order_dic = Dict(
     "-1"       => (-1.0    ,"minus_one"),
@@ -167,15 +177,35 @@ end
         println("Consistency check for calculated distribution:")
         println("Difference in normalization = $(n_tot-nn_marg)")
         
+        # run the MCMC
+        if MCMC
+            println("Running MCMC")
+            chain = run_MCMC(dphi0_k, delta_k, center_mu, center_sig)
+            println("MCMC finished")
+        end
+        
         # create the plot
         title_str = "PN = $(pno)"
         splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=val_injected_dict[pno], title = title_str)
         
         # save plot
         mkpath(figure_dir* nn * "/")
-        fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".png"
+        fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(splot, fig_file_name)
+        if MCMC
+            chain_mu_sigma = [chain[:mu].data, chain[:sigma].data]
+            println(chain_mu_sigma[1][1:10])
+            println(chain_mu_sigma[2][1:10])
+            plot_ = plot_2d_contour(chain_mu_sigma[1], chain_mu_sigma[2], center_mu, center_sig)
+            fig_file_name_MCMC = figure_dir * nn * "/hyperdist_plot_pn_MCMC" * pn_order_dic[pno][2] * ".pdf"
+            println("\nSaving MCMC plot in: $(fig_file_name_MCMC)")
+            savefig(plot_, fig_file_name_MCMC)
+
+            # save the chain
+            serialize( folder * chain_file_name, chain)
+        end
+
     end
 end
 
