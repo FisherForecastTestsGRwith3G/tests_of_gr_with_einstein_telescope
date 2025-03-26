@@ -17,17 +17,17 @@ include(".paths.jl")
 
 PhD = "Andrea"
 path_catalog, path_output = whoIsThere(PhD)
-needToRun = false # set to true if you want to run the simulation
+needToRun = true # set to true if you want to run the simulation
 HM = false # set to true if you want to run the simulation with the HM waveform
 
 # how is this simulation called
-simulation_tag = "BGR"
+simulation_tag = "test"
 
 # network specs
 network_names = ["ETS"]
                 #["ETS", "network_0_15km", "network_45_15km"]
 # specs of catalog
-n_events      = 10000
+n_events      = 100
 source_type   = "BBH"
 catalog_name  = "BGR_TIGER_10k.h5"
 pn_orders =  #["0", "0.5", "1"] 
@@ -58,7 +58,7 @@ pn_order_dic = Dict(
 
 ### Read a catalog and create GR deviations
 println("Read catalog and calculate GR-deviations")
-gr_parameter = ReadCatalog(catalog_name)
+gr_parameter = ReadCatalog(catalog_name, folder=path_catalog)
 # pn_deviation = farrEtAl(
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],
@@ -133,6 +133,7 @@ for nn in keys(networks)
         pno_name = "pn_"*pn_order_dic[pno][2]
         println("\nProcessing: "*pno_name)
         
+        folder_name = output_folder_name * "data/" * nn * "/" * pno_name *"/"
         println("Storing results into:")
         println(folder_name)
         mkpath(folder_name)

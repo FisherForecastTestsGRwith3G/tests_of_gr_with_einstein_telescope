@@ -7,7 +7,7 @@ function whoIsThere(PhD)
     if PhD == "Andrea"
         println("Andrea is here")
         # my paths are
-        path_catalog = "../gwbeast/catalogs"
+        path_catalog = "../gwbeast/catalogs/"
         path_output = "../gwbeast/"
     elseif PhD == "Matteo"
         println("Matteo is here")
