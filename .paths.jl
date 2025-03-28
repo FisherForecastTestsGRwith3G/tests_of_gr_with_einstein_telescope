@@ -12,7 +12,8 @@ function whoIsThere(PhD)
     elseif PhD == "Matteo"
         println("Matteo is here")
         # my paths are
-
+        path_catalog = "catalogs/"
+        path_output = "output"
     elseif PhD == "Joachim"
         println("Joachim is here")
         # my paths are
