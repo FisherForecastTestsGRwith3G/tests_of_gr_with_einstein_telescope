@@ -13,10 +13,11 @@ simulation_tag = "test"
 
 # network specs
 network_names = ["ETS"]
-
+                #["ETS", "network_0_15km", "network_45_15km"]
+                
 # specify the pn-orders we want to analze
-pn_orders =  ["0", "0.5", "1"] 
-           # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders =  #["0", "0.5", "1"] 
+            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
 # snr threshold
 snr_thresh = 12.
@@ -25,7 +26,7 @@ snr_thresh = 12.
 figure_dir = "output/"*simulation_tag*"/plots/"
 
 ### Restrict_catalog 
-n_events = 1000  # number of events from the catalog used     
+n_events = 10000  # number of events from the catalog used     
 
 # ^^^^^^^^
 # ||||||||
@@ -138,7 +139,7 @@ for nn in network_names
         l = @layout [ jeff{1.0w, 0.5h} ; hubert{1.0w, 0.5h}]
      
         snr_fish_plot = plot(pfis, psnr, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/snr_error_catalog_" * pno_name * ".png"
+        fig_file_name = figure_dir * nn * "/catalog_summary/snr_error_catalog_" * pno_name * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(snr_fish_plot, fig_file_name)
 
@@ -198,7 +199,7 @@ for nn in network_names
 
         l = @layout [ jeff{0.6w, 0.6h} heisenberg{0.4w, 0.6h} ; dirac{0.6w, 0.4h} david{0.4w, 0.4h}]
         datasum_plot = plot(psum, phist_1, phist_2, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/param_summary_" * pno_name * ".png"
+        fig_file_name = figure_dir * nn * "/catalog_summary/param_summary_" * pno_name * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(datasum_plot, fig_file_name)
     end 

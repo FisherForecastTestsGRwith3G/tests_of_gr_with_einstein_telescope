@@ -36,7 +36,7 @@ path_catalog, path_output = whoIsThere(PhD)
 figure_dir = "output/"*simulation_tag*"/plots/"
 
 ### plot specifiers
-n_events = 10   # number of events from the catalog used 
+n_events = 10000   # number of events from the catalog used 
 
 # quick and dirty limit option
 n_points = 1000 # Determines gridpoints for visualizing the distribution
