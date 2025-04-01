@@ -5,6 +5,7 @@ using Trapz
 using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
+using Turing
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -18,38 +19,38 @@ include("_setup_MCMC.jl")
 # vvvvvvvv
 
 # specify where the data is stored
-simulation_tag = "BGR"
+simulation_tag = "test"
 
 # network specs
 network_names = ["ETS"]
 
 # specify the pn-orders we want to analze
-pn_orders =  ["0"]#, "0.5", "1"] 
-           # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders = # ["0"], "0.5", "1"] 
+            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
-MCMC = true
+MCMC = false
 chain_file_name = "MCMC_chain.jls"
 
-PhD = "Andrea"
+PhD = "Joachim"
 path_catalog, path_output = whoIsThere(PhD)
 # specify where to save the plots
 figure_dir = "output/"*simulation_tag*"/plots/"
 
 ### plot specifiers
-n_events = 10000   # number of events from the catalog used 
+n_events = 30   # number of events from the catalog used 
 
 # quick and dirty limit option
 n_points = 1000 # Determines gridpoints for visualizing the distribution
                 # Higher value improves estimate of evidence and percentiles
                 # but also increases computing time.
-k_spread = 20   # multipies the estimated spread of the distribution
+k_spread = 30   # multipies the estimated spread of the distribution
                 # for automatic setting of the plotting limits. 
                 # If limits dont make sense, increase this value as 
                 # a first quick fix.
 
 # set limits manually
 mu_lims_dict = Dict(
-    "-1"       => nothing,  #<- if set to nothing, limit will be
+    "-1"       => (-0.0001,0.0001),  #<- if set to nothing, limit will be
     "0"        => nothing,  # tried to be infered outmatically
     "0.5"      => nothing,  # Unsing k_spread variable
     "1"        => nothing,  # Alternatively, the limits can 
@@ -76,16 +77,16 @@ sig_lims_dict = Dict(
 
 # injected values
 val_injected_dict = Dict(
-    "-1"       => nothing,  #<- plots lines for injected values
+    "-1"       => (0,0),  #<- plots lines for injected values
     "0"        => (0,0)  ,  # if set to noting, no lines are plotted
-    "0.5"      => nothing,  # Otherwise, specify as tuple i.e.
-    "1"        => nothing,  # (mu_injected, sig_injected)  
-    "1.5"      => nothing,
-    "2"        => nothing,
-    "log(2.5)" => nothing,
-    "3"        => nothing,
-    "log(3.)"  => nothing,
-    "3.5"      => nothing
+    "0.5"      => (0,0),  # Otherwise, specify as tuple i.e.
+    "1"        => (0,0),  # (mu_injected, sig_injected)  
+    "1.5"      => (0,0),
+    "2"        => (0,0),
+    "log(2.5)" => (0,0),
+    "3"        => (0,0),
+    "log(3.)"  => (0,0),
+    "3.5"      => (0,0)
     )             
 
 # ^^^^^^^^
@@ -122,7 +123,7 @@ for nn in network_names
 end
 
 # process all the plots
- for nn in network_names
+for nn in network_names
 
     for pno in pn_orders
 

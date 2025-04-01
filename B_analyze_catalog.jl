@@ -3,10 +3,15 @@ using Plots
 import Contour
 using Trapz
 
+include(".paths.jl")
+
 ################################################################################
 ## Specify simulation specs in this part of the script
 # ||||||||
 # vvvvvvvv
+
+PhD = "Joachim"
+path_catalog, path_output = whoIsThere(PhD)
 
 # specify where the data is stored
 simulation_tag = "test"
@@ -23,10 +28,10 @@ pn_orders =  #["0", "0.5", "1"]
 snr_thresh = 12.
 
 # secify where to save the plots
-figure_dir = "output/"*simulation_tag*"/plots/"
+figure_dir = path_output*"output/"*simulation_tag*"/plots/"
 
 ### Restrict_catalog 
-n_events = 10000  # number of events from the catalog used     
+n_events = 20  # number of events from the catalog used     
 
 # ^^^^^^^^
 # ||||||||
