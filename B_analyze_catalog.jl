@@ -121,7 +121,7 @@ for nn in network_names
         l = @layout [ jeff{1.0w, 0.5h} ; hubert{1.0w, 0.5h}]
      
         snr_fish_plot = plot(pfis, psnr, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/snr_error_catalog_" * pno_name * ".png"
+        fig_file_name = figure_dir * nn * "/catalog_summary/snr_error_catalog_" * pno_name * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(snr_fish_plot, fig_file_name)
 
@@ -181,7 +181,7 @@ for nn in network_names
 
         l = @layout [ jeff{0.6w, 0.6h} heisenberg{0.4w, 0.6h} ; dirac{0.6w, 0.4h} david{0.4w, 0.4h}]
         datasum_plot = plot(psum, phist_1, phist_2, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/param_summary_" * pno_name * ".png"
+        fig_file_name = figure_dir * nn * "/catalog_summary/param_summary_" * pno_name * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(datasum_plot, fig_file_name)
     end 

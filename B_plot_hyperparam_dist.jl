@@ -31,13 +31,13 @@ pn_orders =  ["0"]
 output_folder_name = output_folder_name*"data/"
 
 ### plot specifiers
-n_events = 15   # number of events from the catalog used 
+n_events = 30   # number of events from the catalog used 
 
 # quick and dirty limit option
-n_points = 2000 # Determines gridpoints for visualizing the distribution
+n_points = 1000 # Determines gridpoints for visualizing the distribution
                 # Higher value improves estimate of evidence and percentiles
                 # but also increases computing time.
-k_spread = 20   # multipies the estimated spread of the distribution
+k_spread = 30   # multipies the estimated spread of the distribution
                 # for automatic setting of the plotting limits. 
                 # If limits dont make sense, increase this value as 
                 # a first quick fix.
