@@ -1,6 +1,5 @@
 using HDF5
 using Plots
-import Contour
 using Trapz
 using LaTeXStrings
 using KernelDensity, Statistics
@@ -46,10 +45,10 @@ k_spread = 20   # multipies the estimated spread of the distribution
 # set limits manually
 mu_lims_dict = Dict(
     "-1"       => nothing,  #<- if set to nothing, limit will be
-    "0"        => nothing,  # tried to be infered outmatically
-    "0.5"      => nothing,  # Unsing k_spread variable
-    "1"        => nothing,  # Alternatively, the limits can 
-    "1.5"      => nothing,  # be specifeid as tuples i.e.
+    "0"        => (-0.05, 0.05),  # tried to be infered outmatically
+    "0.5"      => (-0.05, 0.05),  # Unsing k_spread variable
+    "1"        => (-0.05, 0.05),  # Alternatively, the limits can 
+    "1.5"      => (-0.05, 0.05),  # be specifeid as tuples i.e.
     "2"        => nothing,  # (mu_lim_low, mu_lim_up)
     "log(2.5)" => nothing,
     "3"        => nothing,
@@ -59,10 +58,10 @@ mu_lims_dict = Dict(
 
 sig_lims_dict = Dict(
     "-1"       => nothing,
-    "0"        => nothing,
-    "0.5"      => nothing,
-    "1"        => nothing,
-    "1.5"      => nothing,
+    "0"        => (0.0, 0.1),
+    "0.5"      => (0.0, 0.1),
+    "1"        => (0.0, 0.1),
+    "1.5"      => (0.0, 0.1),
     "2"        => nothing,
     "log(2.5)" => nothing,
     "3"        => nothing,
@@ -72,16 +71,16 @@ sig_lims_dict = Dict(
 
 # injected values
 val_injected_dict = Dict(
-    "-1"       => nothing,  #<- plots lines for injected values
-    "0"        => (0,0)  ,  # if set to noting, no lines are plotted
-    "0.5"      => nothing,  # Otherwise, specify as tuple i.e.
-    "1"        => nothing,  # (mu_injected, sig_injected)  
-    "1.5"      => nothing,
-    "2"        => nothing,
-    "log(2.5)" => nothing,
-    "3"        => nothing,
-    "log(3.)"  => nothing,
-    "3.5"      => nothing
+    "-1"       => (0.,0.0025),  #<- plots lines for injected values
+    "0"        => (0.,0.0025),  # if set to noting, no lines are plotted
+    "0.5"      => (0.,0.0025),  # Otherwise, specify as tuple i.e.
+    "1"        => (0.,0.0025),  # (mu_injected, sig_injected)  
+    "1.5"      => (0.,0.0025),
+    "2"        => (0.,0.0025),
+    "log(2.5)" => (0.,0.0025),
+    "3"        => (0.,0.0025),
+    "log(3.)"  => (0.,0.0025),
+    "3.5"      => (0.,0.0025)
     )             
 
 # ^^^^^^^^
@@ -162,7 +161,7 @@ end
         # run the MCMC
         if MCMC
             println("Running MCMC")
-            chain = run_MCMC(dphi0_k, delta_k, center_mu, center_sig, MCMC_chain_points)
+            chain = run_MCMC(dphi0_k, delta_k, mu_limit, sig_limit[2])
             println("MCMC finished")
         end
         
@@ -179,15 +178,21 @@ end
 
         if MCMC
             chain_mu_sigma = [chain[:mu].data, chain[:sigma].data]
-            println(chain_mu_sigma[1][1:10])
-            println(chain_mu_sigma[2][1:10])
-            plot_ = plot_2d_contour(chain_mu_sigma[1], chain_mu_sigma[2], center_mu, center_sig)
+            plot_ = plot2DContourKDE(chain_mu_sigma[1], chain_mu_sigma[2], val_injected_dict[pno])
             fig_file_name_MCMC = figure_dir * nn * "/hyperdist_plot_pn_MCMC" * pn_order_dic[pno][2] * ".pdf"
             println("\nSaving MCMC plot in: $(fig_file_name_MCMC)")
             savefig(plot_, fig_file_name_MCMC)
 
             # save the chain
             serialize( folder * chain_file_name, chain)
+
+            # produce a plot of the contour on top of the distribution
+
+            plot_on_top = plot2DContourKDE!(splot, chain_mu_sigma[1], chain_mu_sigma[2], val_injected_dict[pno])
+            fig_file_name_MCMC_on_top = figure_dir * nn * "/hyperdist_plot_pn_MCMC_on_top" * pn_order_dic[pno][2] * ".pdf"
+            println("\nSaving MCMC on top plot in: $(fig_file_name_MCMC)")
+            savefig(plot_on_top, fig_file_name_MCMC_on_top)
+
         end
 
     end

@@ -25,6 +25,10 @@ include("_simulation_settings.jl")
 # HM = false
 
 
+# specify GR deviations
+mu = 0.0
+sigma = 0.0025
+
 # ^^^^^^^^
 # ||||||||
 ## Specify simulation specs in this part of the script
@@ -58,7 +62,9 @@ pn_deviation = deltaPnNormal(
     gr_parameter[8][1:n_events],
     gr_parameter[9][1:n_events],
     gr_parameter[10][1:n_events],
-    gr_parameter[11][1:n_events]
+    gr_parameter[11][1:n_events],
+    mu=mu*ones(n_events),
+    sigma = sigma*ones(n_events)
     )
 
 gr_deviation_dict = Dict(
