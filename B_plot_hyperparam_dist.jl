@@ -5,6 +5,7 @@ using Trapz
 using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
+using Turing
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -17,29 +18,24 @@ include("_setup_MCMC.jl")
 # ||||||||
 # vvvvvvvv
 
-# specify where the data is stored
-simulation_tag = "BGR"
+include("_simulation_settings.jl")
 
-# network specs
-network_names = ["ETS"]
+# Below here you may ovveride the simulation settings specified in the _simulation_settings.jl file
+# Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
 
 # specify the pn-orders we want to analze
-pn_orders =  ["0"]#, "0.5", "1"] 
+pn_orders =  ["0"]
            # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
-MCMC = true
-chain_file_name = "MCMC_chain.jls"
+#MCMC = true
 
-PhD = "Andrea"
-path_catalog, path_output = whoIsThere(PhD)
-# specify where to save the plots
-figure_dir = "output/"*simulation_tag*"/plots/"
+output_folder_name = output_folder_name*"data/"
 
 ### plot specifiers
-n_events = 10   # number of events from the catalog used 
+n_events = 15   # number of events from the catalog used 
 
 # quick and dirty limit option
-n_points = 1000 # Determines gridpoints for visualizing the distribution
+n_points = 2000 # Determines gridpoints for visualizing the distribution
                 # Higher value improves estimate of evidence and percentiles
                 # but also increases computing time.
 k_spread = 20   # multipies the estimated spread of the distribution
@@ -93,20 +89,6 @@ val_injected_dict = Dict(
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = path_output*"output/"*simulation_tag*"/data/"
-
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
 
 # get global index
 global_index_fisher = Dict()
@@ -169,7 +151,7 @@ end
         # calculate the ranges 
         mu_values = collect(LinRange(mu_limit[1], mu_limit[2], n_points))
         sig_values = collect(LinRange(sig_limit[1], sig_limit[2], n_points))
-        p_mu_sig, p_sig, p_mu, n_tot, nn_marg = OldHyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
+        p_mu_sig, p_sig, p_mu, n_tot, nn_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
                                                 # TODO: right now, using the old version of this distribution
                                                 # The new version has some issue I could not fix yet. 
                                                 # Maybe someone may try reimplement this function ?
@@ -180,11 +162,12 @@ end
         # run the MCMC
         if MCMC
             println("Running MCMC")
-            chain = run_MCMC(dphi0_k, delta_k, center_mu, center_sig)
+            chain = run_MCMC(dphi0_k, delta_k, center_mu, center_sig, MCMC_chain_points)
             println("MCMC finished")
         end
         
         # create the plot
+        println("Injected values: ", val_injected_dict[pno])
         title_str = "PN = $(pno)"
         splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=val_injected_dict[pno], title = title_str)
         
@@ -193,6 +176,7 @@ end
         fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(splot, fig_file_name)
+
         if MCMC
             chain_mu_sigma = [chain[:mu].data, chain[:sigma].data]
             println(chain_mu_sigma[1][1:10])

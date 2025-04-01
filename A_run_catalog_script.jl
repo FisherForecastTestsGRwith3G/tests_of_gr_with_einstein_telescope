@@ -8,57 +8,44 @@ using GW
 # include required scripts 
 include("_setup_networks.jl")
 include("_setup_gr_deviations.jl")
-include(".paths.jl")
 
 ################################################################################
 ## Specify simulation specs in this part of the script
 # ||||||||
 # vvvvvvvv
 
-PhD = "Andrea"
-path_catalog, path_output = whoIsThere(PhD)
-needToRun = true # set to true if you want to run the simulation
-HM = false # set to true if you want to run the simulation with the HM waveform
+include("_simulation_settings.jl")
 
-# how is this simulation called
-simulation_tag = "test"
+# Below here you may ovveride the simulation settings specified in the _simulation_settings.jl file
+# Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
 
-# network specs
-network_names = ["ETS"]
-                #["ETS", "network_0_15km", "network_45_15km"]
-# specs of catalog
-n_events      = 100
-source_type   = "BBH"
-catalog_name  = "BGR_TIGER_10k.h5"
-pn_orders =  #["0", "0.5", "1"] 
-            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+# e.g.:
+# needToCreateCatalog = true
+# needToRun = true
+# HM = false
 
-# snr threshold
-snr_thresh = 12.
 
 # ^^^^^^^^
 # ||||||||
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = path_output*"output/"*simulation_tag*"/"
 
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
+### Read or generate a catalog and create GR deviations
+if(needToCreateCatalog)
+    println("Creating catalog")
+    # create a catalog
+    @time GenerateCatalog(
+        n_events, 
+        source_type, 
+        name_catalog=catalog_name
+    )
+end
 
-### Read a catalog and create GR deviations
 println("Read catalog and calculate GR-deviations")
 gr_parameter = ReadCatalog(catalog_name, folder=path_catalog)
+
+
 # pn_deviation = farrEtAl(
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],
@@ -94,6 +81,7 @@ for nn in network_names
     networks[nn] = getNetwork(nn)
     println(nn)
 end
+println("Finished collecting networks.\n")
 
 ### Get done the calculations ###
 file_name = output_folder_name*"catalog_w_deviations.h5"
@@ -134,7 +122,7 @@ for nn in keys(networks)
         println("\nProcessing: "*pno_name)
         
         folder_name = output_folder_name * "data/" * nn * "/" * pno_name *"/"
-        println("Storing results into:")
+        println("\nStoring results into:")
         println(folder_name)
         mkpath(folder_name)
 
@@ -184,7 +172,24 @@ for nn in keys(networks)
                 useEarthMotion=true
             )
         else
-            fisher_matrices, snrs = _read_Fishers_SNRs(output_path*"Fishers_SNRs.h5", SNR=true)
+            
+            
+            println("\nSkipping the simulation since data should already exist")
+            println("Loading the results from outputfolder: ")
+            print(folder_name)
+            print()
+
+            # read fisher matrices (which are already stored)
+            filename = folder_name * "fishers.h5"
+            fisher_matrices = h5open(filename, "r") do file
+                fisher_matrices = read(file, "matrices")  
+            end
+    
+            # read snrs (which are already stored)
+            filename = folder_name * "snrs.h5"
+            snrs = h5open(filename, "r") do file
+                snrs = read(file, "values")  
+            end
         end
 
         ### postprocessing #########################################################
