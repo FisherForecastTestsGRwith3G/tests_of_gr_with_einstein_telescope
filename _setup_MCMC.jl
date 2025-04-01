@@ -1,4 +1,4 @@
-using LinearAlgebra
+#using LinearAlgebra
 
 function run_MCMC(parameters, errors, true_mu, true_sigma, chain_points)
 
