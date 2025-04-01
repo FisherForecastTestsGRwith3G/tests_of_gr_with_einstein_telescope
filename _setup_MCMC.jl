@@ -1,5 +1,3 @@
-using Turing
-
 function run_MCMC(parameters, errors, true_mu, true_sigma)
 
     println("mu = ", true_mu, " sigma = ", true_sigma)
@@ -15,7 +13,7 @@ function run_MCMC(parameters, errors, true_mu, true_sigma)
     # Bayesian model
     @model function normal_model(measurements, measurement_errors)
         # Priors
-        mu ~ Normal(0, 10*true_mu)  
+        mu ~ Normal(0, 10*true_sigma)  
         sigma ~ truncated(Normal(0, 5), 0, Inf)  # Positive sigma
         
         # Likelihood
@@ -64,11 +62,18 @@ function plot_2d_contour(x, y, true_mu, true_sigma)
     # Find the contour levels corresponding to 1σ, 2σ, and 3σ
     sorted_Z = sort(Z[:], rev=true)
     cumsum_Z = cumsum(sorted_Z) / sum(sorted_Z)  # Cumulative sum to get percentiles
+    println(cumsum_Z)
     #levels = [0.682, 0.954, 0.997]  # 1σ, 2σ, 3σ intervals
     levels = [0.39, 0.86, 0.99]
 
     # Find density values corresponding to these probability levels
-    sigma_levels = [sorted_Z[findfirst(cumsum_Z .>= level)] for level in levels]
+    sigma_levels = []
+    for level in levels
+        logical_index = findfirst(cumsum_Z .>= level)
+        print("index = $(logical_index)")
+        append!(sigma_levels, [sorted_Z[logical_index]])
+    end
+    println(sigma_levels)
 
     # Plot contour
     contour!(MCMC_plot, X, Y, Z', levels=sigma_levels, color=:viridis, linewidth=2, label="σ levels")

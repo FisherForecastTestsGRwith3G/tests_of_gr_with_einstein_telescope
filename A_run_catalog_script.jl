@@ -15,9 +15,9 @@ include(".paths.jl")
 # ||||||||
 # vvvvvvvv
 
-PhD = "Andrea"
+PhD = "Joachim"
 path_catalog, path_output = whoIsThere(PhD)
-needToRun = true # set to true if you want to run the simulation
+needToRun = false # set to true if you want to run the simulation
 HM = false # set to true if you want to run the simulation with the HM waveform
 
 # how is this simulation called
@@ -27,7 +27,7 @@ simulation_tag = "test"
 network_names = ["ETS"]
                 #["ETS", "network_0_15km", "network_45_15km"]
 # specs of catalog
-n_events      = 100
+n_events      = 1000
 source_type   = "BBH"
 catalog_name  = "BGR_TIGER_10k.h5"
 pn_orders =  #["0", "0.5", "1"] 
@@ -131,10 +131,11 @@ for nn in keys(networks)
     for pno in pn_orders
         
         pno_name = "pn_"*pn_order_dic[pno][2]
+        println("\n"*"#"^81)
         println("\nProcessing: "*pno_name)
         
         folder_name = output_folder_name * "data/" * nn * "/" * pno_name *"/"
-        println("Storing results into:")
+        println("\nStoring results into:")
         println(folder_name)
         mkpath(folder_name)
 
@@ -183,8 +184,26 @@ for nn in keys(networks)
                 return_SNR=true, 
                 useEarthMotion=true
             )
-        else
-            fisher_matrices, snrs = _read_Fishers_SNRs(output_path*"Fishers_SNRs.h5", SNR=true)
+        else #Load the matrices instead of rerunning the analysis
+
+            
+            println("\nSkipping the simulation since data should already exist")
+            println("Loading the results from outputfolder: ")
+            print(folder_name)
+            print()
+
+            # read fisher matrices (which are already stored)
+            filename = folder_name * "fishers.h5"
+            fisher_matrices = h5open(filename, "r") do file
+                fisher_matrices = read(file, "matrices")  
+            end
+    
+            # read snrs (which are already stored)
+            filename = folder_name * "snrs.h5"
+            snrs = h5open(filename, "r") do file
+                snrs = read(file, "values")  
+            end
+
         end
 
         ### postprocessing #########################################################

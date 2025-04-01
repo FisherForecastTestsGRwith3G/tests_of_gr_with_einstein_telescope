@@ -18,7 +18,7 @@ function whoIsThere(PhD)
         println("Joachim is here")
         # my paths are
         path_catalog = "catalogs/"
-        path_output = "output"
+        path_output = ""
     else
         println("I don't know who you are")
 
