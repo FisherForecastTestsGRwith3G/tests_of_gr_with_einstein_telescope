@@ -171,9 +171,6 @@ for nn in network_names
         mu_values = collect(LinRange(mu_limit[1], mu_limit[2], n_points))
         sig_values = collect(LinRange(sig_limit[1], sig_limit[2], n_points))
         p_mu_sig, p_sig, p_mu, n_tot, nn_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
-                                                # TODO: right now, using the old version of this distribution
-                                                # The new version has some issue I could not fix yet. 
-                                                # Maybe someone may try reimplement this function ?
         
         println("Consistency check for calculated distribution:")
         println("Difference in normalization = $(n_tot-nn_marg)")
