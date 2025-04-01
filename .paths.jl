@@ -13,12 +13,12 @@ function whoIsThere(PhD)
         println("Matteo is here")
         # my paths are
         path_catalog = "catalogs/"
-        path_output = "output"
+        path_output = ""
     elseif PhD == "Joachim"
         println("Joachim is here")
         # my paths are
         path_catalog = "catalogs/"
-        path_output = "output"
+        path_output = ""
     else
         println("I don't know who you are")
 
