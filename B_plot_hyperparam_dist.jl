@@ -189,7 +189,7 @@ for nn in network_names
         # save plot
         mkpath(figure_dir* nn * "/")
         fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
-        println("\nSaving plot in: $(fig_file_name)")
+        println("\nSaving hyperparameter distribution plot in: $(fig_file_name)")
         savefig(splot, fig_file_name)
 
         if MCMC
@@ -204,6 +204,18 @@ for nn in network_names
             # save the chain
             serialize( folder * chain_file_name, chain)
         end
+
+        ### Comparison plot between naive and full distribution 
+        p_mu_naive = naiveMuDistTIGER(mu_values, dphi0_k, delta_k, maximum(p_mu))
+        mu_plot = plot(mu_values, p_mu, color=:blue, linewidth = 2, label = "p(μ|D)")
+        plot!(mu_plot, mu_values, p_mu_naive, color=:green, linewidth = 2, label = "p(μ| σ=0, D)")
+        xlims!(mu_limit)
+        xlabel!(mu_plot, "μ")
+        ylabel!(mu_plot, "p(μ)")
+
+        fig_file_name = figure_dir * nn * "/mudist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
+        println("Saving mu-distribution plot in: $(fig_file_name)")
+        savefig(mu_plot, fig_file_name)
 
     end
 end
