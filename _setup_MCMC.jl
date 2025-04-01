@@ -54,6 +54,13 @@ function plot_2d_contour(x, y, true_mu, true_sigma)
     X = kde_result.x
     Y = kde_result.y
 
+    MCMC_plot=plot(xlabel="\$\\mu\$ ", ylabel="\$\\sigma\$", title="MCMC at \$\\mu=\$$true_mu and \$\\sigma=\$$true_sigma",
+    legend=:topright,  minorticks=9, minorgrid=true, grid=true, minorgridwidth=2.,
+    minorgridalpha=.04, gridwidth=0.5, gridalpha=0.5, cbar=false,
+    labelfontsize=21, size=(800, 600), left_margin = 2mm, bottom_margin = 2mm, right_margin = 2.5mm, top_margin = 2.5mm,
+    framestyle=:box)
+
+    
     # Find the contour levels corresponding to 1σ, 2σ, and 3σ
     sorted_Z = sort(Z[:], rev=true)
     cumsum_Z = cumsum(sorted_Z) / sum(sorted_Z)  # Cumulative sum to get percentiles
@@ -64,12 +71,38 @@ function plot_2d_contour(x, y, true_mu, true_sigma)
     sigma_levels = [sorted_Z[findfirst(cumsum_Z .>= level)] for level in levels]
 
     # Plot contour
-    cc=contour(X, Y, Z', levels=sigma_levels, color=:viridis, linewidth=2, label="σ levels")
+    contour!(MCMC_plot, X, Y, Z', levels=sigma_levels, color=:viridis, linewidth=2, label="σ levels")
     #scatter!(x, y, alpha=0.3, label="Samples")
-    xlabel!(L"\mu")
-    ylabel!(L"\sigma")
-    title!("1σ, 2σ, 3σ Intervals posteriors for μ = $(true_mu) and σ = $(true_sigma)")
-    scatter!([true_mu], [true_sigma], label="True values")
-    plot!(size=(800, 600))
-    return cc
+    scatter!(MCMC_plot, [true_mu], [true_sigma], label="True values")
+    return MCMC_plot
+end
+
+
+
+
+function plot_2d_contour(x, y, true_mu, true_sigma, plot_)
+
+    # Estimate the kernel density
+    xy = [x y]
+    kde_result = kde(xy)
+
+    # Extract the density values
+    Z = kde_result.density
+    X = kde_result.x
+    Y = kde_result.y
+    
+    # Find the contour levels corresponding to 1σ, 2σ, and 3σ
+    sorted_Z = sort(Z[:], rev=true)
+    cumsum_Z = cumsum(sorted_Z) / sum(sorted_Z)  # Cumulative sum to get percentiles
+    #levels = [0.682, 0.954, 0.997]  # 1σ, 2σ, 3σ intervals
+    levels = [0.39, 0.86, 0.99]
+
+    # Find density values corresponding to these probability levels
+    sigma_levels = [sorted_Z[findfirst(cumsum_Z .>= level)] for level in levels]
+
+    # Plot contour
+    contour!(plot_, X, Y, Z', levels=sigma_levels, color=:viridis, linewidth=2, label="σ levels")
+    #scatter!(x, y, alpha=0.3, label="Samples")
+    # scatter!(MCMC_plot, [true_mu], [true_sigma], label="True values")
+    return plot_
 end

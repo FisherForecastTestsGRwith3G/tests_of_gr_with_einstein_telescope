@@ -1,6 +1,6 @@
 using HDF5
 using Plots
-import Contour
+using Contour
 using Trapz
 using LaTeXStrings
 using KernelDensity, Statistics
@@ -204,6 +204,14 @@ end
 
             # save the chain
             serialize( folder * chain_file_name, chain)
+
+            # produce a plot of the contour on top of the distribution
+
+            plot_on_top = plot_2d_contour(chain_mu_sigma[1], chain_mu_sigma[2], center_mu, center_sig, splot)
+            fig_file_name_MCMC_on_top = figure_dir * nn * "/hyperdist_plot_pn_MCMC_on_top" * pn_order_dic[pno][2] * ".pdf"
+            println("\nSaving MCMC on top plot in: $(fig_file_name_MCMC)")
+            savefig(plot_on_top, fig_file_name_MCMC_on_top)
+
         end
 
     end
