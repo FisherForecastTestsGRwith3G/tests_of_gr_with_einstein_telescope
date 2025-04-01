@@ -48,7 +48,7 @@ function hyperparamDistTIGER(mu::Vector{Float64}, sigma::Vector{Float64}, dphi0_
         
         else
 
-            throw(ValueError(sig, "Agument `sigma` must be greater than 0!"))
+            throw(ArgumentError("Argument 'sigma' must contain only positive values!"))
         end
 
     end

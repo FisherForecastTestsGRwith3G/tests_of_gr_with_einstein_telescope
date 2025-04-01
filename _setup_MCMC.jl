@@ -65,7 +65,7 @@ function plot_2d_contour(x, y, true_mu, true_sigma)
     # Find the contour levels corresponding to 1σ, 2σ, and 3σ
     sorted_Z = sort(Z[:], rev=true)
     cumsum_Z = cumsum(sorted_Z) / sum(sorted_Z)  # Cumulative sum to get percentiles
-    println(cumsum_Z)
+    #println(cumsum_Z)
 
     #levels = [0.682, 0.954, 0.997]  # 1σ, 2σ, 3σ intervals
     levels = [0.39, 0.86, 0.99]
