@@ -17,24 +17,29 @@ include(".paths.jl")
 
 PhD = "Joachim"
 path_catalog, path_output = whoIsThere(PhD)
-needToRun = false # set to true if you want to run the simulation
+needToRun = true # set to true if you want to run the simulation
 HM = false # set to true if you want to run the simulation with the HM waveform
 
 # how is this simulation called
-simulation_tag = "test"
+simulation_tag = "test_mcmc"
 
 # network specs
 network_names = ["ETS"]
                 #["ETS", "network_0_15km", "network_45_15km"]
+
 # specs of catalog
-n_events      = 1000
+n_events      = 100
 source_type   = "BBH"
 catalog_name  = "BGR_TIGER_10k.h5"
-pn_orders =  #["0", "0.5", "1"] 
-            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders = ["0", "0.5", "1", "1.5"] 
+            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
 # snr threshold
 snr_thresh = 12.
+
+# specify GR deviations
+mu = 0.0
+sigma = 0.0025
 
 # ^^^^^^^^
 # ||||||||
@@ -71,7 +76,9 @@ pn_deviation = deltaPnNormal(
     gr_parameter[8][1:n_events],
     gr_parameter[9][1:n_events],
     gr_parameter[10][1:n_events],
-    gr_parameter[11][1:n_events]
+    gr_parameter[11][1:n_events],
+    mu=mu*ones(n_events),
+    sigma = sigma*ones(n_events)
     )
 
 gr_deviation_dict = Dict(

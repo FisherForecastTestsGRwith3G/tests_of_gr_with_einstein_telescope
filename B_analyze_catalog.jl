@@ -14,15 +14,15 @@ PhD = "Joachim"
 path_catalog, path_output = whoIsThere(PhD)
 
 # specify where the data is stored
-simulation_tag = "test"
+simulation_tag = "test_mcmc"
 
 # network specs
 network_names = ["ETS"]
                 #["ETS", "network_0_15km", "network_45_15km"]
                 
 # specify the pn-orders we want to analze
-pn_orders =  #["0", "0.5", "1"] 
-            ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders = ["0", "0.5", "1", "1.5"] 
+            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
 # snr threshold
 snr_thresh = 12.
@@ -31,7 +31,7 @@ snr_thresh = 12.
 figure_dir = path_output*"output/"*simulation_tag*"/plots/"
 
 ### Restrict_catalog 
-n_events = 20  # number of events from the catalog used     
+n_events = 100  # number of events from the catalog used     
 
 # ^^^^^^^^
 # ||||||||
