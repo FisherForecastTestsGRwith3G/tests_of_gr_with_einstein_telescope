@@ -170,7 +170,7 @@ for nn in network_names
         # calculate the ranges 
         mu_values = collect(LinRange(mu_limit[1], mu_limit[2], n_points))
         sig_values = collect(LinRange(sig_limit[1], sig_limit[2], n_points))
-        p_mu_sig, p_sig, p_mu, n_tot, nn_marg = OldHyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
+        p_mu_sig, p_sig, p_mu, n_tot, nn_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
                                                 # TODO: right now, using the old version of this distribution
                                                 # The new version has some issue I could not fix yet. 
                                                 # Maybe someone may try reimplement this function ?
@@ -194,6 +194,7 @@ for nn in network_names
         fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(splot, fig_file_name)
+
         if MCMC
             chain_mu_sigma = [chain[:mu].data, chain[:sigma].data]
             println(chain_mu_sigma[1][1:10])
