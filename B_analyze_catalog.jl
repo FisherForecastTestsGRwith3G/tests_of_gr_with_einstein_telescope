@@ -20,7 +20,7 @@ include("_simulation_settings.jl")
 
 
 ### Restrict_catalog 
-n_events = 10000  # number of events from the catalog used     
+#n_events = 10000  # number of events from the catalog used     
 
 output_folder_name = output_folder_name*"data/"
 
