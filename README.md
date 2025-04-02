@@ -12,7 +12,8 @@ There is two conventions for scripts
 
 **A_run_catalog_script** <br>
 Reads a catalog, creates GR deviations, saves the catalog + GR deviations, evaluates the fisher matrices,
-analysis the invertability and snr, stores everything. The script takes two arguments
+analysis the invertability and snr, stores everything. 
+The script is called with two arguments.
 
 `julia A_run_catalog_script.jl <NeedToRun> <config_file_name>`
 
@@ -21,14 +22,22 @@ Here:
 * `config_file_name` is the name of the config file to be used
 
 **B_analyze_catalog.jl** <br>
-Visualizes the data in the catalog. The script takes one argument 
+Visualizes the data in the catalog. 
+The script is called with one argument
 
 `julia B_analyze_catalog.jl <config_file_name>`
 
 **B_plot_hyperparam_dist.jl** <br> 
-Visualizes the hyperparameter distribution. The script is called with one argument
+Visualizes the hyperparameter distribution. 
+The script is called with one argument.
 
 `julia B_plot_hyperparam_dist.jl <config_file_name>`
+
+**B_check_selection_bias.jl** <br> 
+Visualizes biases introduced by the selection criteria due to the invertibility of the fisher. 
+The script is called with one argument.
+
+`julia B_check_selection_bias.jl <config_file_name>`
 
 ### How to use config files
 
