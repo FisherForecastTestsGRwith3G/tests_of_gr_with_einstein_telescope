@@ -9,7 +9,6 @@ using Turing
 # include required scripts 
 include("_hierarchical_dist.jl")
 include("_hierarchical_plotting_utils.jl")
-include(".paths.jl")
 include("_setup_MCMC.jl")
 include("_parse_config.jl")
 
