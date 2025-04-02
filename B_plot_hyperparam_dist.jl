@@ -11,90 +11,30 @@ include("_hierarchical_dist.jl")
 include("_hierarchical_plotting_utils.jl")
 include(".paths.jl")
 include("_setup_MCMC.jl")
+include("_parse_config.jl")
 
-################################################################################
-## Specify simulation specs in this part of the script
-# ||||||||
-# vvvvvvvv
+# obtain config file from input
+user_configs = getUserConfigs()
+config_file_name = "config_files/"*user_configs["default_config"]
+if length(ARGS) > 0
+    config_file_name = ARGS[1]
+else
+    println("No config file handed, using default!")
+end
+println("Using config file: $(config_file_name)\n")
 
-include("_simulation_settings.jl")
+configs, simulation_tag = readConfigForB(config_file_name)
 
-# Below here you may ovveride the simulation settings specified in the _simulation_settings.jl file
-# Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
-
-# specify the pn-orders we want to analze
-pn_orders = #["-1"]
-           ["0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
-
-#MCMC = true
-
-output_folder_name = output_folder_name*"data/"
-
-### plot specifiers
-n_events = 30   # number of events from the catalog used 
-
-# quick and dirty limit option
-n_points = 1000 # Determines gridpoints for visualizing the distribution
-                # Higher value improves estimate of evidence and percentiles
-                # but also increases computing time.
-k_spread = 20   # multipies the estimated spread of the distribution
-                # for automatic setting of the plotting limits. 
-                # If limits dont make sense, increase this value as 
-                # a first quick fix.
-
-# set limits manually
-mu_lims_dict = Dict(
-    "-1"       => nothing,  #<- if set to nothing, limit will be
-    "0"        => (-0.05, 0.05),  # tried to be infered outmatically
-    "0.5"      => (-0.05, 0.05),  # Unsing k_spread variable
-    "1"        => (-0.05, 0.05),  # Alternatively, the limits can 
-    "1.5"      => (-0.05, 0.05),  # be specifeid as tuples i.e.
-    "2"        => nothing,  # (mu_lim_low, mu_lim_up)
-    "log(2.5)" => nothing,
-    "3"        => nothing,
-    "log(3.)"  => nothing,
-    "3.5"      => nothing
-    )   
-
-sig_lims_dict = Dict(
-    "-1"       => nothing,
-    "0"        => (0.0, 0.1),
-    "0.5"      => (0.0, 0.1),
-    "1"        => (0.0, 0.1),
-    "1.5"      => (0.0, 0.1),
-    "2"        => nothing,
-    "log(2.5)" => nothing,
-    "3"        => nothing,
-    "log(3.)"  => nothing,
-    "3.5"      => nothing
-    );
-
-# injected values
-val_injected_dict = Dict(
-    "-1"       => (0.,0.0025),  #<- plots lines for injected values
-    "0"        => (0.,0.0025),  # if set to noting, no lines are plotted
-    "0.5"      => (0.,0.0025),  # Otherwise, specify as tuple i.e.
-    "1"        => (0.,0.0025),  # (mu_injected, sig_injected)  
-    "1.5"      => (0.,0.0025),
-    "2"        => (0.,0.0025),
-    "log(2.5)" => (0.,0.0025),
-    "3"        => (0.,0.0025),
-    "log(3.)"  => (0.,0.0025),
-    "3.5"      => (0.,0.0025)
-    )             
-
-# ^^^^^^^^
-# ||||||||
-## Specify simulation specs in this part of the script
-################################################################################
-
+# set up folder names
+data_folder_name = user_configs["path_output"]*simulation_tag*"/data/"
+output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
 
 # get global index
 global_index_fisher = Dict()
 global_index_snr = Dict()
 global_index_total = Dict()
-for nn in network_names
-    file_name = output_folder_name * nn *"/global_indices.h5"
+for nn in configs["network_list"]
+    file_name = data_folder_name * nn *"/global_indices.h5"
     h5open(file_name, "r") do gi_file
         global_index_fisher[nn] = read(gi_file, "fisher")  
         global_index_snr[nn] = read(gi_file, "snr")
@@ -103,15 +43,15 @@ for nn in network_names
 end
 
 # process all the plots
- for nn in network_names
+ for nn in configs["network_list"]
 
-    for pno in pn_orders
+    for pno in configs["pn_waveforms"]
 
         println("\n"*"#"^81)
         println("Processing PN = $(pno)\n")
         
         # load the data
-        folder = output_folder_name * nn * "/pn_" * pn_order_dic[pno][2]
+        folder = data_folder_name * nn * "/pn_" * pn_order_dic[pno][2]
         filename = folder * "/single_event_measurements.h5"
         data = Dict()
         h5open(filename, "r") do file
@@ -121,10 +61,12 @@ end
         end
 
         # extract only valid data-points via global index
-        n_events_used = n_events
-        if n_events > sum(global_index_total[nn])
+        n_events_used = configs["n_events"]
+        if n_events_used > sum(global_index_total[nn])
             println("Warning: There are at most $(sum(global_index_total[nn]))-datapoints available")
             n_events_used = sum(global_index_total[nn])
+        else
+            println("Events used: $(n_events_used)")
         end
         dphi0_k = data["dphi0_k"][global_index_total[nn]]
         dphi0_k = dphi0_k[1:n_events_used] 
@@ -137,56 +79,59 @@ end
         center_sig = max(0, sqrt.(sum(center_mu .- dphi0_k).^2 ./  n_events_used))
         spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
 
+        k_spread = configs["k_spread"]
         mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
-        if !isnothing(mu_lims_dict[pno]) # overwrite mu_lims
-            mu_limit = (mu_lims_dict[pno][1], mu_lims_dict[pno][2])
+        if !isnothing(configs["mu_lims"][pno]) # overwrite mu_lims
+            mu_limit = (configs["mu_lims"][pno][1], configs["mu_lims"][pno][2])
         end 
          
         sig_limit = (max(0, center_sig - k_spread*spread), center_sig + k_spread*spread)
-        if !isnothing(sig_lims_dict[pno]) # overwrite sig_lims
-            sig_limit = (sig_lims_dict[pno][1], sig_lims_dict[pno][2])
+        if !isnothing(configs["sigma_lims"][pno]) # overwrite sig_lims
+            sig_limit = (configs["sigma_lims"][pno][1], configs["sigma_lims"][pno][2])
         end 
 
         # calculate the ranges 
-        mu_values = collect(LinRange(mu_limit[1], mu_limit[2], n_points))
-        sig_values = collect(LinRange(sig_limit[1], sig_limit[2], n_points))
+        mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs["n_points"]))
+        sig_values = collect(LinRange(sig_limit[1], sig_limit[2], configs["n_points"]))
         p_mu_sig, p_sig, p_mu, n_tot, nn_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
         
         println("Consistency check for calculated distribution:")
         println("Difference in normalization = $(n_tot-nn_marg)")
         
         # run the MCMC
-        if MCMC
+        if configs["run_mcmc"]
             println("Running MCMC")
-            chain = run_MCMC(dphi0_k, delta_k, mu_limit, sig_limit[2])
+            chain = run_MCMC(dphi0_k, delta_k, mu_limit, sig_limit[2], configs["mcmc_samples"])
             println("MCMC finished")
         end
         
         # create the plot
-        println("Injected values: ", val_injected_dict[pno])
+        println("Injected values: ", configs["injected_values"][pno])
         title_str = "PN = $(pno)"
-        splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=val_injected_dict[pno], title = title_str)
+        splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=configs["injected_values"][pno], title = title_str)
         
         # save plot
-        mkpath(figure_dir* nn * "/")
-        fig_file_name = figure_dir * nn * "/hyperdist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
+        pno_name = "pn_" *pn_order_dic[pno][2]
+        mkpath(output_folder_name* nn * "/"*pno_name)
+        fig_file_name = output_folder_name * nn * "/"*pno_name*"/hyperdist_plot.pdf"
         println("\nSaving hyperparameter distribution plot in: $(fig_file_name)")
         savefig(splot, fig_file_name)
 
-        if MCMC
+        if configs["run_mcmc"]
             chain_mu_sigma = [chain[:mu].data, chain[:sigma].data]
-            plot_ = plot2DContourKDE(chain_mu_sigma[1], chain_mu_sigma[2], val_injected_dict[pno])
-            fig_file_name_MCMC = figure_dir * nn * "/hyperdist_plot_pn_MCMC" * pn_order_dic[pno][2] * ".pdf"
+            plot_ = plot2DContourKDE(chain_mu_sigma[1], chain_mu_sigma[2], configs["injected_values"][pno])
+            fig_file_name_MCMC = output_folder_name * nn * "/"*pno_name*"/hyperdist_plot_pn_MCMC.pdf"
             println("\nSaving MCMC plot in: $(fig_file_name_MCMC)")
             savefig(plot_, fig_file_name_MCMC)
 
             # save the chain
-            serialize( folder * chain_file_name, chain)
+            #TODO: Specify better the chain file name
+            serialize( folder * "mcmc_chain", chain)
 
             # produce a plot of the contour on top of the distribution
 
-            plot_on_top = plot2DContourKDE!(splot, chain_mu_sigma[1], chain_mu_sigma[2], val_injected_dict[pno])
-            fig_file_name_MCMC_on_top = figure_dir * nn * "/hyperdist_plot_pn_MCMC_on_top" * pn_order_dic[pno][2] * ".pdf"
+            plot_on_top = plot2DContourKDE!(splot, chain_mu_sigma[1], chain_mu_sigma[2])
+            fig_file_name_MCMC_on_top = output_folder_name * nn * "/"*pno_name*"/hyperdist_plot_pn_MCMC_on_top.pdf"
             println("\nSaving MCMC on top plot in: $(fig_file_name_MCMC)")
             savefig(plot_on_top, fig_file_name_MCMC_on_top)
 
@@ -200,7 +145,7 @@ end
         xlabel!(mu_plot, "μ")
         ylabel!(mu_plot, "p(μ)")
 
-        fig_file_name = figure_dir * nn * "/mudist_plot_pn" * pn_order_dic[pno][2] * ".pdf"
+        fig_file_name = output_folder_name * nn * "/"*pno_name*"/mudist_plot.pdf"
         println("Saving mu-distribution plot in: $(fig_file_name)")
         savefig(mu_plot, fig_file_name)
 

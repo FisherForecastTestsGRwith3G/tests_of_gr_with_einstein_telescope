@@ -44,9 +44,6 @@ chain_file_name = "MCMC_chain.jls"
 MCMC_chain_points = 2000
 #MCMC_n_chains_multiple_chains = 16
 
-
-
-
 ### Additional shared setup
 
 path_catalog, path_output = whoIsThere(PhD)
