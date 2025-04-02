@@ -1,0 +1,56 @@
+{
+    "header":"test",
+    
+    "global":{
+        "network_list":["ETS"],
+        "catalog_name":"BGR_TIGER_10k.h5",
+        "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
+        "use_hm_waveform":false,
+        "source_type":"BBH", 
+        "snr_thresh":12.0
+        }, 
+    
+    "mcmc_settings":{
+        "run_mcmc":true,
+        "mcmc_samples":2000
+        },
+        
+    "a_specific":{
+        "n_events":1000,
+        "mu":0,
+        "sigma":0
+        },
+    
+    "b_specific":{
+        "pn_waveforms":["0","0.5","1","1.5"],
+        "k_spread":30,
+        "n_points":10000,
+        "n_events":1000,
+    
+        "mu_lims":{
+            "-1"       : [],  
+            "0"        : [],  
+            "0.5"      : [],  
+            "1"        : [],  
+            "1.5"      : [], 
+            "2"        : [], 
+            "log(2.5)" : [],
+            "3"        : [],
+            "log(3.)"  : [],
+            "3.5"      : []
+            },
+        "sigma_lims":{
+            "-1"       : [],  
+            "0"        : [],  
+            "0.5"      : [],  
+            "1"        : [],  
+            "1.5"      : [], 
+            "2"        : [], 
+            "log(2.5)" : [],
+            "3"        : [],
+            "log(3.)"  : [],
+            "3.5"      : []
+            }
+        }
+    }
+    

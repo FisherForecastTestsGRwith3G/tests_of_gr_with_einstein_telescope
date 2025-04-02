@@ -1,0 +1,6 @@
+{
+    "user":"unknown_user",
+    "path_catalog":"catalogs/",
+    "path_output":"output_new/",
+    "default_config":"config_test.json"
+}

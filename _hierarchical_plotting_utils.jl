@@ -93,7 +93,7 @@ function distributionSummaryPlot(
     xlabel!(mu_plot, "μ")
     ylabel!(mu_plot, "p(μ|D)")
 
-    l = @layout [ jeff{0.8w, 0.8h} karl{0.2w, 0.8h} ; hubert{0.8w, 0.2h} gianlu{0.2w, 0.2h}]
+    l = @layout [ jeff{0.7w, 0.8h} karl{0.3w, 0.8h} ; hubert{0.7w, 0.2h} gianlu{0.3w, 0.2h}]
      
     return plot(cplot, sig_plot, mu_plot, layout = l)
 

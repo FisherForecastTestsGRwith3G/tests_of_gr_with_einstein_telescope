@@ -1,5 +1,6 @@
 using Pkg
 using HDF5
+import JSON
 
 parentdir = dirname(pwd())
 Pkg.activate(string(parentdir)*"/GW.jl")
@@ -8,63 +9,51 @@ using GW
 # include required scripts 
 include("_setup_networks.jl")
 include("_setup_gr_deviations.jl")
-include(".paths.jl")
+include("_parse_config.jl")
 
-################################################################################
-## Specify simulation specs in this part of the script
-# ||||||||
-# vvvvvvvv
+# check if we should run the simulation
+needToRun = false
+if length(ARGS) > 0
+    if ARGS[1] == "1"
+        needToRun = true
+        println("The simulation will be run!")
+    elseif ARGS[1] == "0"
+        @warn "There was a first input argument handed. But it was $(ARGS[1]) and not '1' or '0' and thus ignored"
+    end
+end
 
-PhD = "Joachim"
-path_catalog, path_output = whoIsThere(PhD)
-needToRun = true # set to true if you want to run the simulation
-HM = false # set to true if you want to run the simulation with the HM waveform
+# obtain config file from input
+user_configs = getUserConfigs()
+config_file_name = "config_files/"*user_configs["default_config"]
+if length(ARGS) > 1
+    config_file_name = ARGS[2]
+else
+    println("No config file handed, using default!")
+end
+println("Using config file: $(config_file_name)\n")
 
-# how is this simulation called
-simulation_tag = "test_mcmc"
+configs, simulation_tag = readConfigForA(config_file_name)
 
-# network specs
-network_names = ["ETS"]
-                #["ETS", "network_0_15km", "network_45_15km"]
+# create folder paths
+output_folder_name = user_configs["path_output"]*simulation_tag*"/"
 
-# specs of catalog
-n_events      = 100
-source_type   = "BBH"
-catalog_name  = "BGR_TIGER_10k.h5"
-pn_orders = ["0", "0.5", "1", "1.5"] 
-            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+#Read or generate a catalog and create GR deviations
 
-# snr threshold
-snr_thresh = 12.
+#TODO: I dont think we should create a catalog here
+#if(needToCreateCatalog)
+#    println("Creating catalog")
+#    # create a catalog
+#    @time GenerateCatalog(
+#        n_events, 
+#        source_type, 
+#        name_catalog=catalog_name
+#    )
+#end
 
-# specify GR deviations
-mu = 0.0
-sigma = 0.0025
+println("\nRead catalog and calculate GR-deviations")
+gr_parameter = ReadCatalog(configs["catalog_name"], folder=user_configs["path_catalog"])
 
-# ^^^^^^^^
-# ||||||||
-## Specify simulation specs in this part of the script
-################################################################################
-
-output_folder_name = path_output*"output/"*simulation_tag*"/"
-
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
-
-### Read a catalog and create GR deviations
-println("Read catalog and calculate GR-deviations")
-gr_parameter = ReadCatalog(catalog_name, folder=path_catalog)
-# pn_deviation = farrEtAl(
+n_events = configs["n_events"]
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],
     gr_parameter[2][1:n_events],
@@ -77,8 +66,8 @@ pn_deviation = deltaPnNormal(
     gr_parameter[9][1:n_events],
     gr_parameter[10][1:n_events],
     gr_parameter[11][1:n_events],
-    mu=mu*ones(n_events),
-    sigma = sigma*ones(n_events)
+    mu=configs["mu"]*ones(n_events),
+    sigma = configs["sigma"]*ones(n_events)
     )
 
 gr_deviation_dict = Dict(
@@ -97,10 +86,11 @@ gr_deviation_dict = Dict(
 ### Set up networks 
 println("Collecting networks:")
 networks = Dict()
-for nn in network_names
+for nn in configs["network_list"]
     networks[nn] = getNetwork(nn)
     println(nn)
 end
+println("Finished collecting networks.\n")
 
 ### Get done the calculations ###
 file_name = output_folder_name*"catalog_w_deviations.h5"
@@ -108,24 +98,23 @@ file_name = output_folder_name*"catalog_w_deviations.h5"
 println("Writing parameter to $(file_name)")
 mkpath(output_folder_name)
 h5open(file_name, "w") do file
-    gr_param_group = create_group(file, "gr_parameter")
-    write(gr_param_group, "mc", gr_parameter[1][1:n_events])
-    write(gr_param_group, "eta", gr_parameter[2][1:n_events])
-    write(gr_param_group, "chi1", gr_parameter[3][1:n_events])  
-    write(gr_param_group, "chi2", gr_parameter[4][1:n_events])  
-    write(gr_param_group, "dL", gr_parameter[5][1:n_events])
-    write(gr_param_group, "theta", gr_parameter[6][1:n_events])
-    write(gr_param_group, "phi", gr_parameter[7][1:n_events])
-    write(gr_param_group, "iota", gr_parameter[8][1:n_events])
-    write(gr_param_group, "psi",  gr_parameter[9][1:n_events])
-    write(gr_param_group, "phiCoal", gr_parameter[10][1:n_events])
-    write(gr_param_group, "tcoal", gr_parameter[11][1:n_events])
-    write(gr_param_group, "lambda1", gr_parameter[12][1:n_events])
-    write(gr_param_group, "lambda2", gr_parameter[13][1:n_events])
+    param_group = create_group(file, "parameter")
+    write(param_group, "mc", gr_parameter[1][1:n_events])
+    write(param_group, "eta", gr_parameter[2][1:n_events])
+    write(param_group, "chi1", gr_parameter[3][1:n_events])  
+    write(param_group, "chi2", gr_parameter[4][1:n_events])  
+    write(param_group, "dL", gr_parameter[5][1:n_events])
+    write(param_group, "theta", gr_parameter[6][1:n_events])
+    write(param_group, "phi", gr_parameter[7][1:n_events])
+    write(param_group, "iota", gr_parameter[8][1:n_events])
+    write(param_group, "psi",  gr_parameter[9][1:n_events])
+    write(param_group, "phiCoal", gr_parameter[10][1:n_events])
+    write(param_group, "tcoal", gr_parameter[11][1:n_events])
+    write(param_group, "lambda1", gr_parameter[12][1:n_events])
+    write(param_group, "lambda2", gr_parameter[13][1:n_events])
 
-    gr_deviation_group = create_group(file, "gr_deviation")
-    for pno in pn_orders
-        write(gr_deviation_group, "pn_"*pn_order_dic[pno][2], gr_deviation_dict[pno])
+    for pno in configs["pn_waveforms"]
+        write(param_group, "pn_"*pn_order_dic[pno][2], gr_deviation_dict[pno])
     end
 end
     
@@ -135,10 +124,9 @@ for nn in keys(networks)
     snr_index_global = ones(Bool, n_events)
     fisher_index_global = ones(Bool, n_events)
 
-    for pno in pn_orders
+    for pno in configs["pn_waveforms"]
         
         pno_name = "pn_"*pn_order_dic[pno][2]
-        println("\n"*"#"^81)
         println("\nProcessing: "*pno_name)
         
         folder_name = output_folder_name * "data/" * nn * "/" * pno_name *"/"
@@ -160,10 +148,9 @@ for nn in keys(networks)
         Φ_coal = gr_parameter[11][1:n_events]
         delta_pn = gr_deviation_dict[pno]
 
-        #calculate fisher
+        #choose waveform
         wf = nothing 
-
-        if HM
+        if configs["use_hm_waveform"]
             wf = PhenomHM_TIGER(pn_order_dic[pno][1])
         else
             wf = PhenomD_TIGER(pn_order_dic[pno][1])
@@ -171,6 +158,7 @@ for nn in keys(networks)
 
         network = networks[nn]
 
+        #calculate fisher
         if needToRun
             @time fisher_matrices, snrs = FisherMatrix(
                 wf,
@@ -191,8 +179,8 @@ for nn in keys(networks)
                 return_SNR=true, 
                 useEarthMotion=true
             )
-        else #Load the matrices instead of rerunning the analysis
-
+        else
+            
             
             println("\nSkipping the simulation since data should already exist")
             println("Loading the results from outputfolder: ")
@@ -210,7 +198,6 @@ for nn in keys(networks)
             snrs = h5open(filename, "r") do file
                 snrs = read(file, "values")  
             end
-
         end
 
         ### postprocessing #########################################################
@@ -244,7 +231,7 @@ for nn in keys(networks)
         dphi0k_pn = gr_deviation_dict[pno] .+ deltak_pn .* randn(n_events)
 
         # calculate indices and update global indices
-        snr_index = convert(Vector{Bool}, snrs .> snr_thresh)
+        snr_index = convert(Vector{Bool}, snrs .> configs["snr_thresh"])
         snr_index_global = convert(Vector{Bool}, snr_index .& snr_index_global)
         fisher_index_global = convert(Vector{Bool}, fisher_inverted .& fisher_index_global)
 

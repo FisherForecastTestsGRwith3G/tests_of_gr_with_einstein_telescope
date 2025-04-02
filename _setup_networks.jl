@@ -11,6 +11,7 @@
 # TODO: Clean up namespace
 
 detector_data_dir = string(parentdir)*"/GW.jl/useful_files/ET_curves/"
+detector_data_dir_LVK = string(parentdir)*"/GW.jl/useful_files/"
 
 f_ET_10_1, PSD_ET_10_1 = _readPSD(detector_data_dir*"ET10km.txt", cols=[1, 2])
 f_ET_10_2, PSD_ET_10_2 = _readPSD(detector_data_dir*"ET10km.txt", cols=[1, 3])
@@ -64,11 +65,18 @@ ETLMR_45_15km.fNoise = f_ET_15
 ETLMR_45_15km.psd = PSD_ET_15
 ETLMR_45_15km.orientation_rad = orientation_CBC
 
+#Setting up LVK (LHV) network, using O3 sensitivities
+#Loading realistic O3 PSD for LVK
+LIGO_L_O3 = Detector(getCoords(LIGO_L)..., 'L', _readASD(detector_data_dir_LVK * "LVC_O1O2O3/O3-L1-C01_CLEAN_SUB60HZ-1240573680.0_sensitivity_strain_asd.txt")...,  "LIGO_L_O3")
+LIGO_H_O3 = Detector(getCoords(LIGO_H)..., 'L', _readASD(detector_data_dir_LVK * "LVC_O1O2O3/O3-H1-C01_CLEAN_SUB60HZ-1251752040.0_sensitivity_strain_asd.txt")...,  "LIGO_H_O3")
+VIRGO_O3 = Detector(getCoords(VIRGO)..., 'L', _readASD(detector_data_dir_LVK * "LVC_O1O2O3/O3-V1_sensitivity_strain_asd.txt")...,  "VIRGO_O3")
+
+
 function getNetwork(network_name)
 
-    available_networks = ["ETS", "network_0_15km", "network_45_15km"] 
+    available_networks = ["ETS", "network_0_15km", "network_45_15km", "LHV", "LHVK", "LHV_O3"]
     if !(network_name in available_networks)
-        throw(ValueError(network_name, "network not available. Use one of these: $(available_networks)"))
+        throw(ArgumentError("$(network_name) network not available. Use one of these: $(available_networks)"))
     end
 
     if network_name == "ETS"
@@ -77,5 +85,11 @@ function getNetwork(network_name)
         return [ETLS_15km, ETLMR_0_15km]
     elseif network_name == "network_45_15km"
         return [ETLS_15km, ETLMR_45_15km]
+    elseif network_name == "LHV"
+        return [_available_detectors("LIGO_L"), _available_detectors("LIGO_H"), _available_detectors("VIRGO")]
+    elseif network_name == "LHVK"
+        return [_available_detectors("LIGO_L"), _available_detectors("LIGO_H"), _available_detectors("VIRGO"), _available_detectors("KAGRA")]
+    elseif network_name == "LHV_O3"
+        return [LIGO_L_O3, LIGO_H_O3, VIRGO_O3]
     end 
 end 

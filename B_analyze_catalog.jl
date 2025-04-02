@@ -1,65 +1,37 @@
 using HDF5
 using Plots
-import Contour
+using Contour
 using Trapz
 
-include(".paths.jl")
+include("_parse_config.jl")
 
-################################################################################
-## Specify simulation specs in this part of the script
-# ||||||||
-# vvvvvvvv
+# obtain config file from input
+user_configs = getUserConfigs()
+config_file_name = "config_files/"*user_configs["default_config"]
+if length(ARGS) > 0
+    config_file_name = ARGS[1]
+else
+    println("No config file handed, using default!")
+end
+println("Using config file: $(config_file_name)\n")
 
-PhD = "Andrea"
-path_catalog, path_output = whoIsThere(PhD)
+configs, simulation_tag = readConfigForB(config_file_name)
 
-# specify where the data is stored
-simulation_tag = "BGR_HM"
+# set up folder names
+data_folder_name = user_configs["path_output"]*simulation_tag*"/data/"
+output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
+catalog_name = user_configs["path_output"]*simulation_tag*"/catalog_w_deviations.h5"
 
-# network specs
-network_names = ["ETS"]
-                #["ETS", "network_0_15km", "network_45_15km"]
-                
-# specify the pn-orders we want to analze
-pn_orders = ["0", "0.5", "1", "1.5"] 
-            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
-
-# snr threshold
-snr_thresh = 12.
-
-# secify where to save the plots
-figure_dir = path_output*"output/"*simulation_tag*"/plots/"
-
-### Restrict_catalog 
-n_events = 100  # number of events from the catalog used     
-
-# ^^^^^^^^
-# ||||||||
-## Specify simulation specs in this part of the script
-################################################################################
-
-output_folder_name =  path_output*"output/"*simulation_tag*"/data/"
-
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
+snr_thresh = configs["snr_thresh"]
+n_events = configs["n_events"]
 
 ### get global indices 
 global_index_fisher = Dict()
 global_index_snr = Dict()
 global_index_total = Dict()
-for nn in network_names
+for nn in configs["network_list"]
 
-    file_name = output_folder_name * nn *"/global_indices.h5"
+    file_name = data_folder_name * nn *"/global_indices.h5"
     h5open(file_name, "r") do gi_file
         global_index_fisher[nn] = read(gi_file, "fisher")  
         global_index_snr[nn] = read(gi_file, "snr")
@@ -69,15 +41,16 @@ end
 
 ### analyze catalog for each selected pn order
 event_ks = collect(1:n_events)
-for nn in network_names
+for nn in configs["network_list"]
     
     idx_g_total = global_index_total[nn][1:n_events]
     idx_g_fisher = global_index_fisher[nn][1:n_events]
-    mkpath(figure_dir* nn * "/catalog_summary/")
 
-    for pno in pn_orders
+    for pno in configs["pn_waveforms"]
+
         pno_name = "pn_" *pn_order_dic[pno][2]
-        folder_name = output_folder_name * nn * "/" * pno_name *"/"
+        folder_name = data_folder_name * nn * "/" * pno_name *"/"
+        mkpath(output_folder_name * nn *"/"*pno_name* "/catalog_summary")
 
         #load snr
         snr_data = Dict()
@@ -105,14 +78,14 @@ for nn in network_names
             mc=:red, 
             ms=2, 
             ma=0.5)
-        plot!(psnr, [1, n_events], [snr_thresh,snr_thresh], label = "")
+        plot!(psnr, [1, n_events], [snr_thresh, snr_thresh], label = "")
         scatter!(psnr,
             event_ks[idx_g_total],
             snr_values[idx_g_total],
             label = "event used", 
-            markershape=:star5,
+            #markershape=:star5,
             mc=:blue, 
-            ms=4, 
+            ms=2, 
             ma=0.5
             )
         ylabel!(psnr, "SNR")
@@ -130,9 +103,9 @@ for nn in network_names
         scatter!(pfis,
             event_ks[idx_g_total],
             fisher_errors[idx_g_total],
-            markershape=:star5,
+            #markershape=:star5,
             mc=:blue, 
-            ms=4, 
+            ms=2, 
             ma=0.5,
             label = "",
             ticks = :native, 
@@ -144,7 +117,7 @@ for nn in network_names
         l = @layout [ jeff{1.0w, 0.5h} ; hubert{1.0w, 0.5h}]
      
         snr_fish_plot = plot(pfis, psnr, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/snr_error_catalog_" * pno_name * ".pdf"
+        fig_file_name = output_folder_name * nn *"/"*pno_name* "/catalog_summary/snr_error_catalog.pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(snr_fish_plot, fig_file_name)
 
@@ -162,9 +135,9 @@ for nn in network_names
         scatter!(psum,
             dphi0_k[idx_g_total],
             fisher_errors[idx_g_total],
-            markershape=:star5,
+            #markershape=:star5,
             mc=:blue, 
-            ms=4, 
+            ms=2, 
             ma=0.5,
             label = "events used"
             #ticks = :native, 
@@ -204,7 +177,7 @@ for nn in network_names
 
         l = @layout [ jeff{0.6w, 0.6h} heisenberg{0.4w, 0.6h} ; dirac{0.6w, 0.4h} david{0.4w, 0.4h}]
         datasum_plot = plot(psum, phist_1, phist_2, layout = l)
-        fig_file_name = figure_dir * nn * "/catalog_summary/param_summary_" * pno_name * ".pdf"
+        fig_file_name = output_folder_name * nn *"/"*pno_name* "/catalog_summary/param_summary.pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(datasum_plot, fig_file_name)
     end 

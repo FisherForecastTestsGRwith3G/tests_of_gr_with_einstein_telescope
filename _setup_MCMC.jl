@@ -73,12 +73,8 @@ INPUT:
     y                   y-data
     val_inj             used to mark injected values
 """
-function plot2DContourKDE(x::Matrix{Float64}, y::Matrix{Float64}, val_inj::Tuple{Float64,Float64})
-
-    #injected values 
-    true_mu = val_inj[1]
-    true_sigma =  val_inj[2]
-
+function plot2DContourKDE(x::Matrix{Float64}, y::Matrix{Float64}, val_inj::Union{Nothing, Tuple{Float64,Float64}})
+    
     # Estimate the kernel density
     xy = [x y]
     kde_result = kde(xy)
@@ -88,10 +84,17 @@ function plot2DContourKDE(x::Matrix{Float64}, y::Matrix{Float64}, val_inj::Tuple
     X = kde_result.x
     Y = kde_result.y
 
+    titel_str = "MCMC"
+    if val_inj != nothing
+        true_mu = val_inj[1]
+        true_sigma =  val_inj[2]
+        titel_str = "MCMC at \$\\mu=\$$true_mu and \$\\sigma=\$$true_sigma"
+    end
+
     MCMC_plot=plot(
         xlabel="\$\\mu\$ ",
         ylabel="\$\\sigma\$",
-        title="MCMC at \$\\mu=\$$true_mu and \$\\sigma=\$$true_sigma",
+        title=titel_str,
         legend=:topright,  
         minorticks=9, 
         minorgrid=true, 
@@ -129,15 +132,17 @@ function plot2DContourKDE(x::Matrix{Float64}, y::Matrix{Float64}, val_inj::Tuple
     # Plot contour
     contour!(MCMC_plot, X, Y, Z', levels=sigma_levels, color=:viridis, linewidth=2, label="σ levels")
     #scatter!(x, y, alpha=0.3, label="Samples")
-    scatter!(MCMC_plot, [true_mu], [true_sigma], label="True values")
+    
+    #plot injected values
+    if val_inj != nothing
+        true_mu = val_inj[1]
+        true_sigma =  val_inj[2]
+        scatter!(MCMC_plot, [true_mu], [true_sigma], label="True values")
+    end
     return MCMC_plot
 end
 
-function plot2DContourKDE!(plot_, x::Matrix{Float64}, y::Matrix{Float64}, val_inj::Tuple{Float64,Float64})
-
-    #injected values 
-    true_mu = val_inj[1]
-    true_sigma =  val_inj[2]
+function plot2DContourKDE!(plot_, x::Matrix{Float64}, y::Matrix{Float64})
 
     # Estimate the kernel density
     xy = [x y]

@@ -12,13 +12,37 @@ There is two conventions for scripts
 
 **A_run_catalog_script** <br>
 Reads a catalog, creates GR deviations, saves the catalog + GR deviations, evaluates the fisher matrices,
-analysis the invertability and snr, stores everything.
+analysis the invertability and snr, stores everything. 
+The script is called with two arguments.
+
+`julia A_run_catalog_script.jl <NeedToRun> <config_file_name>`
+
+Here: 
+* `NeedToRun` is either 1 or 0
+* `config_file_name` is the name of the config file to be used
 
 **B_analyze_catalog.jl** <br>
-Visualizes the data in the catalog.
+Visualizes the data in the catalog. 
+The script is called with one argument
+
+`julia B_analyze_catalog.jl <config_file_name>`
 
 **B_plot_hyperparam_dist.jl** <br> 
-Visualizes the hyperparameter distribution
+Visualizes the hyperparameter distribution. 
+The script is called with one argument.
+
+`julia B_plot_hyperparam_dist.jl <config_file_name>`
+
+**B_check_selection_bias.jl** <br> 
+Visualizes biases introduced by the selection criteria due to the invertibility of the fisher. 
+The script is called with one argument.
+
+`julia B_check_selection_bias.jl <config_file_name>`
+
+### How to use config files
+
+The config files are .json files. They specify the parameters of the script and are useful to document different runs.
+For creating such a file see the template file in `/config_files/config_template.json`.
 
 ## File strucutre
 The scripts store all their outputs in files structured as follows.
@@ -31,10 +55,16 @@ The scripts store all their outputs in files structured as follows.
             * single_event_measurement.h5
             * snrs.h5
     * plots/network/
-        * catalog_summary/
-            * param_summary_pn_xy.png
-            * snr_error_catalog_pn_xy.png
-        * hyperdist_plot_pn_xy.png 
+        * pn_xy/
+            * hyperdist_plot_pn_MCMC_on_top.pdf
+            * hyperdist_plot_pn_MCMC.pdf
+            * hyperdist_plot.pdf
+            * mudist_plot.pdf
+            * catalog_summary/
+                * param_summary_pn_xy.png
+                * snr_error_catalog_pn_xy.png
+        * selection_bias_checks/
+            * param_name.pdf
 
 ### File-descriptions
 
