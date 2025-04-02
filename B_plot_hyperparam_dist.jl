@@ -17,23 +17,18 @@ include("_setup_MCMC.jl")
 # ||||||||
 # vvvvvvvv
 
-# specify where the data is stored
-simulation_tag = "test_mcmc"
+include("_simulation_settings.jl")
 
-# network specs
-network_names = ["ETS"]
+# Below here you may ovveride the simulation settings specified in the _simulation_settings.jl file
+# Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
 
 # specify the pn-orders we want to analze
-pn_orders = ["0", "0.5", "1", "1.5"] 
-            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders = #["-1"]
+           ["0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
-MCMC = true
-chain_file_name = "MCMC_chain.jls"
+#MCMC = true
 
-PhD = "Joachim"
-path_catalog, path_output = whoIsThere(PhD)
-# specify where to save the plots
-figure_dir = "output/"*simulation_tag*"/plots/"
+output_folder_name = output_folder_name*"data/"
 
 ### plot specifiers
 n_events = 30   # number of events from the catalog used 
@@ -42,7 +37,7 @@ n_events = 30   # number of events from the catalog used
 n_points = 1000 # Determines gridpoints for visualizing the distribution
                 # Higher value improves estimate of evidence and percentiles
                 # but also increases computing time.
-k_spread = 30   # multipies the estimated spread of the distribution
+k_spread = 20   # multipies the estimated spread of the distribution
                 # for automatic setting of the plotting limits. 
                 # If limits dont make sense, increase this value as 
                 # a first quick fix.
@@ -93,20 +88,6 @@ val_injected_dict = Dict(
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = path_output*"output/"*simulation_tag*"/data/"
-
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
 
 # get global index
 global_index_fisher = Dict()
@@ -122,7 +103,7 @@ for nn in network_names
 end
 
 # process all the plots
-for nn in network_names
+ for nn in network_names
 
     for pno in pn_orders
 
@@ -182,6 +163,7 @@ for nn in network_names
         end
         
         # create the plot
+        println("Injected values: ", val_injected_dict[pno])
         title_str = "PN = $(pno)"
         splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=val_injected_dict[pno], title = title_str)
         

@@ -1,57 +1,34 @@
 using HDF5
 using Plots
-import Contour
+using Contour
 using Trapz
-
-include(".paths.jl")
 
 ################################################################################
 ## Specify simulation specs in this part of the script
 # ||||||||
 # vvvvvvvv
 
-PhD = "Joachim"
-path_catalog, path_output = whoIsThere(PhD)
+include("_simulation_settings.jl")
 
-# specify where the data is stored
-simulation_tag = "test_mcmc"
+# Below here you may ovveride the simulation settings specified in the _simulation_settings.jl file
+# Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
 
-# network specs
-network_names = ["ETS"]
-                #["ETS", "network_0_15km", "network_45_15km"]
-                
+# e.g.:
 # specify the pn-orders we want to analze
-pn_orders = ["0", "0.5", "1", "1.5"] 
-            #["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+#pn_orders =  ["-1", "0", "0.5", "1"] 
+           # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]  
 
-# snr threshold
-snr_thresh = 12.
-
-# secify where to save the plots
-figure_dir = path_output*"output/"*simulation_tag*"/plots/"
 
 ### Restrict_catalog 
-n_events = 100  # number of events from the catalog used     
+#n_events = 100  # number of events from the catalog used     
+
+output_folder_name = output_folder_name*"data/"
 
 # ^^^^^^^^
 # ||||||||
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = "output/"*simulation_tag*"/data/"
-
-pn_order_dic = Dict(
-    "-1"       => (-1.0    ,"minus_one"),
-    "0"        => (0.0     ,"zero"), 
-    "0.5"      => (0.5     ,"half"),
-    "1"        => (1.0     ,"one"), 
-    "1.5"      => (1.5     ,"one_half"),
-    "2"        => (2.0     ,"two"),
-    "log(2.5)" => (log(2.5),"log_two_half"),
-    "3"        => (3.0     ,"three"), 
-    "log(3.)"  => (log(3.) ,"log_three"),
-    "3.5"      => (3.5     ,"three_half")
-);
 
 ### get global indices 
 global_index_fisher = Dict()
