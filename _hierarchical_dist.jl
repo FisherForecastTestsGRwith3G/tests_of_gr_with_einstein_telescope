@@ -1,3 +1,6 @@
+using NLsolve
+using SpecialFunctions
+
 """
 Function that calculates the values of the LSA hyperparameter distribution p(μ, σ | φ_k , Δ_k)
 given the k in (1,...,N) measurements of individual GW events. 
@@ -101,4 +104,70 @@ function naiveMuDistTIGER(mu::Vector{Float64}, dphi0_k::Vector{Float64}, delta_k
     max_log_p_mu = maximum(log_p_mu)
 
     return exp.(log_p_mu .- max_log_p_mu)*norm_max
+end
+
+function getMuDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
+    
+    a0 = sum(1.0 ./ delta_k.^2)
+    b0 = sum(dphi0_k ./ delta_k.^2)
+    #c0 = -0.5 * sum(dphi0_k.^2 ./ delta_k.^2)
+
+    meanMuDist = b0/a0
+    stdMuDist = sqrt(1/a0)
+
+    #The pdf for mu is given by Normal distribution with mean and std calculated above
+    #log_p_mu = -0.5*((mu - meanMuDist)^2)/(stdMuDist^2) - 0.5*log(2*pi*stdMuDist^2)
+    # i will return the mean and variance of this distribution in full generality
+    return meanMuDist, stdMuDist
+end
+
+function getUpperLimitOnAbsValueNormalVariable(mean_dst, std_dev_dst, probability_value = 0.9)
+    
+    # I assume a gaussian distribution for x, with mean and std given by the input arguments
+    # so p(x | mean_dst, std_dst) = 1/(sqrt(2*pi)*std_dst)*exp(-0.5*((x - mean_dst)/std_dst)^2)
+
+    # This function will return the (positive) value of x_upper_limit, such that the probability of the absolute value of x being less than x_upper_limit is probability_value (e.g probability_value = 0.9)
+    # i.e. P(|x| < x_upper_limit) = probability_value
+
+    # In practice I want to calculate the value of x_upper_limit such that the integral from -x_upper_limit to x_upper_limit of the pdf is probability_value
+    # i.e. probability_value = integrate(1/(sqrt(2*pi)*std_dst)*exp(-0.5*((x - mean_dst)/std_dst)^2), x, -xLim, xLim)
+
+    functionToSolve(xLim) = 1/2. * (erf.((xLim .- mean_dst)/(sqrt(2) * std_dev_dst)) + erf.((xLim .+ mean_dst)/(sqrt(2)  *std_dev_dst))) .- probability_value
+
+    initial_guess = [(abs(mean_dst) + std_dev_dst)]
+    solution = nlsolve(functionToSolve, initial_guess)
+    x_upper_limit = solution.zero[1]
+
+    return x_upper_limit
+end
+
+"""
+DESCRIPTION:
+Function that calculates the 90% upper limit of the beyond GR deformation coefficient δφ_n, given the parameters φ_k , Δ_k, for k in (1,...,N) measurements of individual GW events. 
+
+The function evaluates the 90% upper limit by evauating the probability p(δφ_n | data), and then evaluating the value of δφ_n_limit such that the probability of δφ_n being less than δφ_n_limit is 0.9.
+
+The probability p(δφ_n | data) is assumed to come from the hierarchical hyperparamter distribution pHier(μ, σ | φ_k , Δ_k), conditioned with σ=0.
+From p(δφ_n | data) = ∫ p(δφ_n | μ, σ) pHier(μ, σ | data) dμ dσ it follows that p(δφ_n | data) = pHier(μδφ_n, 0 | data) dμ dσ .
+
+Therefore p(δφ_n | data) is given by a gaussian distribution, with a mean different from zero. To evaluate the quantity of interest δφ_n_limit, such that p(|δφ_n| < δφ_n_limit| data) < 0.9, then we evaluate the integral
+∫_(-δφ_n_limit)^(δφ_n_limit) p(δφ_n | data) dδφ_n = 0.9.
+
+
+INPUT:
+    dphi0_k    φ_k-values
+    delta_k    Δ_k-values
+
+    Optional
+    upper_limit_probability_value   Value of the probability that the value of δφ_n is less than δφ_n_limit.
+               value 0.9 by default. 
+"""
+function get90PctUpperLimitMuDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector{Float64}, upper_limit_probability_value = 0.9)
+    # Returns the 90% upper limit (or upper_limit_probability_value) for the "naive" TIGER approach (actually the one where we set sigma = 0, and so impose all events to have the same beyond GR deviation)
+    # takes as input the dphi0_k and delta_k values for the events, at a given PN order
+    
+    meanMuDist, stdMuDist  = getMuDistTIGER(dphi0_k, delta_k)
+    upper_limit = getUpperLimitOnAbsValueNormalVariable(meanMuDist, stdMuDist, upper_limit_probability_value)
+
+    return upper_limit
 end
