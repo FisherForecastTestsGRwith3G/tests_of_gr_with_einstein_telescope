@@ -7,10 +7,10 @@ include(".paths.jl")
 
 ### Generic settings
 
-PhD = "Matteo"
-simulation_tag = "BGR" # how is this simulation called
+PhD = "Joachim"
+simulation_tag = "ETS_test" # how is this simulation called
 
-network_names = ["LHV"]
+network_names = ["ETS"]
                 #["ETS", "network_0_15km", "network_45_15km", "LHV", "LHVK", "LHV_O3"] # network specs
 
 # specify the PN-orders we want to analyze - may be overriden in the specific scripts
@@ -27,21 +27,14 @@ needToRun = true # set to true if you want to run the simulation
 HM = false # set to true if you want to run the simulation with the HM waveform
 
 # specs of catalog
-n_events      = 10000
+n_events      = 100
 source_type   = "BBH"
 catalog_name  = "BGR_TIGER_10k.h5"
-
 
 # snr threshold
 snr_thresh = 12.
 
-
-
-
 ### Settings specific to script B_analyze_catalog.jl
-
-
-
 
 ### Settings specific to script B_plot_hyperparam_dist.jl
 

@@ -23,8 +23,8 @@ include("_simulation_settings.jl")
 # Yet for consistency across different scripts it is recommended to set the simulation settings in the _simulation_settings.jl file
 
 # specify the pn-orders we want to analze
-pn_orders =  ["0"]
-           # ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
+pn_orders = #["-1"]
+           ["0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]   
 
 #MCMC = true
 
@@ -37,7 +37,7 @@ n_events = 30   # number of events from the catalog used
 n_points = 1000 # Determines gridpoints for visualizing the distribution
                 # Higher value improves estimate of evidence and percentiles
                 # but also increases computing time.
-k_spread = 30   # multipies the estimated spread of the distribution
+k_spread = 20   # multipies the estimated spread of the distribution
                 # for automatic setting of the plotting limits. 
                 # If limits dont make sense, increase this value as 
                 # a first quick fix.
