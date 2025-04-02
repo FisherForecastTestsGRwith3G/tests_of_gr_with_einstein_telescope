@@ -10,11 +10,11 @@ include(".paths.jl")
 # ||||||||
 # vvvvvvvv
 
-PhD = "Joachim"
+PhD = "Andrea"
 path_catalog, path_output = whoIsThere(PhD)
 
 # specify where the data is stored
-simulation_tag = "test_mcmc"
+simulation_tag = "BGR_HM"
 
 # network specs
 network_names = ["ETS"]
@@ -38,7 +38,7 @@ n_events = 100  # number of events from the catalog used
 ## Specify simulation specs in this part of the script
 ################################################################################
 
-output_folder_name = "output/"*simulation_tag*"/data/"
+output_folder_name =  path_output*"output/"*simulation_tag*"/data/"
 
 pn_order_dic = Dict(
     "-1"       => (-1.0    ,"minus_one"),
