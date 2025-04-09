@@ -39,21 +39,24 @@ output_folder_name = user_configs["path_output"]*simulation_tag*"/"
 
 #Read or generate a catalog and create GR deviations
 
-#TODO: I dont think we should create a catalog here
-#if(needToCreateCatalog)
+# #TODO: I dont think we should create a catalog here
+# needToCreateCatalog = true
+# if(needToCreateCatalog)
 #    println("Creating catalog")
 #    # create a catalog
 #    @time GenerateCatalog(
-#        n_events, 
-#        source_type, 
-#        name_catalog=catalog_name
+#         configs["n_events"], 
+#         configs["source_type"], 
+#        name_catalog=configs["catalog_name"]
 #    )
-#end
+# end
 
 println("\nRead catalog and calculate GR-deviations")
 gr_parameter = ReadCatalog(configs["catalog_name"], folder=user_configs["path_catalog"])
 
 n_events = configs["n_events"]
+println("Number of events: ", n_events)
+
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],
     gr_parameter[2][1:n_events],
@@ -84,13 +87,13 @@ gr_deviation_dict = Dict(
 )
 
 ### Set up networks 
-println("Collecting networks:")
+println("Loading networks:")
 networks = Dict()
 for nn in configs["network_list"]
     networks[nn] = getNetwork(nn)
     println(nn)
 end
-println("Finished collecting networks.\n")
+println("Finished loading networks.\n")
 
 ### Get done the calculations ###
 file_name = output_folder_name*"catalog_w_deviations.h5"
