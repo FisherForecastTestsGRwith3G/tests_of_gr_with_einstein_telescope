@@ -1,6 +1,6 @@
 {
-    "user":"unknown_user",
-    "path_catalog":"catalogs/",
-    "path_output":"output_new/",
-    "default_config":"config_test.json"
+    "user":"Andrea",
+    "path_catalog":"../gwbeast/catalogs/",
+    "path_output":"output/",
+    "default_config":"config_ET.json"
 }

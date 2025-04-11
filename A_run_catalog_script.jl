@@ -18,7 +18,7 @@ if length(ARGS) > 0
         needToRun = true
         println("The simulation will be run!")
     elseif ARGS[1] == "0"
-        @warn "There was a first input argument handed. But it was $(ARGS[1]) and not '1' or '0' and thus ignored"
+        @warn "There was a first input argument handed. But it was $(ARGS[1]) and not \"1\" or \"0\" and thus ignored"
     end
 end
 

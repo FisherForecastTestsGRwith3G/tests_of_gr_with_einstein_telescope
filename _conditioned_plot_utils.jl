@@ -1,7 +1,14 @@
 using StatsPlots
+using Plots
+using Plots.Measures
+using ColorSchemes
 
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
+
+default(fontfamily="Computer Modern", titlefontsize=19, guidefontsize=10, tickfontsize=16, legendfontsize=12, 
+size=(800, 600), left_margin = 2mm, bottom_margin = 2mm, right_margin = 2.5mm, top_margin = 2.5mm, legend=:topright,  minorticks=9, minorgrid=true, grid=true,
+  framestyle=:box, minorgridwidth=2., minorgridalpha=.04, gridwidth=0.5, gridalpha=0.5, labelfontsize=21)
 
 # This function plots the cumulative error on PN order for different networks and PN orders
 # plotTitle should be something like "Cumulative Error on PN Order - PhenomHM ET"
@@ -34,7 +41,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
     # Define a list of different markers to enhance readability
     markers = [:circle, :square, :diamond, :utriangle, :dtriangle, :hexagon]
-    pointColors = [:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    
+    pointColors = colors = palette(:seaborn_colorblind) #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    
     horizontalLineColorNetworks = pointColors
 
     # Proper LaTeX labels
