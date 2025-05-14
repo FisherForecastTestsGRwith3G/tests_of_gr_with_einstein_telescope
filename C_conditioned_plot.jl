@@ -50,7 +50,7 @@ println("Number of events per realization: $(numberOfEventsSingleRealization)")
 
 # Plot Settings
 printEventsAsHorizontalLinesOrDensityPlot = true #I will do this only for the first realization, if there are more than 1 realizations
-plotLVK_GWTC3_results = true #Overlay the GWTC-3 results on the plot
+plotLVK_GWTC3_results = configs["LVK"] #Overlay the GWTC-3 results on the plot
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
 upperLimits = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), 2)
@@ -135,7 +135,8 @@ end
 
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
-final_conditioned_plot = plotConditionedUpperLimits(L"\mathrm{Cumulative\ Error\ on\ PN\ Order\ -\ PhenomD\ LVK}", upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results)
+title = configs["title"] == "" ? "" : latexstring(configs["title"])
+final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results)
 
 # Save the combined plot to file
 mkpath(output_folder_name)

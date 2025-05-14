@@ -54,9 +54,12 @@
         },
 
         "c_specific":{
-            "n_events":100000,
+            "n_events":1000,
             "averageOverSeveralRealizations":true,
-            "numberOfEventsSingleRealization":12
+            "numberOfEventsSingleRealization":12,
+            "LVK":false,
+            "plot_samples":true,
+            "title":"\\mathrm{Cumulative\\ Error\\ on\\ PN\\ Order\\ -\\ PhenomD\\ LVK}"
             }
 
     }

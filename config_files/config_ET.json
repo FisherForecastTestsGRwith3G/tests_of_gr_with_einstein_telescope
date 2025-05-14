@@ -16,16 +16,16 @@
         },
         
     "a_specific":{
-        "n_events":10000,
+        "n_events":1000,
         "mu":0,
         "sigma":0
         },
     
     "b_specific":{
-        "pn_waveforms":["0","0.5","1","1.5"],
+        "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
         "k_spread":30,
         "n_points":10000,
-        "n_events":1000,
+        "n_events":10000,
     
         "mu_lims":{
             "-1"       : [],  
@@ -54,10 +54,22 @@
         },
         
        "c_specific":{
-            "n_events":1000,
+            "n_events":10000,
             "averageOverSeveralRealizations":false,
-            "numberOfEventsSingleRealization":1000
-        }
+            "numberOfEventsSingleRealization":10000,
+            "LVK":false,
+            "plot_samples":false,
+            "title":""
+            },
+        "z_specific":{
+            "n_events":10000,
+            "mu":[0, 0.0035, 0.007],
+            "sigma" : [0, 0.0025, 0.005],
+            "PN_order":"1",
+            "title":""
+            }
         
     }
+        
+    
     

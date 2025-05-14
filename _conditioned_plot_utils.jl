@@ -6,9 +6,9 @@ using ColorSchemes
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
 
-default(fontfamily="Computer Modern", titlefontsize=19, guidefontsize=10, tickfontsize=16, legendfontsize=12, 
-size=(800, 600), left_margin = 2mm, bottom_margin = 2mm, right_margin = 2.5mm, top_margin = 2.5mm, legend=:topright,  minorticks=9, minorgrid=true, grid=true,
-  framestyle=:box, minorgridwidth=2., minorgridalpha=.04, gridwidth=0.5, gridalpha=0.5, labelfontsize=21)
+default(fontfamily="Computer Modern", titlefontsize=19, guidefontsize=10, tickfontsize=16, legendfontsize=16, 
+left_margin = 2mm, bottom_margin = 2mm, right_margin = 2.5mm, top_margin = 2.5mm, legend=:topright,  #minorticks=9, #minorgrid=true, grid=true,
+  framestyle=:box, minorgridalpha=.04, gridwidth=0.5, gridalpha=0.5, labelfontsize=21) # minorgridwidth=2.,
 
 # This function plots the cumulative error on PN order for different networks and PN orders
 # plotTitle should be something like "Cumulative Error on PN Order - PhenomHM ET"
@@ -62,6 +62,8 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
    PN_orders = configs["pn_waveforms"];
    name_PN = configs["pn_waveforms"];
    network_names = configs["network_list"];
+   network_labels = labels_from_networks(network_names);
+   PN_labels = labels_from_PN_orders(PN_orders);
 
     # Extend the arrays, eventually wrapping around
     markers = markers[mod1.(1:length(network_names), length(markers))]
@@ -122,7 +124,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # Initialize the main plot with white background and high resolution
     cc_main = plot(
         xlabel=xlabel_str, title=plotTitle,
-        legend=:bottomright, xticks=(2:10, name_PN[2:end]), 
+        legend=:bottomright, xticks=(2:10, PN_labels[2:end]), 
         yscale=:log10, size=(plotWidth * (1. - ratioFirstToTotalPlotMarginsIncluded), plotHeight), dpi=plotDpi,
         xlims=(1.5, 10.5),
         grid=true, framestyle=:box,
@@ -136,7 +138,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # Initialize the subplot for the first point
     cc_sub = plot(
         xlabel=xlabel_str, ylabel=ylabel_str,
-        legend=false, xticks=([1], [name_PN[1]]), 
+        legend=false, xticks=([1], [PN_labels[1]]), 
         xlims=(0.5, 1.5),
         yscale=:log10, size=(plotWidth * ratioFirstToTotalPlotMarginsIncluded, plotHeight), dpi=plotDpi,
         grid=true, framestyle=:box,
@@ -163,15 +165,17 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                 vecc = upperLimitSingleEvents[jj, ii, :]
                 # I need to discard all NaNs!
                 vecc = vecc[.!isnan.(vecc)]
-                if !toPlotDensity
-                    # Plot the single events as horizontal lines
-                    scatter!(
-                        cc_sub, fill(ii, length(vecc)), vecc, label="",
-                        marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
-                    )
-                else
-                    # Plot violin plots to show the density distribution of the events, as a function of the upper limits (along the vertical axis), instead of plotting each single event
-                    violin!(cc_sub, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                if configs["plot_samples"] == true
+                    if !toPlotDensity
+                        # Plot the single events as horizontal lines
+                        scatter!(
+                            cc_sub, fill(ii, length(vecc)), vecc, label="",
+                            marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
+                        )
+                    else
+                        # Plot violin plots to show the density distribution of the events, as a function of the upper limits (along the vertical axis), instead of plotting each single event
+                        violin!(cc_sub, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                    end
                 end
             end
         
@@ -179,23 +183,29 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                 vecc = upperLimitSingleEvents[jj, ii, :]
                 # I need to discard all NaNs!
                 vecc = vecc[.!isnan.(vecc)]
-                if !toPlotDensity
-                    # Plot the single events as horizontal lines
-                    scatter!(
-                        cc_main, fill(ii, length(vecc)), vecc, label="",
-                        marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
-                    )
-                else
-                    # Plot the density of the single events
-                    violin!(cc_main, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                if configs["plot_samples"] == true
+
+                    if !toPlotDensity
+                        # Plot the single events as horizontal lines
+                        scatter!(
+                            cc_main, fill(ii, length(vecc)), vecc, label="",
+                            marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
+                        )
+                    else
+                        # Plot the density of the single events
+                        violin!(cc_main, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                    end
                 end
             end
 
             #if !toPlotDensity
-            scatter!(
-                cc_main, [NaN], [NaN],
-                marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 2), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Errors from single events ("*network_names[jj]*")"
-            )
+            if configs["plot_samples"] == true
+
+                scatter!(
+                    cc_main, [NaN], [NaN],
+                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 2), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Errors from single events ("*network_labels[jj]*")"
+                )
+            end
             #else
             #   violin!(cc_main, [NaN, NaN], [NaN, NaN], orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Errors from single events ("*network_names[jj]*")" )
             #end
@@ -212,7 +222,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         scatter!(
             cc_sub, [1], [upperLimits[jj, 1, 1]],
             yerr= ErrorBarsIntervalMultiplier * [upperLimits[jj, 1, 2]],  # Add error bars
-            label=network_names[jj],
+            label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
             markersize=6, markerstrokewidth=1, markerstrokecolor=:black,
@@ -225,7 +235,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         scatter!(
             cc_main, 2:length(PN_orders), upperLimits[jj, 2:end, 1],
             yerr= ErrorBarsIntervalMultiplier * upperLimits[jj, 2:end, 2],  # Add error bars
-            label=network_names[jj],
+            label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
             markersize=6, markerstrokewidth=1, markerstrokecolor=:black,
@@ -256,7 +266,39 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
     # Combine the main plot and the subplot
     final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])])) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
-
+    plot!(size=(800, 600))
     # Return the final plot
     return final_plot
+end
+
+
+function labels_from_networks(network_names)
+    # Define a dictionary to map network names to their labels
+    network_labels = Dict(
+        "ETS" => L"\textbf{T}",
+        "network_45_15km" => L"\textbf{2L\_45}",
+        "network_0_15km" => L"\textbf{2L\_0}",
+    )
+
+    # Map the network names to their corresponding labels
+    return [network_labels[name] for name in network_names]
+end
+
+function labels_from_PN_orders(PN_orders)
+    # Define a dictionary to map PN orders to their labels
+    PN_labels = Dict(
+        "-1" => L"\varphi_{-1}",
+        "0" => L"\varphi_{0}",
+        "0.5" => L"\varphi_{1}",
+        "1" => L"\varphi_{2}",
+        "1.5" => L"\varphi_{3}",
+        "2" => L"\varphi_{4}",
+        "log(2.5)" => L"\varphi_{5\,\ell}",
+        "3" => L"\varphi_{6}",
+        "log(3.)" => L"\varphi_{6\,\ell}",
+        "3.5" => L"\varphi_{7}"
+    )
+
+    # Map the PN orders to their corresponding labels
+    return [PN_labels[order] for order in PN_orders]
 end
