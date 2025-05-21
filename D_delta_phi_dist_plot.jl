@@ -97,7 +97,7 @@ end
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
 title = configs["title"] == "" ? "" : latexstring(configs["title"])
-delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned, plotLVK_GWTC3_results = plotLVK_GWTC3_results)
+delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned)
 
 # Save the combined plot to file
 mkpath(output_folder_name)

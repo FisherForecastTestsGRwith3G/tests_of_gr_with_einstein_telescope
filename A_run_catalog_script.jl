@@ -11,13 +11,16 @@ include("_setup_networks.jl")
 include("_setup_gr_deviations.jl")
 include("_parse_config.jl")
 
-# check if we should run the simulation
-needToRun = false
+# check if we should run the simulation. Default is to run it, so that first-time users will have no issues running the code
+needToEvaluateFisherSNRs = true
 if length(ARGS) > 0
     if ARGS[1] == "1"
-        needToRun = true
-        println("The simulation will be run!")
+        needToEvaluateFisherSNRs = true
+        println("Fisher matrices and SNRs will be evaluated!")
     elseif ARGS[1] == "0"
+        needToEvaluateFisherSNRs = false
+        println("Fisher matrices and SNRs will not be evaluated, and instead will be loaded from disk (saves time if you already run evaluated them before)!")
+    else
         @warn "There was a first input argument handed. But it was $(ARGS[1]) and not \"1\" or \"0\" and thus ignored"
     end
 end
@@ -37,19 +40,7 @@ configs, simulation_tag = readConfigForA(config_file_name)
 # create folder paths
 output_folder_name = user_configs["path_output"]*simulation_tag*"/"
 
-#Read or generate a catalog and create GR deviations
-
-# #TODO: I dont think we should create a catalog here
-# needToCreateCatalog = true
-# if(needToCreateCatalog)
-#    println("Creating catalog")
-#    # create a catalog
-#    @time GenerateCatalog(
-#         configs["n_events"], 
-#         configs["source_type"], 
-#        name_catalog=configs["catalog_name"]
-#    )
-# end
+#Read catalog and create GR deviations
 
 println("\nRead catalog and calculate GR-deviations")
 gr_parameter = ReadCatalog(configs["catalog_name"], folder=user_configs["path_catalog"])
@@ -163,7 +154,7 @@ for nn in keys(networks)
         network = networks[nn]
 
         #calculate fisher
-        if needToRun
+        if needToEvaluateFisherSNRs
 
             println("Calculating Fisher matrices and SNRs")
             @time fisher_matrices, snrs = FisherMatrix(
@@ -285,7 +276,7 @@ for nn in keys(networks)
 
         filename = folder_name * "fishers.h5"
         h5open(filename, "a") do file
-            if needToRun
+            if needToEvaluateFisherSNRs
                 write(file, "matrices", fisher_matrices)
             end
             write(file, "index", fisher_inverted)
@@ -293,7 +284,7 @@ for nn in keys(networks)
 
         filename = folder_name * "snrs.h5"
         h5open(filename, "a") do file
-            if needToRun
+            if needToEvaluateFisherSNRs
                 write(file, "values", snrs)
             end
             write(file, "index", snr_index)
@@ -301,7 +292,7 @@ for nn in keys(networks)
 
         filename = folder_name * "inspiral_snrs.h5"
         h5open(filename, "a") do file
-            if needToRun
+            if needToEvaluateFisherSNRs
                 write(file, "values", inspiral_snrs)
             end
             write(file, "index", inspiral_snr_index)

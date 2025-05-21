@@ -17,6 +17,10 @@
         "mcmc_samples":2000
         },
         
+    "alpha_specific":{
+        "n_events":100000
+        },
+        
     "a_specific":{
         "n_events":100000,
         "mu":0,
