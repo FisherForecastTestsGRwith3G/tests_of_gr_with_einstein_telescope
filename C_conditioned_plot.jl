@@ -7,7 +7,8 @@ using Serialization
 using Turing
 
 # include required scripts 
-include("_hierarchical_dist.jl")
+#include("_hierarchical_dist.jl")
+include("_hierarchical_deltaphi_dist.jl")
 include("_parse_config.jl")
 include("_conditioned_plot_utils.jl")
 
