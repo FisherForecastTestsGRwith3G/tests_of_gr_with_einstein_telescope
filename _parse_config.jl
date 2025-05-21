@@ -86,6 +86,18 @@ function readConfigForC(json_file_name)
     return configs, run_tag
 end
 
+function readConfigForD(json_file_name)
+
+    config_dic = open(json_file_name,"r") do f
+        config_dic = JSON.parse(f)
+    end
+    configs = merge(config_dic["global"], config_dic["d_specific"])
+
+    run_tag = config_dic["header"]
+
+    return configs, run_tag
+end
+
 
 function readConfigForZ(json_file_name)
 

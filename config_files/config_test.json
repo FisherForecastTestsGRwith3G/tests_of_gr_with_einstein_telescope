@@ -7,7 +7,9 @@
     "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
     "use_hm_waveform":false,
     "source_type":"BBH", 
-    "snr_thresh":12.0
+    "snr_thresh":12.0,
+    "use_inspiral_snr_thresh":false,
+    "inspiral_snr_thresh":6.0
     }, 
 
 "mcmc_settings":{
@@ -56,7 +58,16 @@
     "c_specific":{
          "n_events":1000,
          "averageOverSeveralRealizations":false,
-         "numberOfEventsSingleRealization":100
+         "numberOfEventsSingleRealization":100,
+         "LVK":false,
+         "plot_samples":true,
+         "title":"\\mathrm{Cumulative\\ Error\\ on\\ PN\\ Order}"
+     },
+         
+     "d_specific":{
+        "n_events":1000,
+     	"mcmc_samples":5000,
+    	"mcmc_burnin":1000
      }
         
 }

@@ -13,31 +13,6 @@ Care should be taken of removing the burn-in samples and make sure that the chai
 
 """
 
-# Remove struct below, as it is not used
-# struct Delta_phi_posterior_pdf
-
-
-#     dphi0_k::Vector{Float64}
-#     delta_k::Vector{Float64}
-
-#     # Private variables
-
-#     _a::Float64
-#     _b::Float64
-#     _c::Float64
-#     _d::Float64
-
-#     _normalization_prefactor::Float64
-#     _sigma_maximum_value::Float64
-#     _sigma_normalization_integration_range::Ntuple{2, Float64}
-
-#     function Delta_phi_posterior_pdf(dphi0_k::Float64, delta_k::Float64)
-#         new(a, b, c, d)
-#     end
-
-
-# end
-
 function _evaluate_delta_phi_quantities_abcd(sigma::Float64, dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
     # This function evaluates the quantities needed to evaluate the distribution p(δφ_n | data) for a given value of σ
     # The function returns the values of the quantities a, b, c, d which appear in the integrand
@@ -75,7 +50,7 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     return result
 end
 
-function obtain_sample_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{Float64}; n_samples::Int64 = 5000, burn_in::Int64 = 1000)
+function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{Float64}; n_samples::Int64 = 5000, burn_in::Int64 = 1000)
     # This function samples from the distribution p(δφ_n | data) for a given set of parameters φ_k , Δ_k
 
     struct _delta_phi_pdf{P} <: ContinuousUnivariateDistribution
@@ -129,6 +104,17 @@ function getMuDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
     #log_p_mu = -0.5*((mu - meanMuDist)^2)/(stdMuDist^2) - 0.5*log(2*pi*stdMuDist^2)
     # i will return the mean and variance of this distribution in full generality
     return meanMuDist, stdMuDist
+end
+
+function obtain_samples_delta_phi_pdf_conditioned(dphi0_k::Vector{Float64}, delta_k::Vector{Float64}; n_samples::Int64 = 5000)
+    # This function samples from the distribution p(δφ_n | data) for a given set of parameters φ_k , Δ_k, with the posterior distribution conditioned on σ=0
+    # I know the analytical form of the distribution, which is a Normal distribution: then I will just sample from it
+    
+    meanMuDist, stdMuDist = getMuDistTIGER(dphi0_k, delta_k)
+    dist = Normal(meanMuDist, stdMuDist)      # Create a Normal distribution
+    samples = rand(dist, n_samples)
+
+    return samples
 end
 
 function getUpperLimitOnAbsValueNormalVariable(mean_dst, std_dev_dst, probability_value = 0.9)
