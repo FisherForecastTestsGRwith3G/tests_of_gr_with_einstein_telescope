@@ -27,6 +27,7 @@ println("Creating catalog with ", configs["n_events"], " number of events and so
 @time GenerateCatalog(
     configs["n_events"], 
     configs["source_type"], 
-    name_catalog=configs["catalog_name"],
-    folder=user_configs["path_catalog"]
+    name_catalog= configs["catalog_name"]
 )
+
+println("Catalog saved as: ", configs["catalog_name"])

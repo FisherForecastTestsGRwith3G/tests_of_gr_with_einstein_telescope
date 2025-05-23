@@ -194,7 +194,6 @@ for nn in keys(networks)
                 iota, 
                 ψ, 
                 tcoal, 
-                Φ_coal, 
                 delta_pn, 
                 auto_save=false, 
                 useEarthMotion=true,
@@ -252,7 +251,7 @@ for nn in keys(networks)
             end
         end
 
-        print("$(not_inverted) Fisher matrices (out of $(length(covariance_matrices))) could not be inverted")
+        print("$(not_inverted) Fisher matrices (out of $(n_events)) could not be inverted")
 
         # caclulate the expected deviations 
         # TODO: Do a better calculation than this. This is provisorical
@@ -275,25 +274,43 @@ for nn in keys(networks)
         end
 
         filename = folder_name * "fishers.h5"
-        h5open(filename, "a") do file
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
             if needToEvaluateFisherSNRs
+                if haskey(file, "matrices")
+                    HDF5.delete_object(file, "matrices")
+                end
                 write(file, "matrices", fisher_matrices)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
             end
             write(file, "index", fisher_inverted)
         end
 
         filename = folder_name * "snrs.h5"
-        h5open(filename, "a") do file
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
             if needToEvaluateFisherSNRs
+                if haskey(file, "values")
+                    HDF5.delete_object(file, "values")
+                end
                 write(file, "values", snrs)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
             end
             write(file, "index", snr_index)
         end
 
         filename = folder_name * "inspiral_snrs.h5"
-        h5open(filename, "a") do file
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
             if needToEvaluateFisherSNRs
+                if haskey(file, "values")
+                    HDF5.delete_object(file, "values")
+                end
                 write(file, "values", inspiral_snrs)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
             end
             write(file, "index", inspiral_snr_index)
         end
@@ -313,7 +330,7 @@ for nn in keys(networks)
         total_index_global = total_index_global_without_inspiral_snr_cut
     end
 
-    println("Statistics for network $(nn):")
+    println("\nStatistics for network $(nn):")
     println("Total number of events: ", length(total_index_global))
     println("Total number of events after SNR cut (snrs > ", configs["snr_thresh"] , ")): ", sum(snr_index_global), " (", round(sum(snr_index_global) * 100. / length(total_index_global) , digits=2), "%)")
     println("Total number of events after inspiral SNR cut (inspiral_snrs > ", configs["inspiral_snr_thresh"] , "): ", sum(inspiral_snr_index_global), " (", round(sum(inspiral_snr_index_global) * 100. / length(total_index_global), digits=2), "%)")
