@@ -71,7 +71,8 @@
         "d_specific":{
             "n_events":1000,
         	"mcmc_samples":5000,
-		    "mcmc_burnin":1000
+		    "mcmc_burnin":1000,
+        	"title":"\\mathrm{Posterior\\ distributions\\ for\\ \\delta\\varphi}"
         },
         
         "z_specific":{

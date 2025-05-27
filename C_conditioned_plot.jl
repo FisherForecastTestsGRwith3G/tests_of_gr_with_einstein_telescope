@@ -141,4 +141,5 @@ final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEve
 
 # Save the combined plot to file
 mkpath(output_folder_name)
+println("Saving the conditioned upper limits plot to file: ", output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")
 savefig(final_conditioned_plot, output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")
