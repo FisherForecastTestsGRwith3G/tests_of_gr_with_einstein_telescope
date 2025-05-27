@@ -58,7 +58,7 @@ The script is called with one argument.
 
 `julia C_conditioned_plot <config_file_name>`
 
-**D_delta_phi_dist_plot** <br> 
+**D_delta_phi_dist_plot.jl** <br> 
 Produces the plot showing the posterior distribution for the delta_phi PN deformation coefficients, obtained in hierarchical framework.  
 The plot shows both the generic posterior distribution, and the distribution obtained by conditioning on the hyperparameter sigma = 0.  
 The script is called with one argument.

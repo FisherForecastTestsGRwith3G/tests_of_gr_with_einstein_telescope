@@ -12,14 +12,6 @@ using SpecialFunctions
 
 # Distributions.logpdf(distr::_delta_phi_pdf, delta_phi::Real) = log(_evaluate_delta_phi_pdf(delta_phi, distr.params...))
 
-"""
-Function that evaluates the posterior distribution p(δφ_n | data) for the beyond GR deformation coefficient δφ_n, given the parameters φ_k , Δ_k, for k in (1,...,N) measurements of individual GW events.
-
-Since this is an unnormalized 1D pdf (in delta_phi), I will perform an MCMC to sample from the distribution, and then produce a violin plot with the samples. 
-Care should be taken of removing the burn-in samples and make sure that the chain has converged.
-
-"""
-
 function _evaluate_delta_phi_quantities_abcd(sigma::Float64, dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
     # This function evaluates the quantities needed to evaluate the distribution p(δφ_n | data) for a given value of σ
     # The function returns the values of the quantities a, b, c, d which appear in the integrand
@@ -34,7 +26,9 @@ end
 
 function _evaluate_log_delta_phi_sigma_integrand(sigma::Float64, delta_phi::Float64, dphi0_k::Vector{Float64}, delta_k::Vector{Float64}; _internal_log_normalization_value::Union{Nothing, Float64} = nothing)
     # This function evaluates the integrand of the distribution p(δφ_n | data), at a given point σ, given the value of δφ_n (delta_phi)
-    # _internal_log_normalization_value is the (log) value of _evaluate_log_delta_phi_sigma_integrand at δφ_n = 0: this . If not, it can be set to nothing.
+    # _internal_log_normalization_value is a constant value that I will subtract from the log of the integrand, to regularize the pdf for numerical evaluation
+    # In practice this amounts to dividing the integrand (and so the integral ~ pdf) by exp(_internal_log_normalization_value), which is a constant prefactor
+    # This is perfectly allowed, since the posterior distribution is not normalized anyway
 
     if sigma < 0
         return 0.0
@@ -59,10 +53,9 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     # This function estimates the integral over sigma, from 0 to +infinity, of the distribution p(δφ_n | data), given the value of δφ_n (delta_phi)
     # I evaluate the integral using the Gauss-Kronrod quadrature, variables the QuadGK package
 
-    # Since this function is somewhat difficult to integrate,  I suggest quadgk a series of points where to evaluate the integrand
+    # Since this function is somewhat difficult to integrate, for improved accuracy I split the integral in three regions, using a guess for the spread of the distribution as a gauge of the order of magnitude over which the integrand varies
     guess_distributuion_spread = mean(delta_k)
 
-    # I split the integral in three, for added accuracy
     result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-7, atol = 0.)
     result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-7, atol = 0.)
     result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-7, atol = 0.)
@@ -70,9 +63,8 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     result = result1 + result2 + result3
     err = sqrt(err1^2 + err2^2 + err3^2)
 
-    println("Integral result, for delta_phi = ", delta_phi , ": (", result1, " ± ", err1 , ") + (",  result2, " ± ", err2, ") + (", result3, " ± ", err3, ")")
-
-    println("Final integral result, for delta_phi = ", delta_phi , ": ", result, " ± ", err, ", relative error: ", err / abs(result))
+    # println("Integral result, for delta_phi = ", delta_phi , ": (", result1, " ± ", err1 , ") + (",  result2, " ± ", err2, ") + (", result3, " ± ", err3, ")")
+    # println("Final integral result, for delta_phi = ", delta_phi , ": ", result, " ± ", err, ", relative error: ", err / abs(result))
 
     return result
 end
@@ -159,7 +151,17 @@ end
 #     return samples
 # end
 
+
+
 # New definition of the function, which uses information from the analytical form of the conditioned pdf (with sigma = 0)
+
+"""
+Function that evaluates the posterior distribution p(δφ_n | data) for the beyond GR deformation coefficient δφ_n, given the parameters φ_k , Δ_k, for k in (1,...,N) measurements of individual GW events.
+
+Since this is an unnormalized 1D pdf (in delta_phi), I perform an MCMC to sample from the distribution. Then it will be possible to produce a violin plot with these samples, to plot the posterior distribution. 
+Care should be taken of removing the burn-in samples and making sure that the chain has converged. 
+I will produce trace plots and histograms of the samples, to check the convergence and the distribution of the samples.
+"""
 function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{Float64}; n_samples::Int64 = 5000, burn_in::Int64 = 1000, debug_folder_name::Union{Nothing, String} = nothing, pnorder::Union{Nothing, String} = nothing)
     # This function samples from the distribution p(δφ_n | data) for a given set of parameters φ_k , Δ_k
 
@@ -177,13 +179,13 @@ function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{
     uniform_prior_multiplier = 50.
     uniform_prior_range = (mu_conditioned_case - (uniform_prior_multiplier * std_conditioned_case), mu_conditioned_case + (uniform_prior_multiplier * std_conditioned_case))
     println("Uniform prior range for delta_phi (automatically chosen): ", uniform_prior_range)
-    # I expect the spread of this "marginalized" pdf to be larger than the conditioned one, but by considering a factor of 20 (uniform_prior_multiplier) I should be safe 
+    # I expect the spread of this "marginalized" pdf to be larger than the conditioned one, but by considering a factor of 20 [50] (uniform_prior_multiplier) I should be safe 
     # (In fact I will still be able to correctly sample points within about the 5 sigma interval, even if the spread of this "marginalized" pdf is 4 times larger than the conditioned one)
     # For safety this value should be made larger, but this decreases the convergence speed of the MCMC sampling
     # Also the mean of the distribution may be slightly different
     # I could also perform some checks right now, for example estimating the maximum of the pdf in the prior range, and then checking that at the boundaries of the prior range the probability density is much lower than the maximum
     # However I will directly sample via MCMC, and instead look at the resulting chain
-    # => Therefore, a posteriori, as a rule of thumb, one should always chech that recovered samples are always well within the bounds of the prior! I will do so below.
+    # => Therefore, a posteriori, as a rule of thumb, one should always chech that recovered samples are always well within the bounds of the prior! I will do so below, producing plots and performing an automatic check.
 
 
     # To increase the numerical accuracy and stability, I will also evaluate a constant normalization factor, needed to regularize the pdf for numerical evaluation 
