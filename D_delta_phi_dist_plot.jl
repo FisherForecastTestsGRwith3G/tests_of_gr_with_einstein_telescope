@@ -21,11 +21,12 @@ else
 end
 println("Using config file: $(config_file_name)\n")
 
-configs, simulation_tag = readConfigForC(config_file_name)
+configs, simulation_tag = readConfigForD(config_file_name)
 
 # set up folder names
 data_folder_name = user_configs["path_output"]*simulation_tag*"/data/"
 output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
+debug_folder_name =  user_configs["path_output"]*simulation_tag*"/debug/script_D/"
 
 # get global index
 global_index_fisher = Dict()
@@ -86,10 +87,10 @@ posterior_dist_deltaphi_conditioned = zeros(length(configs["network_list"]), len
         delta_k = delta_k[1:n_events_used]
 
         # Obtain samples for posterior distributions for delta_phi
-        posterior_dist_deltaphi[index_nn, index_pno] = obtain_samples_delta_phi_pdf(dphi0_k, delta_k; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"])
+        posterior_dist_deltaphi[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k, delta_k; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name, pnorder = pn_order_dic[pno][2])
 
         # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
-        posterior_dist_deltaphi_conditioned[index_nn, index_pno] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
+        posterior_dist_deltaphi_conditioned[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
 
     end
 end
@@ -101,4 +102,5 @@ delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi,
 
 # Save the combined plot to file
 mkpath(output_folder_name)
+println("Saving the plot to: ", output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * ".pdf")
 savefig(delta_phi_posterior_plot, output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * ".pdf")
