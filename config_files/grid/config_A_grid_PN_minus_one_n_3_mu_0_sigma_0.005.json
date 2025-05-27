@@ -60,10 +60,10 @@
         "averageOverSeveralRealizations": false,
         "numberOfEventsSingleRealization": 10000
     },
-    "header": "grid_PN_minus_one_n_3_mu_0_sigma_0.005",
+    "header": "grid/grid_PN_minus_one_n_3_mu_0_sigma_0.005",
     "a_specific": {
         "sigma": 0.005,
-        "n_events": 10,
+        "n_events": 1000,
         "mu": 0
     },
     "z_specific": {
@@ -74,7 +74,7 @@
         ],
         "PN_order": "1",
         "title": "",
-        "n_events": 10,
+        "n_events": 1000,
         "mu": [
             0,
             0.0035,

@@ -66,12 +66,14 @@ if needToRun
                 continue
             end
             # modify the config file
+            #header = "grid_PN_$(PN_name)_n_$(idx)_mu_" * string(mu_vec[i]) * "_sigma_" * string(sigma_vec[j])
             header = "grid_PN_$(PN_name)_n_$(idx)_mu_" * string(mu_vec[i]) * "_sigma_" * string(sigma_vec[j])
+
             mu = mu_vec[i]
             sigma = sigma_vec[j]
             config_file_name_out = "config_files/grid/config_A_"*header*".json"
 
-            modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN, network_list, n_events)
+            modify_configs(config_file_name, config_file_name_out, simulation_tag*"/"*header, mu, sigma, PN, network_list, n_events)
             # run the simulation
             run(`julia A_run_catalog_script.jl 1 $(config_file_name_out)`)
             println("Simulation for index $(idx) out of $(gridSize) done!")
