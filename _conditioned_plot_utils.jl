@@ -3,12 +3,14 @@ using Plots
 using Plots.Measures
 using ColorSchemes
 
+# include required scripts 
+include("_plot_style.jl")
+
+set_common_plot_style()
+
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
 
-default(fontfamily="Computer Modern", titlefontsize=19, guidefontsize=10, tickfontsize=16, legendfontsize=16, 
-left_margin = 2mm, bottom_margin = 2mm, right_margin = 2.5mm, top_margin = 2.5mm, legend=:topright,  #minorticks=9, #minorgrid=true, grid=true,
-  framestyle=:box, minorgridalpha=.04, gridwidth=0.5, gridalpha=0.5, labelfontsize=21) # minorgridwidth=2.,
 
 # This function plots the cumulative error on PN order for different networks and PN orders
 # plotTitle should be something like "Cumulative Error on PN Order - PhenomHM ET"
