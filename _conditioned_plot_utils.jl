@@ -11,16 +11,17 @@ set_common_plot_style()
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
 
-
-# This function plots the cumulative error on PN order for different networks and PN orders
-# plotTitle should be something like "Cumulative Error on PN Order - PhenomHM ET"
-# upperLimits should be a 3D array with dimensions (number of networks, number of PN orders, 2)
-# upperLimits[:, :, 1] should contain the mean values
-# upperLimits[:, :, 2] should contain the standard deviation values
-# printEventsAsHorizontalLinesOrDensityPlot should be a boolean indicating whether to plot individual events as horizontal lines or density plots
-# upperLimitSingleEvents should be a 3D array with dimensions (number of networks, number of PN orders, number of events)
-# plotLVK_GWTC3_results = True overlays the results for the LVK GWTC-3 results (yet it does not rescale the axis yet, so they may be out of the plotted region!)
-function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false)
+"""
+The plotConditionedUpperLimits function plots the cumulative error on PN order for different networks and PN orders
+plotTitle should be something like "Cumulative Error on PN Order - PhenomHM ET"
+upperLimits should be a 3D array with dimensions (number of networks, number of PN orders, 2)
+upperLimits[:, :, 1] should contain the mean values
+upperLimits[:, :, 2] should contain the standard deviation values
+printEventsAsHorizontalLinesOrDensityPlot should be a boolean indicating whether to plot individual events as horizontal lines or density plots
+upperLimitSingleEvents should be a 3D array with dimensions (number of networks, number of PN orders, number of events)
+plotLVK_GWTC3_results = True overlays the results for the LVK GWTC-3 results (yet it does not rescale the axis yet, so they may be out of the plotted region!)
+"""
+function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20)
 
     # Settings:
 
@@ -31,25 +32,21 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # if ErrorBarsIntervalMultiplier = 2, then you are showing approx the 95% interval
     ErrorBarsIntervalMultiplier = 1.645;
 
-    plotHeight = 450;
-    plotWidth = 900;
+    plotHeight, plotWidth, plotDpi = default_plot_dimensions() # Get the default plot dimensions
     ratioFirstToTotalPlotMarginsIncluded = 1/4.;
     ratioFirstToTotalPlotPlotOnly = 0.125;
-    plotDpi = 300;
-    thresholdNumberEventsAboveWhichToPlotDensity = 20 # Threshold for the number of events above which to plot density instead of horizontal lines
+    thresholdNumberEventsAboveWhichToPlotDensity = plot_samples_min_n_events_for_violin_plots # Threshold for the number of events above which to plot density instead of horizontal lines
     plot_padding_top= 3;
     plot_padding_bottom = 4;
     alpha_level_single_events = 0.4;
 
     # Define a list of different markers to enhance readability
-    markers = [:circle, :square, :diamond, :utriangle, :dtriangle, :hexagon]
-    pointColors = colors = palette(:seaborn_colorblind) #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    
+    markers, pointColors = get_markers_and_palette()
     horizontalLineColorNetworks = pointColors
 
     # Proper LaTeX labels
     xlabel_str = L"\mathrm{PN\ Order}"  # Use \mathrm for proper LaTeX rendering
     ylabel_str = L"\mathrm{90\%\ Upper\ limits}"
-
 
 
     println("\n"*"#"^81)
@@ -167,7 +164,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                 vecc = upperLimitSingleEvents[jj, ii, :]
                 # I need to discard all NaNs!
                 vecc = vecc[.!isnan.(vecc)]
-                if configs["plot_samples"] == true
+                if plot_samples_distribution == true
                     if !toPlotDensity
                         # Plot the single events as horizontal lines
                         scatter!(
@@ -185,7 +182,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                 vecc = upperLimitSingleEvents[jj, ii, :]
                 # I need to discard all NaNs!
                 vecc = vecc[.!isnan.(vecc)]
-                if configs["plot_samples"] == true
+                if plot_samples_distribution == true
 
                     if !toPlotDensity
                         # Plot the single events as horizontal lines
@@ -201,7 +198,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
             end
 
             #if !toPlotDensity
-            if configs["plot_samples"] == true
+            if plot_samples_distribution == true
 
                 scatter!(
                     cc_main, [NaN], [NaN],
@@ -271,36 +268,4 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     plot!(size=(800, 600))
     # Return the final plot
     return final_plot
-end
-
-
-function labels_from_networks(network_names)
-    # Define a dictionary to map network names to their labels
-    network_labels = Dict(
-        "ETS" => L"\textbf{T}",
-        "network_45_15km" => L"\textbf{2L\_45}",
-        "network_0_15km" => L"\textbf{2L\_0}",
-    )
-
-    # Map the network names to their corresponding labels
-    return [network_labels[name] for name in network_names]
-end
-
-function labels_from_PN_orders(PN_orders)
-    # Define a dictionary to map PN orders to their labels
-    PN_labels = Dict(
-        "-1" => L"\varphi_{-1}",
-        "0" => L"\varphi_{0}",
-        "0.5" => L"\varphi_{1}",
-        "1" => L"\varphi_{2}",
-        "1.5" => L"\varphi_{3}",
-        "2" => L"\varphi_{4}",
-        "log(2.5)" => L"\varphi_{5\,\ell}",
-        "3" => L"\varphi_{6}",
-        "log(3.)" => L"\varphi_{6\,\ell}",
-        "3.5" => L"\varphi_{7}"
-    )
-
-    # Map the PN orders to their corresponding labels
-    return [PN_labels[order] for order in PN_orders]
 end

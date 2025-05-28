@@ -46,9 +46,13 @@ n_events_used = configs["n_events"]
 # Samples from the posterior distribution of delta_phi
 posterior_dist_deltaphi = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), configs["mcmc_samples"])
 
-# Samples from the posterior distribution of delta_phi, conditioned on sigma = 0 for the hyperparameter distribution. 
-# In this case I know the analytical form of the pdf, but for simplicity I will just sample from it to produce the violin plots.
-posterior_dist_deltaphi_conditioned = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), configs["mcmc_samples"])
+if configs["plot_conditioned_distribution"]
+    # Samples from the posterior distribution of delta_phi, conditioned on sigma = 0 for the hyperparameter distribution. 
+    # In this case I know the analytical form of the pdf, but for simplicity I will just sample from it to produce the violin plots.
+    posterior_dist_deltaphi_conditioned = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), configs["mcmc_samples"])
+else
+    posterior_dist_deltaphi_conditioned = nothing
+end
 
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
@@ -89,8 +93,10 @@ posterior_dist_deltaphi_conditioned = zeros(length(configs["network_list"]), len
         # Obtain samples for posterior distributions for delta_phi
         posterior_dist_deltaphi[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k, delta_k; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name, pnorder = pn_order_dic[pno][2])
 
-        # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
-        posterior_dist_deltaphi_conditioned[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
+        if configs["plot_conditioned_distribution"]
+            # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
+            posterior_dist_deltaphi_conditioned[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
+        end
 
     end
 end
@@ -98,7 +104,7 @@ end
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
 title = configs["title"] == "" ? "" : latexstring(configs["title"])
-delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned)
+delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi, plot_conditioned_distribution = configs["plot_conditioned_distribution"], posterior_dist_deltaphi_conditioned = posterior_dist_deltaphi_conditioned)
 
 # Save the combined plot to file
 mkpath(output_folder_name)
