@@ -251,7 +251,7 @@ for nn in keys(networks)
             end
         end
 
-        print("$(not_inverted) Fisher matrices (out of $(n_events)) could not be inverted")
+        print("$(not_inverted) Fisher matrices (out of $(n_events)) could not be inverted, or had a SNR below the threshold.")
 
         # caclulate the expected deviations 
         # TODO: Do a better calculation than this. This is provisorical

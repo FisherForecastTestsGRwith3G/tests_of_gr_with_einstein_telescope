@@ -1,5 +1,6 @@
 using Plots
 using Plots.Measures
+using ColorSchemes
 
 function set_common_plot_style()
     default(
@@ -23,7 +24,7 @@ end
 
 function default_plot_dimensions()
     # Set default plot dimensions
-    return (plotHeight=500, plotHeiplotWidthght=1200, plotDpi=300)
+    return (plotHeight=500, plotHeiplotWidthght=1200, plotDpi=300, padding = (10mm, 5mm))
 end
 
 function labels_from_networks(network_names)
@@ -62,7 +63,8 @@ function get_markers_and_palette()
     markers = [:circle, :square, :diamond, :utriangle, :dtriangle, :hexagon]
     
     # Define a color palette
-    palette = palette(:seaborn_colorblind) #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    #viridis
+    # palette_var = palette(:seaborn_colorblind)
+    palette_var = ColorSchemes.seaborn_colorblind #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    #viridis
 
-    return markers, palette
+    return markers, palette_var
 end

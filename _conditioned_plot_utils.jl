@@ -1,7 +1,4 @@
 using StatsPlots
-using Plots
-using Plots.Measures
-using ColorSchemes
 
 # include required scripts 
 include("_plot_style.jl")
@@ -32,7 +29,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # if ErrorBarsIntervalMultiplier = 2, then you are showing approx the 95% interval
     ErrorBarsIntervalMultiplier = 1.645;
 
-    plotHeight, plotWidth, plotDpi = default_plot_dimensions() # Get the default plot dimensions
+    plotHeight, plotWidth, plotDpi, padding = default_plot_dimensions() # Get the default plot dimensions
     ratioFirstToTotalPlotMarginsIncluded = 1/4.;
     ratioFirstToTotalPlotPlotOnly = 0.125;
     thresholdNumberEventsAboveWhichToPlotDensity = plot_samples_min_n_events_for_violin_plots # Threshold for the number of events above which to plot density instead of horizontal lines
@@ -57,12 +54,12 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         printEventsAsHorizontalLinesOrDensityPlot = false
     end
 
-   # name_PN = collect(keys(pn_order_dic));
-   PN_orders = configs["pn_waveforms"];
-   name_PN = configs["pn_waveforms"];
-   network_names = configs["network_list"];
-   network_labels = labels_from_networks(network_names);
-   PN_labels = labels_from_PN_orders(PN_orders);
+    # name_PN = collect(keys(pn_order_dic));
+    PN_orders = configs["pn_waveforms"];
+    name_PN = configs["pn_waveforms"];
+    network_names = configs["network_list"];
+    network_labels = labels_from_networks(network_names);
+    PN_labels = labels_from_PN_orders(PN_orders);
 
     # Extend the arrays, eventually wrapping around
     markers = markers[mod1.(1:length(network_names), length(markers))]
@@ -264,8 +261,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
 
     # Combine the main plot and the subplot
-    final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])])) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
-    plot!(size=(800, 600))
+    final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])]), size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
     # Return the final plot
     return final_plot
 end

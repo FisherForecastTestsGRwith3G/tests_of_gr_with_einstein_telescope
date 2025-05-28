@@ -97,7 +97,7 @@ The scripts store all their outputs in files structured as follows.
         * plot_conditioned_delta_phi_upper_limits_simulation_tag.pdf
         * plot_delta_phi_posterior_dist_simulation_tag.pdf
     * debug/
-        * script_D/
+        * script_D/network/
             * MCMC_posterior_distribution_pn_xy.pdf
 
 ### File-descriptions
