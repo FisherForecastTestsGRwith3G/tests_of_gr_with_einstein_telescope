@@ -3,9 +3,10 @@
 
 "global":{
     "network_list":["ETS"],
-    "catalog_name":"BGR_TIGER_10k.h5",
+    "catalog_name":"BGR_TIGER_1k.h5",
     "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
-    "use_hm_waveform":false,
+    "use_hm_waveform":true,
+    "use_spinless_waveform":true,
     "source_type":"BBH", 
     "snr_thresh":12.0,
     "use_inspiral_snr_thresh":false,

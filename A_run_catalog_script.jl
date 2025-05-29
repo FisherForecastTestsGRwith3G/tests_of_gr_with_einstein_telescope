@@ -166,9 +166,17 @@ for nn in keys(networks)
         #choose waveform
         wf = nothing 
         if configs["use_hm_waveform"]
-            wf = PhenomHM_TIGER(pn_order_dic[pno][1])
+            if configs["use_spinless_waveform"]
+                wf = PhenomHM_TIGER_spinless(pn_order_dic[pno][1])
+            else
+                wf = PhenomHM_TIGER(pn_order_dic[pno][1])
+            end
         else
-            wf = PhenomD_TIGER(pn_order_dic[pno][1])
+            if configs["use_spinless_waveform"]
+                wf = PhenomD_TIGER_spinless(pn_order_dic[pno][1])
+            else
+                wf = PhenomD_TIGER(pn_order_dic[pno][1])
+            end
         end
 
         network = networks[nn]

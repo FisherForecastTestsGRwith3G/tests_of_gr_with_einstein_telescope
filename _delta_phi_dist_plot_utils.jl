@@ -75,7 +75,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
         # Create a new subplot for the current PN order grouping
         subplots[index_subplot] = plot(
             #xlabel=xlabel_str, 
-            #ylabel=(index_subplot > 1 ? "" : ylabel_str),
+            ylabel=(index_subplot > 1 ? "" : ylabel_str),
             #title=plotTitle,
             legend=:bottomright, 
             xticks=(1:length(pn_order_indices), PN_labels[pn_order_indices]),
@@ -151,7 +151,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
     # Combine the subplots into a single plot
     final_plot = plot(subplots..., layout = @layout([grid(1, length(subplots_pn_order_grouping), widths = 0.999999999 .* [length(pn_indices) for pn_indices in subplots_pn_order_grouping] ./ number_PN_orders_to_plot )])) 
     #I will set the title in this final subplot, so that it is centered
-    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, ylabel=ylabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, ylabel=ylabel_str, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
     # Return the final plot
     return final_plot
 end

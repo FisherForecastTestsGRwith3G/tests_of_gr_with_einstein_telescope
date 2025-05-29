@@ -136,7 +136,8 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
     # Initialize the subplot for the first point
     cc_sub = plot(
-        xlabel=xlabel_str, ylabel=ylabel_str,
+        xlabel=xlabel_str, 
+        ylabel=ylabel_str,
         legend=false, xticks=([1], [PN_labels[1]]), 
         xlims=(0.5, 1.5),
         yscale=:log10, size=(plotWidth * ratioFirstToTotalPlotMarginsIncluded, plotHeight), dpi=plotDpi,
@@ -265,7 +266,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
     # Combine the main plot and the subplot
     final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])])) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
-    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, ylabel=ylabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, ylabel=ylabel_str, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
     # Return the final plot
     return final_plot
 end
