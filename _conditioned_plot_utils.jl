@@ -3,7 +3,6 @@ using StatsPlots
 # include required scripts 
 include("_plot_style.jl")
 
-set_common_plot_style()
 
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
@@ -27,6 +26,9 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # if ErrorBarsIntervalMultiplier = 1, then you are showing approx the 68% interval,
     # if ErrorBarsIntervalMultiplier = 1.645, then you are showing approx the 90% interval
     # if ErrorBarsIntervalMultiplier = 2, then you are showing approx the 95% interval
+    
+    set_common_plot_style()
+
     ErrorBarsIntervalMultiplier = 1.645;
 
     plotHeight, plotWidth, plotDpi, padding = default_plot_dimensions() # Get the default plot dimensions
@@ -35,15 +37,16 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     thresholdNumberEventsAboveWhichToPlotDensity = plot_samples_min_n_events_for_violin_plots # Threshold for the number of events above which to plot density instead of horizontal lines
     plot_padding_top= 3;
     plot_padding_bottom = 4;
-    alpha_level_single_events = 0.4;
+    alpha_level_single_events = 0.2;
+    violin_plots_width = 0.5;  # Width of the violin plots
 
     # Define a list of different markers to enhance readability
-    markers, pointColors = get_markers_and_palette()
+    markers, markersize, pointColors = get_markers_and_palette()
     horizontalLineColorNetworks = pointColors
 
     # Proper LaTeX labels
     xlabel_str = L"\mathrm{PN\ Order}"  # Use \mathrm for proper LaTeX rendering
-    ylabel_str = L"\mathrm{90\%\ Upper\ limits}"
+    ylabel_str = L"|\delta\varphi_i|"
 
 
     println("\n"*"#"^81)
@@ -170,7 +173,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         )
                     else
                         # Plot violin plots to show the density distribution of the events, as a function of the upper limits (along the vertical axis), instead of plotting each single event
-                        violin!(cc_sub, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                        violin!(cc_sub, fill(ii, length(vecc)), vecc, orientation=:vertical, width=violin_plots_width, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="", linewidth = 0.0)
                     end
                 end
             end
@@ -189,7 +192,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         )
                     else
                         # Plot the density of the single events
-                        violin!(cc_main, fill(ii, length(vecc)), vecc, orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="")
+                        violin!(cc_main, fill(ii, length(vecc)), vecc, orientation=:vertical, width=violin_plots_width, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="", linewidth = 0.0)
                     end
                 end
             end
@@ -199,11 +202,11 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
                 scatter!(
                     cc_main, [NaN], [NaN],
-                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 2), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Errors from single events ("*network_labels[jj]*")"
+                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 2), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_labels[jj]*")"
                 )
             end
             #else
-            #   violin!(cc_main, [NaN, NaN], [NaN, NaN], orientation=:vertical, width=0.8, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Errors from single events ("*network_names[jj]*")" )
+            #   violin!(cc_main, [NaN, NaN], [NaN, NaN], orientation=:vertical, width=violin_plots_width, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_names[jj]*")" )
             #end
             
         end
@@ -221,7 +224,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
             label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
-            markersize=6, markerstrokewidth=1, markerstrokecolor=:black,
+            markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black,
             alpha=0.9  # Slight transparency for overlapping points
         )
     end
@@ -234,7 +237,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
             label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
-            markersize=6, markerstrokewidth=1, markerstrokecolor=:black,
+            markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black,
             alpha=0.9  # Slight transparency for overlapping points
         )
     end
@@ -249,19 +252,20 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         # Plot the GWTC-3 results in the main plot
         scatter!(
             cc_main, 2:length(PN_orders), LVK_GWTC3_results[2:end],
-            label="LVK GWTC-3", marker=:diamond, markersize=6, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
+            label="LVK GWTC-3", marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
         )
 
         # Plot the first GWTC-3 result in the subplot
         scatter!(
             cc_sub, [1], [LVK_GWTC3_results[1]],
-            label="LVK GWTC-3", marker=:diamond, markersize=6, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
+            label="LVK GWTC-3", marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
         )
     end
 
 
     # Combine the main plot and the subplot
-    final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])]), size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+    final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])])) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, ylabel=ylabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
     # Return the final plot
     return final_plot
 end

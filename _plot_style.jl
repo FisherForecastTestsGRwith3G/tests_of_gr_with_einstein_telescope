@@ -9,10 +9,10 @@ function set_common_plot_style()
         guidefontsize=10,
         tickfontsize=16,
         legendfontsize=16,
-        left_margin = 2mm,
-        bottom_margin = 2mm,
-        right_margin = 2.5mm,
-        top_margin = 2.5mm,
+        left_margin = 8mm,
+        bottom_margin = 8mm,
+        right_margin = 10mm,
+        top_margin = 10mm,
         legend=:topright,
         framestyle=:box,
         minorgridalpha=.04,
@@ -24,7 +24,7 @@ end
 
 function default_plot_dimensions()
     # Set default plot dimensions
-    return (plotHeight=500, plotHeiplotWidthght=1200, plotDpi=300, padding = (10mm, 5mm))
+    return (plotHeight=800, plotWidth=1200, plotDpi=300, padding = (8mm, 5mm))
 end
 
 function labels_from_networks(network_names)
@@ -61,10 +61,11 @@ end
 function get_markers_and_palette()
     # Define a list of different markers to enhance readability
     markers = [:circle, :square, :diamond, :utriangle, :dtriangle, :hexagon]
+    markersize = 8
     
     # Define a color palette
     # palette_var = palette(:seaborn_colorblind)
     palette_var = ColorSchemes.seaborn_colorblind #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    #viridis
 
-    return markers, palette_var
+    return markers, markersize, palette_var
 end

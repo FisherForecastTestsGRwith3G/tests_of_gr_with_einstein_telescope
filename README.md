@@ -61,9 +61,13 @@ The script is called with one argument.
 **D_delta_phi_dist_plot.jl** <br> 
 Produces the plot showing the posterior distribution for the delta_phi PN deformation coefficients, obtained in hierarchical framework.  
 The plot shows both the generic posterior distribution, and the distribution obtained by conditioning on the hyperparameter sigma = 0.  
-The script is called with one argument.
+The script is called with two arguments.
 
-`julia D_delta_phi_dist_plot <config_file_name>`
+`julia D_delta_phi_dist_plot <perform_MCMC_sampling> <config_file_name>`
+
+Here: 
+* `perform_MCMC_sampling` is either 1 or 0 (by default 1). Can be set to 0 to load precomputed MCMC sampling of the posterior distributions.
+* `config_file_name` is the name of the config file to be used
 
 ### How to use config files
 

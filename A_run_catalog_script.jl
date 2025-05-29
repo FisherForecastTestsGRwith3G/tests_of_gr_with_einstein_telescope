@@ -19,7 +19,7 @@ if length(ARGS) > 0
         println("Fisher matrices and SNRs will be evaluated!")
     elseif ARGS[1] == "0"
         needToEvaluateFisherSNRs = false
-        println("Fisher matrices and SNRs will not be evaluated, and instead will be loaded from disk (saves time if you already run evaluated them before)!")
+        println("Fisher matrices and SNRs will not be evaluated, and instead will be loaded from disk (saves time if you already evaluated them before)!")
     else
         @warn "There was a first input argument handed. But it was $(ARGS[1]) and not \"1\" or \"0\" and thus ignored"
     end
@@ -88,6 +88,26 @@ println("Finished loading networks.\n")
 
 ### Get done the calculations ###
 file_name = output_folder_name*"catalog_w_deviations.h5"
+
+# If the user required to not evaluate the Fisher matrices and SNRs, then I will check that the previously evaluated SNR and Fisher
+# were calculated using the same PN deviations as the ones just now generated, otherwise everything below would be inconsistent!
+if !needToEvaluateFisherSNRs
+    # check if the file exists
+    if !isfile(file_name)
+        throw(ArgumentError("The file $(file_name) does not exist, but you set needToEvaluateFisherSNRs to false. Please set it to true to perform the first run."))
+    end
+
+    # check if the PN deviations are the same as the ones in the file
+    h5open(file_name, "r") do file
+        param_group = file["parameter"]
+        for pno in configs["pn_waveforms"]
+            saved_deviation = read(param_group, "pn_" * pn_order_dic[pno][2])
+            if !all(saved_deviation[1:n_events] .== gr_deviation_dict[pno][1:n_events])
+                throw(ArgumentError("The PN deviations in the file $(file_name) do not match the ones just generated. Please set needToEvaluateFisherSNRs to true to re-run the SNR and Fisher evaluations with the new requested injections of the beyond GR deviations!"))
+            end
+        end
+    end
+end
 
 println("Writing parameter to $(file_name)")
 mkpath(output_folder_name)
@@ -225,6 +245,11 @@ for nn in keys(networks)
             inspiral_snrs = h5open(filename, "r") do file
                 read(file, "values")  
             end
+
+            # Select only the first n_events, in case the fisher matrices and SNRs were calculated for more events than requested
+            fisher_matrices = fisher_matrices[1:n_events, :, :]
+            snrs = snrs[1:n_events]
+            inspiral_snrs = inspiral_snrs[1:n_events]
             
         end
 

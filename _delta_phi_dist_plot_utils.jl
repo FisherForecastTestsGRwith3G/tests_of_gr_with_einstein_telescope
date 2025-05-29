@@ -3,8 +3,6 @@ using StatsPlots
 # include required scripts 
 include("_plot_style.jl")
 
-set_common_plot_style()
-
 """
 The plotDeltaPhiPosterior function plots the posterior distributions ('marginalized' and eventually 'conditioned') for the PN deformation coefficients delta_phi, for several networks and PN orders
 - plotTitle should be something like "Posterior distributions for delta varphi"
@@ -15,13 +13,13 @@ The plotDeltaPhiPosterior function plots the posterior distributions ('marginali
 """
 function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaphi::AbstractArray{Float64,3}; plot_conditioned_distribution::Bool = false, posterior_dist_deltaphi_conditioned::Union{Nothing, AbstractArray{Float64,3}} = nothing, subplots_pn_order_grouping::Union{Nothing, Vector{Vector{Int64}}} = nothing)
     
+    set_common_plot_style()
+    
     # Settings:
     plotHeight, plotWidth, plotDpi, padding = default_plot_dimensions() # Get the default plot dimensions
-    plot_padding_top= 3;
-    plot_padding_bottom = 4;
 
     # Define a list of different markers and colors to enhance readability
-    markers, pointColors = get_markers_and_palette()
+    markers, markersize, pointColors = get_markers_and_palette()
 
     # Proper LaTeX labels
     xlabel_str = L"\mathrm{PN\ Order}"  # Use \mathrm for proper LaTeX rendering
@@ -96,10 +94,20 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
             xminorgrid=false  # Disable minor grid lines for the x-axis
         )
 
+        # Add horizontal line at y = 0
+        hline!(subplots[index_subplot], [0.], linecolor=:gray, linestyle=:dash, linewidth=4, label="")
+
+        # Add top labels for each x-tick
+        # for (pnindex, pno) in enumerate(pn_order_indices)
+        #     annotate!(subplots[index_subplot], pnindex, maximum(posterior_dist_deltaphi[:, pno, :]) + 0.1, text(name_PN[pno], :center, 12))
+        # end
+
         # Plot the posterior distributions for the current PN order grouping as violin plots, with some transparency and different color depending on the network
         for jj in 1:length(network_names)
             for (pnindex, pno) in enumerate(pn_order_indices)
                 # plotting the violin plots for the delta_phi 'marginalized' distributions
+                # It would be nice to have the width of the violin plots be proportional to the proability density function
+                # but it seems that in Plot.jl there is no way to set the width of the violin plots
                 violin!(
                     subplots[index_subplot], 
                     fill(pnindex, length(posterior_dist_deltaphi[jj,pno,:])),
@@ -126,12 +134,12 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                         label= nothing, # I set no labels at all here, just like in GWTC-3, you may explain in the caption that the conditioned distributions are plotted just as an outline
                         #marker=markers[jj],  # Cycle through marker list
                         color=:transparent, # Fill color
-                        #markersize=6, 
-                        #markerstrokewidth=1, 
+                        #markersize=10, 
+                        #markerstrokewidth=10, 
                         #markerstrokecolor=:black,
                         orientation=:vertical,
                         linecolor=pointColors[jj],   # Outline color
-                        linewidth= 10,        # Outline thickness
+                        linewidth= 10,        # Outline thickness -- does not seem to work!
                         width=0.65,         # Violin width
                     )
                 end
