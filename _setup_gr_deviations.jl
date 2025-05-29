@@ -66,10 +66,10 @@ function deltaPnNormal(
     n_events = length(mc)
     # TODO: add check that all inputs have the same length.
 
-    if mu == nothing
+    if mu === nothing
         mu = zeros(10)
     end
-    if sigma == nothing
+    if sigma === nothing
         sigma = zeros(10)
     end
     

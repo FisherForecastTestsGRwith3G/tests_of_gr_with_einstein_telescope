@@ -11,13 +11,16 @@ include("_setup_networks.jl")
 include("_setup_gr_deviations.jl")
 include("_parse_config.jl")
 
-# check if we should run the simulation
-needToRun = false
+# check if we should run the simulation. Default is to run it, so that first-time users will have no issues running the code
+needToEvaluateFisherSNRs = true
 if length(ARGS) > 0
     if ARGS[1] == "1"
-        needToRun = true
-        println("The simulation will be run!")
+        needToEvaluateFisherSNRs = true
+        println("Fisher matrices and SNRs will be evaluated!")
     elseif ARGS[1] == "0"
+        needToEvaluateFisherSNRs = false
+        println("Fisher matrices and SNRs will not be evaluated, and instead will be loaded from disk (saves time if you already evaluated them before)!")
+    else
         @warn "There was a first input argument handed. But it was $(ARGS[1]) and not \"1\" or \"0\" and thus ignored"
     end
 end
@@ -37,19 +40,7 @@ configs, simulation_tag = readConfigForA(config_file_name)
 # create folder paths
 output_folder_name = user_configs["path_output"]*simulation_tag*"/"
 
-#Read or generate a catalog and create GR deviations
-
-# #TODO: I dont think we should create a catalog here
-# needToCreateCatalog = true
-# if(needToCreateCatalog)
-#    println("Creating catalog")
-#    # create a catalog
-#    @time GenerateCatalog(
-#         configs["n_events"], 
-#         configs["source_type"], 
-#        name_catalog=configs["catalog_name"]
-#    )
-# end
+#Read catalog and create GR deviations
 
 println("\nRead catalog and calculate GR-deviations")
 gr_parameter = ReadCatalog(configs["catalog_name"], folder=user_configs["path_catalog"])
@@ -98,6 +89,26 @@ println("Finished loading networks.\n")
 ### Get done the calculations ###
 file_name = output_folder_name*"catalog_w_deviations.h5"
 
+# If the user required to not evaluate the Fisher matrices and SNRs, then I will check that the previously evaluated SNR and Fisher
+# were calculated using the same PN deviations as the ones just now generated, otherwise everything below would be inconsistent!
+if !needToEvaluateFisherSNRs
+    # check if the file exists
+    if !isfile(file_name)
+        throw(ArgumentError("The file $(file_name) does not exist, but you set needToEvaluateFisherSNRs to false. Please set it to true to perform the first run."))
+    end
+
+    # check if the PN deviations are the same as the ones in the file
+    h5open(file_name, "r") do file
+        param_group = file["parameter"]
+        for pno in configs["pn_waveforms"]
+            saved_deviation = read(param_group, "pn_" * pn_order_dic[pno][2])
+            if !all(saved_deviation[1:n_events] .== gr_deviation_dict[pno][1:n_events])
+                throw(ArgumentError("The PN deviations in the file $(file_name) do not match the ones just generated. Please set needToEvaluateFisherSNRs to true to re-run the SNR and Fisher evaluations with the new requested injections of the beyond GR deviations!"))
+            end
+        end
+    end
+end
+
 println("Writing parameter to $(file_name)")
 mkpath(output_folder_name)
 h5open(file_name, "w") do file
@@ -125,6 +136,7 @@ end
 for nn in keys(networks)
 
     snr_index_global = ones(Bool, n_events)
+    inspiral_snr_index_global = ones(Bool, n_events)
     fisher_index_global = ones(Bool, n_events)
 
     for pno in configs["pn_waveforms"]
@@ -162,7 +174,9 @@ for nn in keys(networks)
         network = networks[nn]
 
         #calculate fisher
-        if needToRun
+        if needToEvaluateFisherSNRs
+
+            println("Calculating Fisher matrices and SNRs")
             @time fisher_matrices, snrs = FisherMatrix(
                 wf,
                 network,
@@ -182,6 +196,30 @@ for nn in keys(networks)
                 return_SNR=true, 
                 useEarthMotion=true
             )
+
+            println("Calculating inspiral SNRs")
+            #I evaluate the SNR at the end of the "inspiral" phase, as defined in the Phenom waveform models
+            f_inspiral_cutoff = @. 0.018 / (  mc / η^(3. /5.) ) / GMsun_over_c3
+
+            @time inspiral_snrs = SNR(
+                wf,
+                network,
+                mc, 
+                η, 
+                χ_1, 
+                χ_2, 
+                dL, 
+                θ, 
+                ϕ, 
+                iota, 
+                ψ, 
+                tcoal, 
+                delta_pn, 
+                auto_save=false, 
+                useEarthMotion=true,
+                fmax = f_inspiral_cutoff
+            )
+            
         else
             
             
@@ -193,14 +231,26 @@ for nn in keys(networks)
             # read fisher matrices (which are already stored)
             filename = folder_name * "fishers.h5"
             fisher_matrices = h5open(filename, "r") do file
-                fisher_matrices = read(file, "matrices")  
+                read(file, "matrices")  
             end
     
             # read snrs (which are already stored)
             filename = folder_name * "snrs.h5"
             snrs = h5open(filename, "r") do file
-                snrs = read(file, "values")  
+                read(file, "values")  
             end
+            
+            # read inspiral snrs (which are already stored)
+            filename = folder_name * "inspiral_snrs.h5"
+            inspiral_snrs = h5open(filename, "r") do file
+                read(file, "values")  
+            end
+
+            # Select only the first n_events, in case the fisher matrices and SNRs were calculated for more events than requested
+            fisher_matrices = fisher_matrices[1:n_events, :, :]
+            snrs = snrs[1:n_events]
+            inspiral_snrs = inspiral_snrs[1:n_events]
+            
         end
 
         ### postprocessing #########################################################
@@ -226,7 +276,7 @@ for nn in keys(networks)
             end
         end
 
-        print("$(not_inverted) Fisher matrices could not be inverted")
+        print("$(not_inverted) Fisher matrices (out of $(n_events)) could not be inverted, or had a SNR below the threshold.")
 
         # caclulate the expected deviations 
         # TODO: Do a better calculation than this. This is provisorical
@@ -235,7 +285,9 @@ for nn in keys(networks)
 
         # calculate indices and update global indices
         snr_index = convert(Vector{Bool}, snrs .> configs["snr_thresh"])
+        inspiral_snr_index = convert(Vector{Bool}, inspiral_snrs .> configs["inspiral_snr_thresh"])
         snr_index_global = convert(Vector{Bool}, snr_index .& snr_index_global)
+        inspiral_snr_index_global = convert(Vector{Bool}, inspiral_snr_index .& inspiral_snr_index_global)
         fisher_index_global = convert(Vector{Bool}, fisher_inverted .& fisher_index_global)
 
         # save everything to .h5 file 
@@ -247,27 +299,83 @@ for nn in keys(networks)
         end
 
         filename = folder_name * "fishers.h5"
-        h5open(filename, "w") do file
-            write(file, "matrices", fisher_matrices)
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
+            if needToEvaluateFisherSNRs
+                if haskey(file, "matrices")
+                    HDF5.delete_object(file, "matrices")
+                end
+                write(file, "matrices", fisher_matrices)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
+            end
             write(file, "index", fisher_inverted)
         end
 
         filename = folder_name * "snrs.h5"
-        h5open(filename, "w") do file
-            write(file, "values", snrs)
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
+            if needToEvaluateFisherSNRs
+                if haskey(file, "values")
+                    HDF5.delete_object(file, "values")
+                end
+                write(file, "values", snrs)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
+            end
             write(file, "index", snr_index)
         end
+
+        filename = folder_name * "inspiral_snrs.h5"
+        h5open(filename, (isfile(filename) ? "r+" : "w")) do file
+            if needToEvaluateFisherSNRs
+                if haskey(file, "values")
+                    HDF5.delete_object(file, "values")
+                end
+                write(file, "values", inspiral_snrs)
+            end
+            if haskey(file, "index")
+                HDF5.delete_object(file, "index")
+            end
+            write(file, "index", inspiral_snr_index)
+        end
+
     end
 
-    # saving global index
-    total_index_global = convert(Vector{Bool}, snr_index_global .& fisher_index_global)
+    # saving global indices
+    
+    # For additional flexibility in the following scripts, I save both total_index_global-like variables, assuming both use_inspiral_snr_thresh=true and use_inspiral_snr_thresh=false anyway
+    total_index_global_with_inspiral_snr_cut = convert(Vector{Bool}, snr_index_global .& fisher_index_global .& inspiral_snr_index_global)
+    total_index_global_without_inspiral_snr_cut = convert(Vector{Bool}, snr_index_global .& fisher_index_global)
+
+    # But in the end, I set the total_global_index variables, which is the one automatically used in the other scripts, according to the current setting of use_inspiral_snr_thresh from the config file
+    if configs["use_inspiral_snr_thresh"]
+        total_index_global = total_index_global_with_inspiral_snr_cut
+    else
+        total_index_global = total_index_global_without_inspiral_snr_cut
+    end
+
+    println("\nStatistics for network $(nn):")
+    println("Total number of events: ", length(total_index_global))
+    println("Total number of events after SNR cut (snrs > ", configs["snr_thresh"] , ")): ", sum(snr_index_global), " (", round(sum(snr_index_global) * 100. / length(total_index_global) , digits=2), "%)")
+    println("Total number of events after inspiral SNR cut (inspiral_snrs > ", configs["inspiral_snr_thresh"] , "): ", sum(inspiral_snr_index_global), " (", round(sum(inspiral_snr_index_global) * 100. / length(total_index_global), digits=2), "%)")
+    println("Total number of events after Fisher cut: ", sum(fisher_index_global), " (", round(sum(fisher_index_global) * 100. / length(total_index_global), digits=2), "%)")
+    println("Total number of events after Fisher and SNR cut: ", sum(total_index_global_without_inspiral_snr_cut), " (", round(sum(total_index_global_without_inspiral_snr_cut) * 100. / length(total_index_global) , digits=2), "%)")
+    println(",- Total number of events after Fisher and SNR and inspiral SNR cut: ", sum(total_index_global_with_inspiral_snr_cut), " (", round(sum(total_index_global_with_inspiral_snr_cut) * 100. / length(total_index_global), digits=2), "%)")
+    if configs["use_inspiral_snr_thresh"]
+        println("`-> currently applying inspiral SNR cut")
+    else
+        println("`-> currently not applying inspiral SNR cut")
+    end
 
     filename = output_folder_name * "data/" * nn * "/global_indices.h5"
     h5open(filename, "w") do file
         write(file, "snr", snr_index_global)
+        write(file, "inspiral_snr", inspiral_snr_index_global)
         write(file, "fisher", fisher_index_global)
         write(file, "total", total_index_global)
+        write(file, "total_with_inspiral_snr_cut", total_index_global_with_inspiral_snr_cut)
+        write(file, "total_without_inspiral_snr_cut", total_index_global_without_inspiral_snr_cut)
     end
 end
-
 

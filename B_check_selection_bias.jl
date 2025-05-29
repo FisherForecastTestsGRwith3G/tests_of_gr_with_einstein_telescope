@@ -43,7 +43,7 @@ for nn in configs["network_list"]
 
     file_name = data_folder_name * "/catalog_w_deviations.h5"
     h5open(file_name, "r") do catalog_file
-        mkpath(output_folder_name * "/"*nn*"/selection_bias_checks/")        
+        mkpath(output_folder_name *nn*"/selection_bias_checks/")        
         param_group = catalog_file["parameter"]
         
         for param_name in keys(param_group)
@@ -71,7 +71,7 @@ for nn in configs["network_list"]
             xlabel!(phist, param_name)
             #title!(phist, "Difference in distribution for: $(param_name)")
             
-            fig_file_name = output_folder_name * "/"*nn*"/selection_bias_checks/"*param_name*".png"
+            fig_file_name = output_folder_name * nn*"/selection_bias_checks/"*param_name*".png"
             println("\nSaving plot for parameter '$(param_name)' to: $(fig_file_name)")
             savefig(phist, fig_file_name)
             

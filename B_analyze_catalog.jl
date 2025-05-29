@@ -23,11 +23,14 @@ output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
 catalog_name = user_configs["path_output"]*simulation_tag*"/catalog_w_deviations.h5"
 
 snr_thresh = configs["snr_thresh"]
+inspiral_snr_thresh = configs["inspiral_snr_thresh"]
+use_inspiral_snr_thresh = configs["use_inspiral_snr_thresh"]
 n_events = configs["n_events"]
 
 ### get global indices 
 global_index_fisher = Dict()
 global_index_snr = Dict()
+global_index_inspiral_snr = Dict()
 global_index_total = Dict()
 for nn in configs["network_list"]
 
@@ -35,6 +38,7 @@ for nn in configs["network_list"]
     h5open(file_name, "r") do gi_file
         global_index_fisher[nn] = read(gi_file, "fisher")  
         global_index_snr[nn] = read(gi_file, "snr")
+        global_index_inspiral_snr[nn] = read(gi_file, "inspiral_snr")
         global_index_total[nn] = read(gi_file, "total")
     end
 end
@@ -74,7 +78,7 @@ for nn in configs["network_list"]
         psnr = scatter(
             event_ks,
             snr_values,
-            label = "event available", 
+            label = "events available", 
             mc=:red, 
             ms=2, 
             ma=0.5)
@@ -82,7 +86,7 @@ for nn in configs["network_list"]
         scatter!(psnr,
             event_ks[idx_g_total],
             snr_values[idx_g_total],
-            label = "event used", 
+            label = "events used", 
             #markershape=:star5,
             mc=:blue, 
             ms=2, 
@@ -113,13 +117,53 @@ for nn in configs["network_list"]
         ylabel!(pfis, "Δ_k")
         xlabel!(pfis, "k")
 
-        # plot parameter summery 
+        # plot parameter summary 
         l = @layout [ jeff{1.0w, 0.5h} ; hubert{1.0w, 0.5h}]
      
         snr_fish_plot = plot(pfis, psnr, layout = l)
         fig_file_name = output_folder_name * nn *"/"*pno_name* "/catalog_summary/snr_error_catalog.pdf"
         println("\nSaving plot in: $(fig_file_name)")
         savefig(snr_fish_plot, fig_file_name)
+
+        # Load and show inspiral snr as well, if requested
+        if use_inspiral_snr_thresh
+            inspiral_snr_data = Dict()
+            file_name = folder_name * "inspiral_snrs.h5"
+            h5open(file_name, "r") do inspiral_snr_file
+                inspiral_snr_data["values"] = read(inspiral_snr_file, "values")  
+                inspiral_snr_data["index"] = read(inspiral_snr_file, "index")
+            end
+
+            # plot snr 
+            inspiral_snr_values = inspiral_snr_data["values"][1:n_events]
+            psnr_inspiral = scatter(
+                event_ks,
+                inspiral_snr_values,
+                label = "events available", 
+                mc=:red, 
+                ms=2, 
+                ma=0.5)
+            plot!(psnr_inspiral, [1, n_events], [inspiral_snr_thresh, inspiral_snr_thresh], label = "")
+            scatter!(psnr_inspiral,
+                event_ks[idx_g_total],
+                inspiral_snr_values[idx_g_total],
+                label = "events used", 
+                #markershape=:star5,
+                mc=:blue, 
+                ms=2, 
+                ma=0.5
+                )
+            ylabel!(psnr_inspiral, "inspiral SNR")
+            xlabel!(psnr_inspiral, "k (event index)")
+
+            # plot parameter summary 
+            l = @layout [ jeff{1.0w, 0.33h} ; hubert{1.0w, 0.33h}; jeff2{1.0w, 0.33h}]
+        
+            snr_fish_snr_insp_plot = plot(pfis, psnr, psnr_inspiral, layout = l)
+            fig_file_name = output_folder_name * nn *"/"*pno_name* "/catalog_summary/snr_snr_inspiral_error_catalog.pdf"
+            println("\nSaving plot in: $(fig_file_name)")
+            savefig(snr_fish_snr_insp_plot, fig_file_name)
+        end
 
         # summary plot of the rest of the data
 

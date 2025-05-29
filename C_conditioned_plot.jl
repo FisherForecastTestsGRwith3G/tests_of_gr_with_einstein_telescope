@@ -7,7 +7,8 @@ using Serialization
 using Turing
 
 # include required scripts 
-include("_hierarchical_dist.jl")
+#include("_hierarchical_dist.jl")
+include("_hierarchical_deltaphi_dist.jl")
 include("_parse_config.jl")
 include("_conditioned_plot_utils.jl")
 
@@ -136,8 +137,9 @@ end
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
 title = configs["title"] == "" ? "" : latexstring(configs["title"])
-final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results)
+final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results, plot_samples_distribution = configs["plot_samples"])
 
 # Save the combined plot to file
 mkpath(output_folder_name)
-savefig(final_conditioned_plot, output_folder_name * "plot_conditioned_upper_limits_" * simulation_tag * ".pdf")
+println("Saving the conditioned upper limits plot to file: ", output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")
+savefig(final_conditioned_plot, output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")
