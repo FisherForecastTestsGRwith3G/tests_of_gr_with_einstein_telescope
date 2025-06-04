@@ -13,9 +13,12 @@
 
 #     return configs
 # end
+using Random
+using Base.Threads
+using Statistics
+using JSON
+using Interpolations
 
-
-# using JSON
 function modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN, network_list, n_events)
 
     # Read the JSON file into a Julia dictionary
@@ -61,11 +64,21 @@ function bisection_method(f, a, b; tol=1e-6, max_iter=100, debug=true, args_f=()
     - converged: Boolean indicating if the method converged.
     """       
     try 
-        if f(a, args_f...) * f(b, args_f...) > 0
+
+        fa = f(a, args_f...)
+        fb = f(b, args_f...)
+        # if res > 0 it means that (0., 0.) is outside the 3 sigma level
+
+        if  fa * fb > 0
             if debug
                 println("The function must have opposite signs at the endpoints a and b.")
             end
-            return a, false
+            if fa > 0.
+            
+                return a, false
+            else
+                return b, false
+            end
         end
 
         for i in 1:max_iter
@@ -88,14 +101,55 @@ function bisection_method(f, a, b; tol=1e-6, max_iter=100, debug=true, args_f=()
         end
         return (a + b) / 2, false
     catch e
-        if debug
-            println("Error in bisection method: ", e)
-        end
+        # if debug
+        #     println("Error in bisection method: ", e)
+        # end
+        #@error "ERROR: " exception=(err, catch_backtrace())
+        rethrow(e)
         return NaN, false
     end
 end
 
-using Statistics
+
+# function reshuffling_bisection(n_events_used, n_reshuffling, ff, dphi0_k, delta_k, sigma)
+#     res = zeros(n_reshuffling)
+#     # dphi0_k, delta_k, sigma = args_f
+#     for i in 1:n_reshuffling
+
+#         n_events_used = Int(round(n_events_used))
+
+#         println(n_events_used)
+#         p = randperm(n_events_used)
+
+#         dphi0_k_shuf = dphi0_k[p]
+#         delta_k_shuf = delta_k[p]
+
+#         args_ff = [dphi0_k_shuf, delta_k_shuf, sigma]
+#         res[i] = ff(n_events_used, args_ff...)
+#     end
+
+#     return median(res)
+# end
+
+function reshuffling_bisection(n_reshuffling, ff, dphi0_k, delta_k, sigma)
+    res = zeros(n_reshuffling)
+
+    n_events = length(delta_k)
+    @threads for i in 1:n_reshuffling
+
+        p = randperm(n_events)
+
+        dphi0_k_shuf = dphi0_k[p]
+        delta_k_shuf = delta_k[p]
+
+        res[i] = bisection_method(ff, 3, n_events, tol=1,  args_f=(dphi0_k_shuf, delta_k_shuf, sigma))[1]
+    end
+
+    return median(res), res
+end
+
+    
+
 
 function sigmas_from_center(pdf::Matrix{Float64}, x::Float64, y::Float64)
     # Find the center of the distribution
@@ -113,6 +167,56 @@ function sigmas_from_center(pdf::Matrix{Float64}, x::Float64, y::Float64)
     sigmas_y = (y - mu_y) / std_y
 
     return sigmas_x, sigmas_y
+end
+
+
+function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
+
+    n_events_used = Int(round(n_events_used))
+
+    dphi0_k = dphi0_k[1:n_events_used] 
+    delta_k = delta_k[1:n_events_used]
+
+    ### calculate the hyper-parameter distribution
+    # first estimate where to place it
+    center_mu = sum(dphi0_k) / n_events_used
+    # center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
+    spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
+
+    k_spread = 5. #configs_B["k_spread"]
+    mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
+    if !isnothing(configs_B["mu_lims"][pno]) # overwrite mu_lims
+        mu_limit = (configs_B["mu_lims"][pno][1], configs_B["mu_lims"][pno][2])
+    end 
+    
+    sig_limit = (max(0, center_sig - k_spread*spread), center_sig + k_spread*spread)
+    if !isnothing(configs_B["sigma_lims"][pno]) # overwrite sig_lims
+        sig_limit = (configs_B["sigma_lims"][pno][1], configs_B["sigma_lims"][pno][2])
+    end 
+    #sig_limit = (0., configs_B["sigma_lims"][pno][2])
+
+    # println("mu_limit: ", mu_limit)
+    # println("sig_limit: ", sig_limit)
+    # sig_limit = (0., 0.05)
+    # mu_limit = (0., 0.05)
+    # calculate the ranges 
+    mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs_B["n_points"]))
+    sig_values = collect(LinRange(sig_limit[1], sig_limit[2], configs_B["n_points"]))
+    p_mu_sig, p_sig, p_mu, n_tot, network_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
+
+    # 2d interpolation
+    itp = interpolate((mu_values, sig_values), p_mu_sig, Gridded(Linear()))
+    p_mu_sig_interp = extrapolate(itp, 0.0)
+
+    #try
+    level = calcPercentileLvl( p_mu_sig, [0.9889])
+    p_GR = p_mu_sig_interp(0., 0.)
+
+    # out of the 3 sigma interval if level > p_GR
+    res = level[1] - p_GR
+    # if res > 0 it means that (0., 0.) is outside the 3 sigma level
+    return res#, p_mu_sig, level, p_GR, mu_values, sig_values, p_mu_sig_interp
+
 end
 
 # # Example usage:

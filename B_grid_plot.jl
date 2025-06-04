@@ -5,6 +5,8 @@ using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
 using Turing
+using Base.Threads
+
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -36,7 +38,10 @@ pno = configs["pn_waveforms"][1]
 PN_name = pn_order_dic[pno][2]
 network = configs["network_list"][1]
 n_events = configs["n_events"]
+n_median = configs["n_median"]
 gridSize = length(mu_vec) * length(sigma_vec) 
+
+println("\n Anlayzing grid composed of $gridSize grid points\n")
 
 # get global index
 global_index_fisher = Dict()
@@ -46,12 +51,13 @@ global_index_total = Dict()
 
 # process all the plots
 
-idx = 0
 
+idx=0
+res = zeros((length(mu_vec), length(sigma_vec)))
 for i in 1:length(mu_vec)
     for j in 1:length(sigma_vec)
-        idx += 1
-        println("Analyzing data for index $(idx) out of $(gridSize)")
+        global idx += 1
+        println("\n Analyzing data for index $(idx) out of $(gridSize)")
         # skip the (0.,0.) case
         if mu_vec[i] == 0. && sigma_vec[j] == 0.
             continue
@@ -59,14 +65,10 @@ for i in 1:length(mu_vec)
 
         mu = mu_vec[i]
         sigma = sigma_vec[j]
-        folder = data_folder_name * nn * "/pn_" * pn_order_dic[pno][2]
-        filename = folder * "/single_event_measurements.h5"
-        data = Dict()
-        h5open(filename, "r") do file
-            for key in keys(file)
-                data[key] = read(file, key)
-            end
-        end
+        header = "grid_PN_$(PN_name)_n_$(idx)_mu_" * string(mu) * "_sigma_" * string(sigma)
+        data_grid_folder_name = data_folder_name * header * "/data/" * network# * "/pn_" * PN_name 
+
+        println(" Mu: ", mu, " Sigma: ", sigma)
         file_name = data_grid_folder_name * "/global_indices.h5"
         h5open(file_name, "r") do gi_file
             global_index_fisher[network] = read(gi_file, "fisher")  
@@ -74,8 +76,8 @@ for i in 1:length(mu_vec)
             global_index_total[network] = read(gi_file, "total")
         end
 
-        
-        filename = data_grid_folder_name * "/single_event_measurements.h5"
+        data_grid_folder_name_pno = data_folder_name * header * "/data/" * network * "/pn_" * PN_name
+        filename = data_grid_folder_name_pno * "/single_event_measurements.h5"
         data = Dict()
         h5open(filename, "r") do file
             for key in keys(file)
@@ -87,38 +89,19 @@ for i in 1:length(mu_vec)
         dphi0_k = data["dphi0_k"][global_index_total[network]]
         delta_k = data["delta_k"][global_index_total[network]]
 
-        function wrapper_3sigma(n_events_used, dphi0_k, delta_k)
-
-            dphi0_k = dphi0_k[1:n_events_used] 
-            delta_k = delta_k[1:n_events_used]
-
-            ### calculate the hyper-parameter distribution
-            # first estimate where to place it
-            center_mu = sum(dphi0_k) / n_events_used
-            center_sig = max(0, sqrt.(sum(center_mu .- dphi0_k).^2 ./  n_events_used))
-            spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
-
-            k_spread = configs_B["k_spread"]
-            mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
-            if !isnothing(configs_B["mu_lims"][pno]) # overwrite mu_lims
-                mu_limit = (configs_B["mu_lims"][pno][1], configs_B["mu_lims"][pno][2])
-            end 
-            
-            sig_limit = (max(0, center_sig - k_spread*spread), center_sig + k_spread*spread)
-            if !isnothing(configs_B["sigma_lims"][pno]) # overwrite sig_lims
-                sig_limit = (configs_B["sigma_lims"][pno][1], configs_B["sigma_lims"][pno][2])
-            end 
-
-            # calculate the ranges 
-            mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs["n_points"]))
-            sig_values = collect(LinRange(sig_limit[1], sig_limit[2], configs["n_points"]))
-            p_mu_sig, p_sig, p_mu, n_tot, network_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
-
-            return p_mu_sig
-    
-            # calculate the 3 sigma upper limit
-            # first estimate where to place it  
-
-end
+        res[i,j] = reshuffling_bisection(n_median, wrapper_3sigma, dphi0_k, delta_k, sigma)[1]
+    end
 end
 
+# save data
+
+h5open(data_folder_name*"results_.h5", "w") do file
+    write(file, "results", res)
+end
+
+mkpath(output_folder_name* "/" * network * "/" *PN_name)
+fig_file_name = output_folder_name * "grid_plot.pdf"
+println("\nSaving grid plot in: $(fig_file_name)")
+
+splot = heatmap(mu_vec, sigma_vec, res')
+savefig(splot, fig_file_name)

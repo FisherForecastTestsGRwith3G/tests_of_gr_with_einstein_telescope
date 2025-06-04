@@ -57,12 +57,19 @@ if needToRun
     # run the simulation
     println("Running the simulation...")
     local idx = 0
+    local skips = configs["skips"]
+
     for i in 1:length(mu_vec)
         for j in 1:length(sigma_vec)
             idx += 1
             println("Running simulation for index $(idx) out of $(gridSize)")
             # skip the (0.,0.) case
             if mu_vec[i] == 0. && sigma_vec[j] == 0.
+                continue
+            end
+
+            if skips > 0
+                skips -=1
                 continue
             end
             # modify the config file

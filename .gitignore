@@ -1,3 +1,5 @@
 test.ipynb
 output/
 config_files/user_configs.json
+output.txt
+nohup.txt

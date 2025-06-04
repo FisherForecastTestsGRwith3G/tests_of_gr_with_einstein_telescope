@@ -1,7 +1,9 @@
 {
     "global": {
         "catalog_name": "BGR_TIGER_10k.h5",
-        "pn_waveforms": ["1"],
+        "pn_waveforms": [
+            "1"
+        ],
         "snr_thresh": 12.0,
         "network_list": [
             "network_45_15km"
@@ -58,11 +60,11 @@
         "averageOverSeveralRealizations": false,
         "numberOfEventsSingleRealization": 10000
     },
-    "header": "grid",
+    "header": "grid/grid_PN_one_n_44_mu_0.005_sigma_0.004",
     "a_specific": {
-        "sigma": 0.1,
+        "sigma": 0.004,
         "n_events": 1400,
-        "mu": 2.0
+        "mu": 0.005
     },
     "z_specific": {
         "sigma": [
@@ -91,9 +93,7 @@
             0.008,
             0.009,
             0.01
-        ],
-        "skips":70,
-        "n_median":150
+        ]
     },
     "mcmc_settings": {
         "run_mcmc": false,

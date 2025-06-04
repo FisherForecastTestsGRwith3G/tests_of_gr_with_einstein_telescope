@@ -75,7 +75,7 @@ end
         ### calculate the hyper-parameter distribution
         # first estimate where to place it
         center_mu = sum(dphi0_k) / n_events_used
-        center_sig = max(0, sqrt.(sum(center_mu .- dphi0_k).^2 ./  n_events_used))
+        center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
         spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
 
         k_spread = configs["k_spread"]
