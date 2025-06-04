@@ -30,9 +30,9 @@ end
 function labels_from_networks(network_names)
     # Define a dictionary to map network names to their labels
     network_labels = Dict(
-        "ETS" => L"\textbf{T}",
-        "network_45_15km" => L"\textbf{2L\_45}",
-        "network_0_15km" => L"\textbf{2L\_0}",
+        "ETS" => L"\texttt{T}",
+        "network_45_15km" => L"\texttt{2L\_45}",
+        "network_0_15km" => L"\texttt{2L\_0}",
     )
 
     # Map the network names to their corresponding labels

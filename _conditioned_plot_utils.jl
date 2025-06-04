@@ -170,7 +170,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         # Plot the single events as horizontal lines
                         scatter!(
                             cc_sub, fill(ii, length(vecc)), vecc, label="",
-                            marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
+                            marker=:hline, markersize=15, markerstrokewidth=1, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
                         )
                     else
                         # Plot violin plots to show the density distribution of the events, as a function of the upper limits (along the vertical axis), instead of plotting each single event
@@ -189,7 +189,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         # Plot the single events as horizontal lines
                         scatter!(
                             cc_main, fill(ii, length(vecc)), vecc, label="",
-                            marker=:hline, markersize=15, markerstrokewidth=2, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
+                            marker=:hline, markersize=15, markerstrokewidth=1, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj]
                         )
                     else
                         # Plot the density of the single events
@@ -203,7 +203,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
                 scatter!(
                     cc_main, [NaN], [NaN],
-                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 2), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_labels[jj]*")"
+                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 1), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_labels[jj]*")"
                 )
             end
             #else
