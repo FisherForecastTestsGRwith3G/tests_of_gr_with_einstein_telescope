@@ -10,8 +10,8 @@ function set_common_plot_style()
         tickfontsize=16,
         legendfontsize=16,
         left_margin = 8mm,
-        bottom_margin = 8mm,
-        right_margin = 10mm,
+        right_margin = 8mm,
+        bottom_margin = 10mm,
         top_margin = 10mm,
         legend=:topright,
         framestyle=:box,
@@ -33,6 +33,8 @@ function labels_from_networks(network_names)
         "ETS" => L"\texttt{T}",
         "network_45_15km" => L"\texttt{2L\_45}",
         "network_0_15km" => L"\texttt{2L\_0}",
+        "LHV" => L"\texttt{LHV}",
+        "LHVK" => L"\texttt{LHVK}",
     )
 
     # Map the network names to their corresponding labels
@@ -68,4 +70,12 @@ function get_markers_and_palette()
     palette_var = ColorSchemes.seaborn_colorblind #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    #viridis
 
     return markers, markersize, palette_var
+end
+
+function get_relative_x_offset_network(current_network_index, total_number_networks)
+    # Calculate the relative x offset (from -1.0 to 1.0) for each network, used to avoid overlap. I assume current_network_index starts from 1.
+    if total_number_networks == 1
+        return 0.0
+    end
+    return ((current_network_index - 1) / (total_number_networks - 1)) * 2.0 - 1.0
 end

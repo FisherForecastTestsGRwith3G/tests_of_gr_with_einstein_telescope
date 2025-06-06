@@ -66,7 +66,12 @@
             "numberOfEventsSingleRealization":10000,
             "LVK":false,
             "plot_samples":false,
-            "title":""
+            "title":"",
+            "use_all_n_events_for_single_event_sample_distribution":true,
+            "offset_x_axis_hierarchical_networks_upper_bounds":0.1,
+            "offset_x_axis_single_event_networks_upper_bounds":0.0,
+            "impose_y_axis_limits":false,
+            "y_axis_limits":[[1e-8, 1e-6],[2e-5, 1e-2]]
         },
          
         "d_specific":{
