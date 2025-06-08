@@ -127,7 +127,7 @@ for (index_nn, nn) in enumerate(configs["network_list"])
         end
 
         println("Saving the posterior distribution for delta_phi to disk, in $(filename_samples)")
-        mkpath(data_folder_name * "script_D/")
+        mkpath(data_folder_name * "script_D/" * nn  * "/")
         # save to .h5 file 
         h5open(filename_samples, "w") do file
             write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi)
