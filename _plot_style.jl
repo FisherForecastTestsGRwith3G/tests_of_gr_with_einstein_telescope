@@ -9,9 +9,9 @@ function set_common_plot_style()
         guidefontsize=10,
         tickfontsize=16,
         legendfontsize=16,
-        left_margin = 8mm,
+        left_margin = 10mm,
         right_margin = 8mm,
-        bottom_margin = 10mm,
+        bottom_margin = 12mm,
         top_margin = 10mm,
         legend=:topright,
         framestyle=:box,
@@ -29,7 +29,7 @@ end
 
 function smaller_margins_subplots()
     # Set default plot margins for subplots
-    return (left_margin = 2mm, right_margin = 2mm, bottom_margin = 3mm, top_margin = 3mm)
+    return (left_margin = 2mm, right_margin = 2mm, bottom_margin = 3mm, top_margin = 3mm, left_margin_with_ylabel = 8mm)
 end
 
 function labels_from_networks(network_names)

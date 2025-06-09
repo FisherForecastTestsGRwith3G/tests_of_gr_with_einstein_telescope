@@ -28,8 +28,8 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
     markers, markersize, pointColors = get_markers_and_palette()
 
     # Proper LaTeX labels
-    xlabel_str = L"\mathrm{PN\ Order}"  # Use \mathrm for proper LaTeX rendering
-    ylabel_str = L"\delta \varphi_i"
+    xlabel_str = "PN order" 
+    ylabel_str = L"\delta \varphi_{\!i}"
 
     # Perform some checks and set defaults
     if plot_conditioned_distribution && posterior_dist_deltaphi_conditioned === nothing
@@ -91,16 +91,16 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
             size=(plotWidth * length(pn_order_indices) / number_PN_orders_to_plot, plotHeight), 
             dpi=plotDpi,
             xlims=(0.5 - configs["offset_x_axis_hierarchical_networks_upper_bounds"], length(pn_order_indices) + 0.5 + configs["offset_x_axis_hierarchical_networks_upper_bounds"]),
-            grid=false,
+            grid=true,
             framestyle=:box,
-            ylims=(configs["impose_y_axis_limits"] ? configs["y_axis_limits"][index_subplot] : nothing),  # Set y-axis limits if requested
+            ylims=(configs["impose_y_axis_limits"] ? configs["y_axis_limits"][index_subplot] : :auto),  # Set y-axis limits if requested
             gridalpha=0.5, 
             gridcolor=:gray,  # Set grid lines to be transparent or gray
             yminorgrid=true, 
             minorgridalpha=0.3, 
             minorgridcolor=:gray,  # Enable minor grid lines
             xminorgrid=false,  # Disable minor grid lines for the x-axis,        
-            left_margin = small_margin_subplots.left_margin,
+            left_margin = (index_subplot ==  1 ? small_margin_subplots.left_margin_with_ylabel : small_margin_subplots.left_margin),
             right_margin = small_margin_subplots.right_margin,
             top_margin = small_margin_subplots.top_margin,
             bottom_margin = small_margin_subplots.bottom_margin
@@ -131,10 +131,10 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                     #markerstrokewidth=1, 
                     #markerstrokecolor=:black,
                     orientation=:vertical,
-                    alpha=0.5,          # Slight fill transparency for overlapping violin plots
+                    alpha=0.45,          # Slight fill transparency for overlapping violin plots
                     linecolor=pointColors[jj],   # Outline color
                     linewidth=0,        # No outline thickness
-                    width=0.65,         # Violin width
+                    width=0.65,         # Violin width... does not seem to work!
                     bandwidth=std(posterior_dist_deltaphi[jj,pno,:]) * configs["violin_plots_bandwidth_std_multiplier"] # Bandwidth for the kernel density estimation, to smooth out the (noisy) data
                 )
 
@@ -153,7 +153,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                         orientation=:vertical,
                         linecolor=pointColors[jj],   # Outline color
                         linewidth= 10,        # Outline thickness -- does not seem to work!
-                        width=0.65,         # Violin width 
+                        width=0.65,         # Violin width, does not seem to work!
                         bandwidth=std(posterior_dist_deltaphi_conditioned[jj,pno,:]) * configs["violin_plots_bandwidth_std_multiplier"] # Bandwidth for the kernel density estimation, to smooth out the (noisy) data
                     )
                 end

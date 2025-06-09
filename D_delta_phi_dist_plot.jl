@@ -148,11 +148,11 @@ for (index_nn, nn) in enumerate(configs["network_list"])
             return network_posterior_dist_deltaphi, network_posterior_dist_deltaphi_conditioned
         end
         # Check if the loaded posterior distribution has the correct dimensions
-        if size(posterior_dist_deltaphi, 1) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi, 2) != configs["mcmc_samples"]
-            throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi))."))
+        if size(network_posterior_dist_deltaphi, 1) != length(configs["pn_waveforms"]) || size(network_posterior_dist_deltaphi, 2) != configs["mcmc_samples"]
+            throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(network_posterior_dist_deltaphi))."))
         end
-        if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(posterior_dist_deltaphi_conditioned, 1) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi_conditioned, 2) != configs["mcmc_samples"])
-            throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi_conditioned))."))
+        if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(network_posterior_dist_deltaphi_conditioned, 1) != length(configs["pn_waveforms"]) || size(network_posterior_dist_deltaphi_conditioned, 2) != configs["mcmc_samples"])
+            throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(network_posterior_dist_deltaphi_conditioned))."))
         end
         # Assign the loaded posterior distributions to the main variable
         posterior_dist_deltaphi[index_nn, :, :] = network_posterior_dist_deltaphi
