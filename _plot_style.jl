@@ -27,6 +27,11 @@ function default_plot_dimensions()
     return (plotHeight=800, plotWidth=1200, plotDpi=300, padding = (8mm, 5mm))
 end
 
+function smaller_margins_subplots()
+    # Set default plot margins for subplots
+    return (left_margin = 2mm, right_margin = 2mm, bottom_margin = 3mm, top_margin = 3mm)
+end
+
 function labels_from_networks(network_names)
     # Define a dictionary to map network names to their labels
     network_labels = Dict(

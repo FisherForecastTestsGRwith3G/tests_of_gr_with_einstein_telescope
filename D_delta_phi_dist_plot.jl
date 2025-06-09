@@ -130,29 +130,34 @@ for (index_nn, nn) in enumerate(configs["network_list"])
         mkpath(data_folder_name * "script_D/" * nn  * "/")
         # save to .h5 file 
         h5open(filename_samples, "w") do file
-            write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi)
+            write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi[index_nn, :, :])
             if configs["plot_conditioned_distribution"]
-                write(file, "samples_posterior_dist_deltaphi_conditioned", posterior_dist_deltaphi_conditioned)
+                write(file, "samples_posterior_dist_deltaphi_conditioned", posterior_dist_deltaphi_conditioned[index_nn, :, :])
             end
         end
     else
         # If we do not perform the MCMC sampling, I will load the results from disk
         println("Loading the posterior distribution for delta_phi from disk, from file $(filename_samples)")
-        global posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned = h5open(filename_samples, "r") do file
-            posterior_dist_deltaphi = read(file, "samples_posterior_dist_deltaphi")
+        local network_posterior_dist_deltaphi, network_posterior_dist_deltaphi_conditioned = h5open(filename_samples, "r") do file
+            network_posterior_dist_deltaphi = read(file, "samples_posterior_dist_deltaphi")
             if configs["plot_conditioned_distribution"]
-                posterior_dist_deltaphi_conditioned = read(file, "samples_posterior_dist_deltaphi_conditioned")
+                network_posterior_dist_deltaphi_conditioned = read(file, "samples_posterior_dist_deltaphi_conditioned")
             else
-                posterior_dist_deltaphi_conditioned = nothing
+                network_posterior_dist_deltaphi_conditioned = nothing
             end
-            return posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned
+            return network_posterior_dist_deltaphi, network_posterior_dist_deltaphi_conditioned
         end
         # Check if the loaded posterior distribution has the correct dimensions
-        if size(posterior_dist_deltaphi, 1) != length(configs["network_list"]) || size(posterior_dist_deltaphi, 2) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi, 3) != configs["mcmc_samples"]
-            throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["network_list"])), $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi))."))
+        if size(posterior_dist_deltaphi, 1) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi, 2) != configs["mcmc_samples"]
+            throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi))."))
         end
-        if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(posterior_dist_deltaphi_conditioned, 1) != length(configs["network_list"]) || size(posterior_dist_deltaphi_conditioned, 2) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi_conditioned, 3) != configs["mcmc_samples"])
-            throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["network_list"])), $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi_conditioned))."))
+        if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(posterior_dist_deltaphi_conditioned, 1) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi_conditioned, 2) != configs["mcmc_samples"])
+            throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi_conditioned))."))
+        end
+        # Assign the loaded posterior distributions to the main variable
+        posterior_dist_deltaphi[index_nn, :, :] = network_posterior_dist_deltaphi
+        if configs["plot_conditioned_distribution"]
+            posterior_dist_deltaphi_conditioned[index_nn, :, :] = network_posterior_dist_deltaphi_conditioned
         end
     end
 end
