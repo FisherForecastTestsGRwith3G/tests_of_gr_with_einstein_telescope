@@ -23,6 +23,7 @@ In the config files,
 "offset_x_axis_single_event_networks_upper_bounds": allows to offset the x-axis for the single events upper bounds (e.g. violin plots), so that they do not overlap if there are multiple networks [float, default 0.0],
 "impose_y_axis_limits": allows to impose the y-axis limits for the plot, so that they are not automatically set based on the data [true/false]
 "y_axis_limits": allows to set the y-axis limits for the plot, if impose_y_axis_limits is true [2x2 vector, outer vector represent the left and right subplots, the inner vector represents the lower and upper limits, e.g. [[1e-8, 1e-6],[2e-5, 1e-2]] ]
+"violin_plots_bandwidth_std_multiplier": allows to set the bandwidth for the kernel density estimation used in the violin plots, as a multiplier of the standard deviation of the data [float, default 0.4]
 """
 function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20)
 
@@ -142,7 +143,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         xlabel=xlabel_str, title=plotTitle,
         legend=:bottomright, xticks=(2:10, PN_labels[2:end]), 
         yscale=:log10, size=(plotWidth * (1. - ratioFirstToTotalPlotMarginsIncluded), plotHeight), dpi=plotDpi,
-        xlims=(1.5, 10.5),
+        xlims=(1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 10.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])),
         grid=true, framestyle=:box,
         yticks=[10.0^i for i in floor(Int, log10(min_y)):ceil(Int, log10(max_y))],  # Set y-axis ticks for each 10^N value within the range
         ylims=(min_y, max_y),  # Automatically set the y-axis range
@@ -156,7 +157,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         xlabel=xlabel_str, 
         ylabel=ylabel_str,
         legend=false, xticks=([1], [PN_labels[1]]), 
-        xlims=(0.5, 1.5),
+        xlims=(0.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 1.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])),
         yscale=:log10, size=(plotWidth * ratioFirstToTotalPlotMarginsIncluded, plotHeight), dpi=plotDpi,
         grid=true, framestyle=:box,
         yticks=[10.0^i for i in floor(Int, log10(min_y_sub)) : ceil(Int, log10(max_y_sub))],  # Set y-axis ticks for the first point
@@ -192,7 +193,30 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         )
                     else
                         # Plot violin plots to show the density distribution of the events, as a function of the upper limits (along the vertical axis), instead of plotting each single event
-                        violin!(cc_sub, fill(( isnothing(configs["offset_x_axis_single_event_networks_upper_bounds"]) ? ii : ii + configs["offset_x_axis_single_event_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), length(vecc)), vecc, orientation=:vertical, width=violin_plots_width, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="", linewidth = 0.0)
+                        # Actually, since the violin plots do not work well on a log scale, I plot them on a separate linear y axis, but where I perform myself the transformation to the log space
+                        # Add a second y-axis (linear, no label, no grid, no ticks)
+                        cc_sub2 = twinx(cc_sub)
+                        xlims!(cc_sub2, (0.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 1.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])))
+                        ylims!(cc_sub2, log.((min_y_sub, max_y_sub)))
+                        Plots.xlabel!(cc_sub2, "")
+
+                        violin!(
+                            cc_sub2, 
+                            fill((ii + configs["offset_x_axis_single_event_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), length(vecc)), 
+                            log.(vecc), 
+                            ylabel = "",
+                            yticks = [],
+                            #grid = false,
+                            #legend = false,
+                            #framestyle = :none,
+                            orientation=:vertical, 
+                            width=violin_plots_width, 
+                            alpha=alpha_level_single_events, 
+                            color=horizontalLineColorNetworks[jj], 
+                            label="", 
+                            linewidth = 0.0, 
+                            bandwidth=std(log.(vecc)) * configs["violin_plots_bandwidth_std_multiplier"]
+                        )
                     end
                 end
             end
@@ -211,7 +235,30 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         )
                     else
                         # Plot the density of the single events
-                        violin!(cc_main, fill(( isnothing(configs["offset_x_axis_single_event_networks_upper_bounds"]) ? ii : ii + configs["offset_x_axis_single_event_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), length(vecc)), vecc, orientation=:vertical, width=violin_plots_width, alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="", linewidth = 0.0)
+                        # Actually, since the violin plots do not work well on a log scale, I plot them on a separate linear y axis, but where I perform myself the transformation to the log space
+                        # Add a second y-axis (linear, no label, no grid, no ticks)
+                        cc_main2 = twinx(cc_main)
+                        xlims!(cc_main2, (1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 10.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])))
+                        ylims!(cc_main2, log.((min_y, max_y)))
+                        Plots.xlabel!(cc_main2, "")
+
+                        violin!(
+                            cc_main2, 
+                            fill((ii + configs["offset_x_axis_single_event_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), length(vecc)), 
+                            log.(vecc),
+                            ylabel = "",
+                            yticks = [],
+                            #grid = false,
+                            #legend = false,
+                            #framestyle = :none,
+                            orientation=:vertical, 
+                            width=violin_plots_width, 
+                            alpha=alpha_level_single_events, 
+                            color=horizontalLineColorNetworks[jj], 
+                            label="", 
+                            linewidth = 0.0, 
+                            bandwidth=std(log.(vecc)) * configs["violin_plots_bandwidth_std_multiplier"]
+                        )
                     end
                 end
             end
@@ -284,7 +331,21 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
 
     # Combine the main plot and the subplot
     final_plot = plot(cc_sub, cc_main, layout = @layout([grid(1, 2, widths = [ratioFirstToTotalPlotPlotOnly, 1 - ratioFirstToTotalPlotPlotOnly])])) #, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
-    plot!(final_plot, title=plotTitle, xlabel=xlabel_str, size=(plotWidth, plotHeight), padding = padding, dpi=plotDpi) #, ylabel=ylabel_str, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+    plot!(
+        final_plot, 
+        title=plotTitle, 
+        #xlabel=xlabel_str, 
+        size=(plotWidth, plotHeight), 
+        padding = padding, 
+        dpi=plotDpi,
+        framestyle = :box,
+        grid = true,
+        gridalpha=0.5, 
+        gridcolor=:gray,  # Set grid lines to be transparent or gray
+        yminorgrid=true, 
+        minorgridalpha=0.3
+    ) #, ylabel=ylabel_str, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
+
     # Return the final plot
     return final_plot
 end
