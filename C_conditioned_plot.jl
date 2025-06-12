@@ -79,7 +79,7 @@ end
  for (index_nn, name_network) in enumerate(list_of_networks)
 
     println("\n"*"#"^81)
-    println("Processing Network = $(nn)\n")
+    println("Processing Network = $(name_network)\n")
 
 
     # set up folder names
@@ -127,17 +127,17 @@ end
             n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"],
             printEventsAsHorizontalLinesOrDensityPlot = printEventsAsHorizontalLinesOrDensityPlot,
             use_all_n_events_for_single_event_sample_distribution = configs["use_all_n_events_for_single_event_sample_distribution"]
-            )
+        )
 
-        # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            
-        # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
-        if !(configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"])
-            println("Number of realizations: ", length(number_events_single_realization))
-            println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
-            println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
-            println("Average number of events observed per realization: ", mean(number_events_single_realization))
-            println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
-        end
+        # # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            
+        # # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
+        # if !(configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"])
+        #     println("Number of realizations: ", length(number_events_single_realization))
+        #     println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
+        #     println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
+        #     println("Average number of events observed per realization: ", mean(number_events_single_realization))
+        #     println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
+        # end
 
         if sum(number_events_single_realization .== 0) > 0
             println("Warning! There are $(sum(number_events_single_realization .== 0)) realizations with zero number of events, so they will not be used to obtain the upper bounds (so will not influence the average upper bound, nor its error bars)!")
@@ -168,7 +168,7 @@ final_conditioned_plot = plotConditionedUpperLimits(title,
     plotLVK_GWTC3_results = plotLVK_GWTC3_results, 
     plot_samples_distribution = configs["plot_samples"], 
     compute_mean_std_dev_in_log_space = configs["compute_mean_std_dev_in_log_space"], 
-    list_of_networks = (overload_detector_networks_as_waveform_models ? list_of_networks[:,1] .* "_" .* list_of_networks[:,2] : list_of_networks)
+    list_of_networks_names = (overload_detector_networks_as_waveform_models ? list_of_networks[:,1] .* "_" .* list_of_networks[:,2] : list_of_networks)
 )
 
 # Save the combined plot to file

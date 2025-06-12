@@ -477,7 +477,48 @@ function get90PctUpperLimitMuDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector
     return upper_limit
 end
 
-function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, printEventsAsHorizontalLinesOrDensityPlot::Bool = true, use_all_n_events_for_single_event_sample_distribution::Bool = true)
+function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, printEventsAsHorizontalLinesOrDensityPlot::Bool = true, use_all_n_events_for_single_event_sample_distribution::Bool = true, print_info_catalog_realization::Bool = true)
+
+    dphi0_k_realization, delta_k_realization, number_events_single_realization = obtain_dphi0k_deltak_from_realizations(n_events, global_index_network, dphi0_k_full, delta_k_full; averageOverSeveralRealizations, numberOfEventsSingleRealization, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events, print_info_catalog_realization)
+
+    vectorUpperLimits = zeros(numberOfRealization)
+    upperLimitSingleEventsTemp = nothing # This will be used to store the upper limits for the single events, if requested
+
+    for realization_index in 1:numberOfRealization
+
+        # Now I iterate over each realization
+        if number_events_single_realization[realization_index] == 0
+            # No events in realization, so I will skip this realization and set the upper limit to NaN
+            vectorUpperLimits[realization_index] = NaN
+            continue
+        end
+
+        #Evaluate the 90% upper limit given this single realization
+        vectorUpperLimits[realization_index] = get90PctUpperLimitMuDistTIGER(dphi0_k_realization[realization_index], delta_k_realization[realization_index], 0.9)
+
+    end
+
+    #Save the single events 90% upper limits (eventually for a given realization), if requested
+    if printEventsAsHorizontalLinesOrDensityPlot
+        # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
+
+        if use_all_n_events_for_single_event_sample_distribution
+            # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
+            #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
+            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vcat(dphi0_k_realization...), vcat(delta_k_realization...))
+        else
+            # I use only a single realization to plot the single events upper limits
+            # I look for the first realization_index which has at least one event
+            first_realization_with_events = findfirst(x -> x > 0, number_events_single_realization)
+            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization[first_realization_with_events, :], delta_k_realization[first_realization_with_events, :])
+        end
+        
+    end
+
+    return vectorUpperLimits, upperLimitSingleEventsTemp, number_events_single_realization, numberOfEventsSingleRealization
+end
+
+function obtain_dphi0k_deltak_from_realizations(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, print_info_catalog_realization::Bool = true)
     if n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events
         println("Considering directly observed events (i.e. not performing a random draw (which would introduce 'poissonian' noise - actually binomially distributed) from the catalog)! Therefore, selecting directly n_events = $(n_events) from the observed ones! This may not be what you want!")
         # If the number of events refers to the observed events, then we select the events to be used (in practice dphi0_k and delta_k) directly only from observed events (i.e. with global_index_network == 1)
@@ -539,7 +580,6 @@ function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network
     dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
     delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, numberOfEventsSingleRealization)
 
-    vectorUpperLimits = zeros(numberOfRealization)
     dphi0_k_realization = Vector{Vector{Float64}}(undef, numberOfRealization)
     delta_k_realization = Vector{Vector{Float64}}(undef, numberOfRealization)
     number_events_single_realization = zeros(Int64, numberOfRealization)
@@ -551,39 +591,15 @@ function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network
         number_events_single_realization[realization_index] = sum(global_index_network_effective[realization_index, :])
     end
 
-    for realization_index in 1:numberOfRealization
-
-        # Now I iterate over each realization
-        if number_events_single_realization[realization_index] == 0
-            # No events in realization, so I will skip this realization and set the upper limit to NaN
-            vectorUpperLimits[realization_index] = NaN
-            continue
-        end
-
-        #Evaluate the 90% upper limit given this single realization
-        vectorUpperLimits[realization_index] = get90PctUpperLimitMuDistTIGER(dphi0_k_realization[realization_index], delta_k_realization[realization_index], 0.9)
-
-    end
-    
-
-    upperLimitSingleEventsTemp = nothing # This will be used to store the upper limits for the single events, if requested
-
-    #Save the single events 90% upper limits (eventually for a given realization), if requested
-    if printEventsAsHorizontalLinesOrDensityPlot
-        # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
-
-        if use_all_n_events_for_single_event_sample_distribution
-            # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
-            #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
-            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vcat(dphi0_k_realization...), vcat(delta_k_realization...))
-        else
-            # I use only a single realization to plot the single events upper limits
-            # I look for the first realization_index which has at least one event
-            first_realization_with_events = findfirst(x -> x > 0, number_events_single_realization)
-            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization[first_realization_with_events, :], delta_k_realization[first_realization_with_events, :])
-        end
-        
+    if print_info_catalog_realization && !(n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events)
+    # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            
+    # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
+        println("Number of realizations: ", length(number_events_single_realization))
+        println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
+        println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
+        println("Average number of events observed per realization: ", mean(number_events_single_realization))
+        println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
     end
 
-    return vectorUpperLimits, upperLimitSingleEventsTemp, number_events_single_realization, numberOfEventsSingleRealization
+    return dphi0_k_realization, delta_k_realization, numberOfEventsSingleRealization
 end

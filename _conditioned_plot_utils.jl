@@ -70,7 +70,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
     # name_PN = collect(keys(pn_order_dic));
     PN_orders = configs["pn_waveforms"];
-    if isnothing(network_names)
+    if isnothing(list_of_networks_names)
         # If no network names are provided, use the default ones
         println("Warning: No network names provided in plotConditionedUpperLimits, using the default ones from the config file.")
         network_names = configs["network_names"];
@@ -369,10 +369,10 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
         dpi=plotDpi,
         framestyle = :box,
         grid = true,
-        gridalpha=0.5, 
+        gridalpha=0.4, 
         gridcolor=:gray,  # Set grid lines to be transparent or gray
         yminorgrid=true, 
-        minorgridalpha=0.3
+        minorgridalpha=0.15
     ) #, ylabel=ylabel_str, top_margin=2mm, bottom_margin=2mm, left_margin=2mm, right_margin=2mm)
 
     # Return the final plot

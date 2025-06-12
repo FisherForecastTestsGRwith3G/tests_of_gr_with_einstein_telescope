@@ -66,19 +66,28 @@ n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events =
 n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = true # If true, the n_events and numberOfEventsSingleRealization refer directly to the observed events, and there is not poissonian/binomial noise due to drawing observed events from the catalog of all events. This is useful to remove the poissonian/binomial noise contribution to the shown error bars/ribbons.
 
 #   Plot Settings (currently used for y labels only)
-min_y = 10^-8
-max_y = 10^0
+min_y = 10^-9
+max_y = 10^2
+set_y_lims = true
+y_lims = (2e-8, 8e0)
 
 # Compute the number of events used in the hierarchical analysis, conditioned on the delta phi distribution
 # obtain a evenly spaced vector
 n_events_realizations = Int.(floor.(exp.(log(min_number_of_realizations) .+ (log(max_number_of_realizations) - log(min_number_of_realizations)) .* (collect(1:number_of_points_trend_plot) .- 1) ./ (number_of_points_trend_plot - 1))))
+
+# Remove duplicate values, if any
+n_events_realizations = unique(n_events_realizations)
+if length(n_events_realizations) < number_of_points_trend_plot
+    println("Warning: automatically reduced the number of points in n_events_realizations (from $(number_of_points_trend_plot) to $(length(n_events_realizations))) by discarding duplicates values.")
+    number_of_points_trend_plot = length(n_events_realizations)
+end
 println("Number of events used in the hierarchical analysis, conditioned on the delta phi distribution: $(n_events_realizations)")
 
 # Plot some lines going as the square root of the number of events, to show the trend of the upper limits as a function of the number of events used in the hierarchical analysis, conditioned on the delta phi distribution.
 # Here you can just indicate the different initial constants for these trend lines, such that they will be plotted accordingly
 # just set initial_height_square_roots_trend_line = [] if you don't want to plot any trend line
-initial_height_square_roots_trend_line = (exp.(log(10^-5) .+ (log(10^-0) - log(10^-5)) .* (collect(1:6) .- 1) ./ (6- 1))) .* sqrt.(n_events_realizations[1])
-
+# initial_height_square_roots_trend_line = (exp.(log(10^-5) .+ (log(10^-0) - log(10^-5)) .* (collect(1:6) .- 1) ./ (6 - 1))) .* sqrt.(n_events_realizations[1])
+initial_height_square_roots_trend_line = (exp.(log(10^-9) .+ (log(10^4) - log(10^-9)) .* (collect(1:14) .- 1) ./ (14 - 1))) .* sqrt.(n_events_realizations[1])
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
 upperLimits = zeros(length(configs["network_list"]), number_of_points_trend_plot, length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
@@ -187,7 +196,7 @@ markers, markersize, pointColors = get_markers_and_palette()
 
 
 # Proper LaTeX labels
-xlabel_str = L"N"
+xlabel_str = L"N_{obs}"
 ylabel_str = L"|\delta\varphi_{\!i}|" 
 plotTitle = ""
 
@@ -219,7 +228,7 @@ final_plot = plot(
     yscale=:log10, 
     xscale=:log10,
     xlims=(n_events_realizations[1], n_events_realizations[end]),  # Set x-axis limits to the first and last number of events used in the hierarchical analysis
-    #ylims=(configs["impose_y_axis_limits"] ? configs["y_axis_limits"][index_subplot] : :auto),  # Set y-axis limits if requested   
+    ylims=(set_y_lims ? y_lims : :auto),  # Set y-axis limits if requested   
     #left_margin = (index_subplot ==  1 ? small_margin_subplots.left_margin_with_ylabel : small_margin_subplots.left_margin),
     #right_margin = small_margin_subplots.right_margin,
     #top_margin = small_margin_subplots.top_margin,
@@ -248,7 +257,7 @@ if length(initial_height_square_roots_trend_line) > 0
             #label="Trend line: " * string(initial_height) * " * sqrt(N)", 
             color=:gray, 
             alpha=0.5,
-            label=(index_h == 1 ? L"\propto N^{-1/2}" : ""),  # Only label the first trend line
+            label=(index_h == 1 ? L"\propto N_{obs}^{-1/2}" : ""),  # Only label the first trend line
             linestyle=:dash, 
             linewidth=2
         )
@@ -260,27 +269,15 @@ for (index_pno, pno) in enumerate(PN_orders)
     # Extract the upper limits for the current PN order
     upperLimits_pno = upperLimits[index_detector_network_to_use, :, index_pno, (compute_mean_in_log_space ? 3 : 1)]  # Mean values
     upperLimits_std_pno = upperLimits[index_detector_network_to_use, :, index_pno, (use_std_for_ribbon_in_log_space ? 4 : 2)]  # Standard deviation values
-    println(upperLimits[index_detector_network_to_use,1,index_pno,2], " vs ", upperLimits[index_detector_network_to_use,1,index_pno,4])
-    println(upperLimits[index_detector_network_to_use,:,index_pno,2], " vs ", upperLimits[index_detector_network_to_use,:,index_pno,4])
 
     if use_std_for_ribbon_in_log_space
         lower = upperLimits_pno .- exp.(log.(upperLimits_pno) .- ErrorBarsIntervalMultiplier .* log.(upperLimits_std_pno))
         upper = exp.(log.(upperLimits_pno) .+ ErrorBarsIntervalMultiplier .* log.(upperLimits_std_pno)) .- upperLimits_pno
         ribbon_lower_upper_limits = hcat(lower, upper)
-        if index_pno == 1
-            println(lower)
-            println(upper)
-            println(ribbon_lower_upper_limits)
-        end
     else
         lower = upperLimits_pno .- ErrorBarsIntervalMultiplier .* upperLimits_std_pno
         upper = upperLimits_pno .+ ErrorBarsIntervalMultiplier .* upperLimits_std_pno
         ribbon_lower_upper_limits = hcat(lower, upper)
-    end
-    
-    if(any((upperLimits_pno .- ribbon_lower_upper_limits) .< 0))
-        println("Warning: upper limits ribbon goes to negative values, setting them to 0 so they will not produce an error (but the ribbon will appear as cut!)!")
-        ribbon_lower_upper_limits[ribbon_lower_upper_limits[:,1] .< 0, 1] .= 0.
     end
 
     # Plot the mean upper limits with error bars (as a ribbon), but without markers
