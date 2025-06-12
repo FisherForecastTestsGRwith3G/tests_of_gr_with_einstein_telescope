@@ -93,6 +93,5 @@
             "inset_pns":["-1","0","0.5","1","1.5"],
             "n_noise_realizations": 2,
             "noise_seed": 1234
-        },  
-        
+        }  
 }
