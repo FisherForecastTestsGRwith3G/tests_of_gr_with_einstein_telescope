@@ -54,12 +54,18 @@ printEventsAsHorizontalLinesOrDensityPlot = true #I will do this only for the fi
 plotLVK_GWTC3_results = configs["LVK"] #Overlay the GWTC-3 results on the plot
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
-upperLimits = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), 2)
+upperLimits = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
 # Create an empty array to store the single events upper limits, if required.
 n_events_used = configs["n_events"]
 upperLimitSingleEvents = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), n_events_used)
 #For the moment I will fill the array with NaN, so that if the number of events used is lower than n_events_used, I can simply discard the NaN
 upperLimitSingleEvents .= NaN
+
+if configs["compute_mean_std_dev_in_log_space"]
+    println("You are using the mean and std dev evaluated in log space!")
+else
+    println("You are using the mean and std dev evaluated in linear space!")
+end
 
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
@@ -143,7 +149,7 @@ upperLimitSingleEvents .= NaN
 
         end
         # Evaluate the mean and std of the upper limits
-        upperLimits[index_nn, index_pno, :] = [mean(vectorUpperLimits), std(vectorUpperLimits)]
+        upperLimits[index_nn, index_pno, :] = [mean(vectorUpperLimits), std(vectorUpperLimits), exp(mean(log.(vectorUpperLimits))), exp(std(log.(vectorUpperLimits)))]
 
     end
 end
@@ -151,7 +157,7 @@ end
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
 title = configs["title"] == "" ? "" : latexstring(configs["title"])
-final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results, plot_samples_distribution = configs["plot_samples"])
+final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results, plot_samples_distribution = configs["plot_samples"], compute_mean_std_dev_in_log_space = configs["compute_mean_std_dev_in_log_space"])
 
 # Save the combined plot to file
 mkpath(output_folder_name)

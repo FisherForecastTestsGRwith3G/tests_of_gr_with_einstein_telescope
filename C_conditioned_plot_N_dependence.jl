@@ -8,6 +8,8 @@ using Turing
 
 # Fast hack of script C, to produce a plot of the the trend of the hierarchical upper limits as a function of the number of events, conditioned on the delta phi distribution.  
 
+println("Running C_conditioned_plot_N_dependence.jl script: this script is a modified version of the C_conditioned_plot.jl script, not completely refined. You should look a the source code and set the correct parameters in the script (not just in the config files), to obtain the wanted result.")
+
 # include required scripts 
 #include("_hierarchical_dist.jl")
 include("_hierarchical_deltaphi_dist.jl")
@@ -72,16 +74,17 @@ initial_height_square_roots_trend_line = (exp.(log(10^-5) .+ (log(10^-0) - log(1
 
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
-upperLimits = zeros(length(configs["network_list"]), number_of_points_trend_plot, length(configs["pn_waveforms"]), 4) #3rd and 4th dimension: mean and std dev computed in log space
+upperLimits = zeros(length(configs["network_list"]), number_of_points_trend_plot, length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
 # Create an empty array to store the single events upper limits, if required.
 n_events_used = configs["n_events"]
 
-if compute_mean_in_log_space
+if configs["compute_mean_std_dev_in_log_space"]
     println("You are using the mean and std dev evaluated in log space!")
 else
     println("You are using the mean and std dev evaluated in linear space!")
 end
 
+# May be better to collect the for cycle below in a separate function, since it is quite similar to the one in C_conditioned_plot.jl (so any changes are carried over, as they should be)
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
 
@@ -289,12 +292,9 @@ for (index_pno, pno) in enumerate(PN_orders)
         ribbon_lower_upper_limits = hcat(lower, upper)
     end
     
-
-    threshold_to_set_to_nan = 10^-4  # Threshold below which the upper limits will be set to NaN
     if(any((upperLimits_pno .- ribbon_lower_upper_limits) .< 0))
         @warn "Upper limits ribbon goes to negative values or below threshold ($(threshold_to_set_to_nan)), setting them to 0 so they will not produce an error (but the ribbon will appear as cut!)!"
-        ribbon_lower_upper_limits[ribbon_lower_upper_limits[:,1] .< 0,1] .= 0.
-        ribbon_lower_upper_limits[(ribbon_lower_upper_limits[:,1])./upperLimits_pno .< threshold_to_set_to_nan,1] .= 0.
+        ribbon_lower_upper_limits[ribbon_lower_upper_limits[:,1] .< 0, 1] .= 0.
     end
 
     # Plot the mean upper limits with error bars (as a ribbon), but without markers

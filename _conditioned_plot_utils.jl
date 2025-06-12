@@ -24,8 +24,9 @@ In the config files,
 "impose_y_axis_limits": allows to impose the y-axis limits for the plot, so that they are not automatically set based on the data [true/false]
 "y_axis_limits": allows to set the y-axis limits for the plot, if impose_y_axis_limits is true [2x2 vector, outer vector represent the left and right subplots, the inner vector represents the lower and upper limits, e.g. [[1e-8, 1e-6],[2e-5, 1e-2]] ]
 "violin_plots_bandwidth_std_multiplier": allows to set the bandwidth for the kernel density estimation used in the violin plots, as a multiplier of the standard deviation of the data [float, default 0.4]
+"compute_mean_std_dev_in_log_space": computes (and uses) the mean and standard deviation over different catalog and noise realization in log space, instead of linear space [true/false, default: true]
 """
-function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20)
+function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20, compute_mean_std_dev_in_log_space::Bool = true)
 
     # Settings:
 
@@ -81,8 +82,15 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # std_cumulative_error = zeros(length(PN_orders), length(network_names))
 
 
+    # Select the correct data columns from upperLimitsOriginal
+    if compute_mean_std_dev_in_log_space
+        upperLimits = upperLimitsOriginal[:, :, [3, 4]]  # Use the mean and std dev in log space
+    else
+        upperLimits = upperLimitsOriginal[:, :, [1, 2]]  # Use the mean and std dev in linear space
+    end
+
     if size(upperLimits)[2] != 10
-        throw(ArgumentError("You did not process all PN orders, for now this function cannot deal with results processed only partially!"))
+        @warn "You did not process all PN orders, for now this function cannot deal with results processed only partially!"
     end
 
     #I check that there are no NaNs for the (eventually average) value of the upperLimits
@@ -141,9 +149,9 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # Initialize the main plot with white background and high resolution
     cc_main = plot(
         xlabel=xlabel_str, title=plotTitle,
-        legend=:bottomright, xticks=(2:10, PN_labels[2:end]), 
+        legend=:bottomright, xticks=(2:length(PN_orders) , PN_labels[2:end]), 
         yscale=:log10, size=(plotWidth * (1. - ratioFirstToTotalPlotMarginsIncluded), plotHeight), dpi=plotDpi,
-        xlims=(1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 10.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])),
+        xlims=(1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), length(PN_orders) + 0.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])),
         grid=true, framestyle=:box,
         yticks=[10.0^i for i in floor(Int, log10(min_y)):ceil(Int, log10(max_y))],  # Set y-axis ticks for each 10^N value within the range
         ylims=(min_y, max_y),  # Automatically set the y-axis range
@@ -238,7 +246,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
                         # Actually, since the violin plots do not work well on a log scale, I plot them on a separate linear y axis, but where I perform myself the transformation to the log space
                         # Add a second y-axis (linear, no label, no grid, no ticks)
                         cc_main2 = twinx(cc_main)
-                        xlims!(cc_main2, (1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), 10.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])))
+                        xlims!(cc_main2, (1.5 - maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]]), length(PN_orders) + 0.5 + maximum([configs["offset_x_axis_single_event_networks_upper_bounds"], configs["offset_x_axis_hierarchical_networks_upper_bounds"]])))
                         ylims!(cc_main2, log.((min_y, max_y)))
                         Plots.xlabel!(cc_main2, "")
 
@@ -281,12 +289,24 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
         
     end
 
+    #Compute the width of the error bars (which may be asymmetric)
+    if compute_mean_std_dev_in_log_space
+        lower = upperLimits[:, :, 1] .- exp.(log.(upperLimits[:, :, 1]) .- ErrorBarsIntervalMultiplier .* log.(upperLimits[:, :, 2]))
+        upper = exp.(log.(upperLimits[:, :, 1]) .+ ErrorBarsIntervalMultiplier .* log.(upperLimits[:, :, 2])) .- upperLimits[:, :, 1]
+    else
+        lower = (ErrorBarsIntervalMultiplier .* upperLimits[:, :, 2])
+        upper = (ErrorBarsIntervalMultiplier .* upperLimits[:, :, 2])
+    end
+
 
     # Plot the first point in the subplot
     for jj in 1:length(network_names)
+        
         scatter!(
-            cc_sub, [1] .+ ( isnothing(configs["offset_x_axis_hierarchical_networks_upper_bounds"]) ? 0 : configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), [upperLimits[jj, 1, 1]],
-            yerr= ErrorBarsIntervalMultiplier * [upperLimits[jj, 1, 2]],  # Add error bars
+            cc_sub, [1] .+ ( isnothing(configs["offset_x_axis_hierarchical_networks_upper_bounds"]) ? 0 : configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), 
+            [upperLimits[jj, 1, 1]],
+            yerr= (lower[jj,1], upper[jj,1]),  # Add error bars
+
             label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
@@ -298,8 +318,9 @@ function plotConditionedUpperLimits(plotTitle, upperLimits, printEventsAsHorizon
     # Plot the remaining points in the main plot
     for jj in 1:length(network_names)
         scatter!(
-            cc_main, (2:length(PN_orders)) .+ ( isnothing(configs["offset_x_axis_hierarchical_networks_upper_bounds"]) ? 0 : configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), upperLimits[jj, 2:end, 1],
-            yerr= ErrorBarsIntervalMultiplier * upperLimits[jj, 2:end, 2],  # Add error bars
+            cc_main, (2:length(PN_orders)) .+ ( isnothing(configs["offset_x_axis_hierarchical_networks_upper_bounds"]) ? 0 : configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), 
+            upperLimits[jj, 2:end, 1],
+            yerr= (lower[jj, 2:end], upper[jj, 2:end]),  # Add error bars
             label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
             color=pointColors[jj],
