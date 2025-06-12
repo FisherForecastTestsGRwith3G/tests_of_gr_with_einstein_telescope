@@ -39,6 +39,7 @@ function labels_from_networks(network_names)
     return [network_labels[name] for name in network_names]
 end
 
+#TODO: Remove this function
 function labels_from_PN_orders(PN_orders)
     # Define a dictionary to map PN orders to their labels
     PN_labels = Dict(
@@ -58,6 +59,8 @@ function labels_from_PN_orders(PN_orders)
     return [PN_labels[order] for order in PN_orders]
 end
 
+
+
 function get_markers_and_palette()
     # Define a list of different markers to enhance readability
     markers = [:circle, :square, :diamond, :utriangle, :dtriangle, :hexagon]
@@ -69,3 +72,29 @@ function get_markers_and_palette()
 
     return markers, markersize, palette_var
 end
+
+const labels_from_pn_orders = Dict(
+        "-1" => L"\varphi_{-1}",
+        "0" => L"\varphi_{0}",
+        "0.5" => L"\varphi_{1}",
+        "1" => L"\varphi_{2}",
+        "1.5" => L"\varphi_{3}",
+        "2" => L"\varphi_{4}",
+        "log(2.5)" => L"\varphi_{5\,\ell}",
+        "3" => L"\varphi_{6}",
+        "log(3.)" => L"\varphi_{6\,\ell}",
+        "3.5" => L"\varphi_{7}"
+    )
+
+const color_from_pn_orders = Dict(
+        "-1" => get_markers_and_palette()[3][1],
+        "0" => get_markers_and_palette()[3][2],
+        "0.5" => get_markers_and_palette()[3][3],
+        "1" => get_markers_and_palette()[3][4],
+        "1.5" => get_markers_and_palette()[3][5],
+        "2" => get_markers_and_palette()[3][6],
+        "log(2.5)" => get_markers_and_palette()[3][7],
+        "3" => get_markers_and_palette()[3][8],
+        "log(3.)" => get_markers_and_palette()[3][9],
+        "3.5" => get_markers_and_palette()[3][10]
+    )

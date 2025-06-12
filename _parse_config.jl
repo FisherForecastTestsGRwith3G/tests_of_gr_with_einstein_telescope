@@ -109,6 +109,52 @@ function readConfigForD(json_file_name)
     return configs, run_tag
 end
 
+function readConfigForE(json_file_name)
+
+    config_dic = open(json_file_name,"r") do f
+        config_dic = JSON.parse(f)
+    end
+    configs = merge(config_dic["global"], config_dic["b_specific"])
+    configs = merge(configs, config_dic["mcmc_settings"])
+    
+    pn_waveforms = config_dic["e_specific"]["pn_waveforms"]
+    if any(map(x-> !(x in configs["pn_waveforms"]), pn_waveforms))
+        throw(ValueError("`pn_waveforms` in `e_specific` must be contained in the `pn_waveforms` listed in `b_specific`"))
+    end
+    inset_pns = config_dic["e_specific"]["inset_pns"]
+    if any(map(x-> !(x in pn_waveforms), inset_pns))
+        throw(ValueError("`inset_pns` in `e_specific` must be contained in the `pn_waveforms` listed in `e_specific`"))
+    end 
+    configs = merge(configs, config_dic["e_specific"])
+
+    # set defaul values for the limits
+    for key in ["mu_lims", "sigma_lims"]
+        for pno in keys(pn_order_dic)
+            
+            tmp = configs[key][pno]
+            if tmp == []
+                configs[key][pno] = nothing
+            else
+                configs[key][pno] = (Float64(tmp[1]), Float64(tmp[2]))
+            end
+        end
+    end
+
+    # add injected values from injected mu and sigma
+    # TODO: Need to change the way the injection works in the future
+    #       Then, in the future we will have to also adopt this 
+    configs["injected_values"] = Dict{String, Tuple{Float64,Float64}}()
+    for pno in keys(pn_order_dic)
+        configs["injected_values"][pno] = (
+            Float64(config_dic["a_specific"]["mu"]),
+            Float64(config_dic["a_specific"]["sigma"]),
+            )
+    end
+
+    run_tag = config_dic["header"]
+
+    return configs, run_tag
+end
 
 function readConfigForZ(json_file_name)
 

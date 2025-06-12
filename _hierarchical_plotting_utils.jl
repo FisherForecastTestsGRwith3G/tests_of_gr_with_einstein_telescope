@@ -1,5 +1,5 @@
 # using Trapz
-# import Contour
+import Contour as con
 
 
 """
@@ -16,6 +16,10 @@ function calcPercentileLvl(
         weights = ones(size(p_values))
     end
 
+    if any(percentiles .>= 1) | any(percentiles .<= 0)
+         throw(ValueError("Percentiles must be values between 0 and 1!"))
+    end
+
     #calculate contours 
     bin_values = p_values[:] .* weights[:]
     bin_values = sort(bin_values)
@@ -26,7 +30,12 @@ function calcPercentileLvl(
     percentiles = sort(percentiles, rev=true)
     for perc in percentiles
         idx = findfirst(z .>= (1.0-perc))
-        append!(percentile_level, [bin_values[idx]])
+
+        if !(idx == nothing)
+            append!(percentile_level, [bin_values[idx]])
+        else
+            throw(ErrorException("Contour level could not be found. Have a look at the posterior handed!"))
+        end
     end
 
     return percentile_level
@@ -97,4 +106,27 @@ function distributionSummaryPlot(
      
     return plot(cplot, sig_plot, mu_plot, layout = l)
 
+end
+
+"""
+Calculates a line in the mu-sigma plane, representing the 90CI contour
+"""
+function calculate90CIContour(mu_values, sig_values, p_mu_sig) 
+
+    # calculate the probability that corresponds to the 90CI
+    c_levels = calcPercentileLvl(p_mu_sig, [0.90])
+    
+    # determine the 90CI isoline
+    cl_x = []
+    cl_y = []
+    for cl in con.levels(con.contours(mu_values, sig_values, p_mu_sig, c_levels))
+        lvl = con.level(cl) # the z-value of this contour level
+        for line in con.lines(cl)
+            xs, ys = con.coordinates(line) # coordinates of this line segment
+            append!(cl_x, [xs])
+            append!(cl_y, [ys])
+        end
+    end
+
+    return cl_x, cl_y
 end
