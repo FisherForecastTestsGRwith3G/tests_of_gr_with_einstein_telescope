@@ -66,7 +66,13 @@
             "numberOfEventsSingleRealization":1000,
             "LVK":false,
             "plot_samples":true,
-            "title":""
+            "title":"",
+            "use_all_n_events_for_single_event_sample_distribution":true,
+            "offset_x_axis_hierarchical_networks_upper_bounds":0.1,
+            "offset_x_axis_single_event_networks_upper_bounds":0.0,
+            "impose_y_axis_limits":false,
+            "y_axis_limits":[[1e-8, 1e-6],[2e-5, 1e-2]],
+            "violin_plots_bandwidth_std_multiplier":0.4
         },
         
         "d_specific":{
@@ -75,7 +81,11 @@
 		    "mcmc_burnin":1000,
 		    "title":"",
 		    "plot_conditioned_distribution":true,
-		    "subplots_pn_order_grouping": [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
+		    "subplots_pn_order_grouping": [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]],
+            "offset_x_axis_hierarchical_networks_upper_bounds":0.1,
+            "impose_y_axis_limits":false,
+            "y_axis_limits":[[-1e-5, 1e-5],[-0.05, 0.05], [-1.0, 1.0]],
+            "violin_plots_bandwidth_std_multiplier":0.4
         },
 
         "e_specific":{

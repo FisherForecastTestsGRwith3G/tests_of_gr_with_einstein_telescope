@@ -96,6 +96,9 @@ upperLimitSingleEvents .= NaN
         delta_k = delta_k[1:n_events_used]
         if averageOverSeveralRealizations
             numberOfRealization = Int(floor(n_events_used / numberOfEventsSingleRealization))
+            if numberOfRealization == 0
+                @error "Not enough events to perform the average over several realizations. Please decrease the numberOfEventsSingleRealization in the config file, or increase the number of total events."
+            end
             n_events_used = numberOfEventsSingleRealization * numberOfRealization
             dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
             delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, numberOfEventsSingleRealization)
@@ -123,8 +126,19 @@ upperLimitSingleEvents .= NaN
             #Save the single events 90% upper limits for a given realization, if requested
             if printEventsAsHorizontalLinesOrDensityPlot && realization_index == 1
                 # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
-                upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization, delta_k_realization)
+                
+
+                if configs["use_all_n_events_for_single_event_sample_distribution"]
+                    # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
+                    #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
+                    upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vec(dphi0_k), vec(delta_k))
+                else
+                    # I use only a single realization to plot the single events upper limits
+                    upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization, delta_k_realization)
+                end
+                
                 upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
+                
             end
 
         end

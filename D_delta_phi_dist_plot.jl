@@ -5,6 +5,7 @@ using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
 using Turing
+using Base.Threads
 
 # include required scripts 
 include("_parse_config.jl")
@@ -72,84 +73,92 @@ else
     posterior_dist_deltaphi_conditioned = nothing
 end
 
-if perform_MCMC_sampling
-    # process all the plots
-    for (index_nn, nn) in enumerate(configs["network_list"])
+# process all the networks and PN orders
+for (index_nn, nn) in enumerate(configs["network_list"])
 
+    # Filename to save or load the posterior distribution for delta_phi to/from disk
+    filename_samples = data_folder_name * "script_D/" * nn * "/posterior_distributions_deltaphi.h5"
+
+    if perform_MCMC_sampling
         println("\n"*"#"^81)
         println("Processing Network = $(nn)\n")
-
-        for (index_pno, pno) in enumerate(configs["pn_waveforms"])
-
-            println("\n"*"#"^81)
-            println("Processing PN = $(pno)\n")
-            
-            # load the data
-            folder = data_folder_name * nn * "/pn_" * pn_order_dic[pno][2]
-            filename = folder * "/single_event_measurements.h5"
-            data = Dict()
-            h5open(filename, "r") do file
-                for key in keys(file)
-                    data[key] = read(file, key)
+        
+        @time begin
+            @threads for index_pno = 1:length(configs["pn_waveforms"])
+                pno = configs["pn_waveforms"][index_pno]
+                
+                println("\n"*"#"^81)
+                println("Processing PN = $(pno)\n")
+                
+                # load the data
+                folder = data_folder_name * nn * "/pn_" * pn_order_dic[pno][2]
+                filename = folder * "/single_event_measurements.h5"
+                data = Dict()
+                h5open(filename, "r") do file
+                    for key in keys(file)
+                        data[key] = read(file, key)
+                    end
                 end
+
+                # extract only valid data-points via global index
+
+                local n_events_used = configs["n_events"]
+                if n_events_used > sum(global_index_total[nn])
+                    println("Warning: There are at most $(sum(global_index_total[nn]))-datapoints available")
+                    n_events_used = sum(global_index_total[nn])
+                else
+                    println("Events used: $(n_events_used)")
+                end
+
+                dphi0_k = data["dphi0_k"][global_index_total[nn]]
+                dphi0_k = dphi0_k[1:n_events_used] 
+                delta_k = data["delta_k"][global_index_total[nn]]
+                delta_k = delta_k[1:n_events_used]
+
+                # Obtain samples for posterior distributions for delta_phi
+                posterior_dist_deltaphi[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k, delta_k; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name * nn * "/", pnorder = pn_order_dic[pno][2])
+
+                if configs["plot_conditioned_distribution"]
+                    # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
+                    posterior_dist_deltaphi_conditioned[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
+                end
+
             end
+        end
 
-            # extract only valid data-points via global index
-
-            local n_events_used = configs["n_events"]
-            if n_events_used > sum(global_index_total[nn])
-                println("Warning: There are at most $(sum(global_index_total[nn]))-datapoints available")
-                n_events_used = sum(global_index_total[nn])
-            else
-                println("Events used: $(n_events_used)")
-            end
-
-            dphi0_k = data["dphi0_k"][global_index_total[nn]]
-            dphi0_k = dphi0_k[1:n_events_used] 
-            delta_k = data["delta_k"][global_index_total[nn]]
-            delta_k = delta_k[1:n_events_used]
-
-            # Obtain samples for posterior distributions for delta_phi
-            posterior_dist_deltaphi[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k, delta_k; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name * nn * "/", pnorder = pn_order_dic[pno][2])
-
+        println("Saving the posterior distribution for delta_phi to disk, in $(filename_samples)")
+        mkpath(data_folder_name * "script_D/" * nn  * "/")
+        # save to .h5 file 
+        h5open(filename_samples, "w") do file
+            write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi[index_nn, :, :])
             if configs["plot_conditioned_distribution"]
-                # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
-                posterior_dist_deltaphi_conditioned[index_nn, index_pno, :] = obtain_samples_delta_phi_pdf_conditioned(dphi0_k, delta_k; n_samples = configs["mcmc_samples"])
+                write(file, "samples_posterior_dist_deltaphi_conditioned", posterior_dist_deltaphi_conditioned[index_nn, :, :])
             end
-
         end
-    end
-
-    # Save the posterior distribution for delta_phi to disk
-    filename_samples = data_folder_name * "script_D/" * "posterior_distributions_deltaphi.h5"
-    println("Saving the posterior distribution for delta_phi to disk, in $(filename_samples)")
-    mkpath(data_folder_name * "script_D/")
-    # save to .h5 file 
-    h5open(filename_samples, "w") do file
-        write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi)
+    else
+        # If we do not perform the MCMC sampling, I will load the results from disk
+        println("Loading the posterior distribution for delta_phi from disk, from file $(filename_samples)")
+        local network_posterior_dist_deltaphi, network_posterior_dist_deltaphi_conditioned = h5open(filename_samples, "r") do file
+            network_posterior_dist_deltaphi = read(file, "samples_posterior_dist_deltaphi")
+            if configs["plot_conditioned_distribution"]
+                network_posterior_dist_deltaphi_conditioned = read(file, "samples_posterior_dist_deltaphi_conditioned")
+            else
+                network_posterior_dist_deltaphi_conditioned = nothing
+            end
+            return network_posterior_dist_deltaphi, network_posterior_dist_deltaphi_conditioned
+        end
+        # Check if the loaded posterior distribution has the correct dimensions
+        if size(network_posterior_dist_deltaphi, 1) != length(configs["pn_waveforms"]) || size(network_posterior_dist_deltaphi, 2) != configs["mcmc_samples"]
+            throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(network_posterior_dist_deltaphi))."))
+        end
+        if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(network_posterior_dist_deltaphi_conditioned, 1) != length(configs["pn_waveforms"]) || size(network_posterior_dist_deltaphi_conditioned, 2) != configs["mcmc_samples"])
+            throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(network_posterior_dist_deltaphi_conditioned))."))
+        end
+        # Assign the loaded posterior distributions to the main variable
+        posterior_dist_deltaphi[index_nn, :, :] = network_posterior_dist_deltaphi
         if configs["plot_conditioned_distribution"]
-            write(file, "samples_posterior_dist_deltaphi_conditioned", posterior_dist_deltaphi_conditioned)
+            posterior_dist_deltaphi_conditioned[index_nn, :, :] = network_posterior_dist_deltaphi_conditioned
         end
-    end
-else
-    # If we do not perform the MCMC sampling, I will load the results from disk
-    filename_samples = data_folder_name * "script_D/" * "posterior_distributions_deltaphi.h5"
-    println("Loading the posterior distribution for delta_phi from disk, from file $(filename_samples)")
-    posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned = h5open(filename_samples, "r") do file
-        posterior_dist_deltaphi = read(file, "samples_posterior_dist_deltaphi")
-        if configs["plot_conditioned_distribution"]
-            posterior_dist_deltaphi_conditioned = read(file, "samples_posterior_dist_deltaphi_conditioned")
-        else
-            posterior_dist_deltaphi_conditioned = nothing
-        end
-        return posterior_dist_deltaphi, posterior_dist_deltaphi_conditioned
-    end
-    # Check if the loaded posterior distribution has the correct dimensions
-    if size(posterior_dist_deltaphi, 1) != length(configs["network_list"]) || size(posterior_dist_deltaphi, 2) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi, 3) != configs["mcmc_samples"]
-        throw(ArgumentError("The loaded posterior distribution for delta_phi has incorrect dimensions. Expected $(length(configs["network_list"])), $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi))."))
-    end
-    if configs["plot_conditioned_distribution"] && (posterior_dist_deltaphi_conditioned === nothing || size(posterior_dist_deltaphi_conditioned, 1) != length(configs["network_list"]) || size(posterior_dist_deltaphi_conditioned, 2) != length(configs["pn_waveforms"]) || size(posterior_dist_deltaphi_conditioned, 3) != configs["mcmc_samples"])
-        throw(ArgumentError("The loaded posterior distribution for delta_phi conditioned has incorrect dimensions. Expected $(length(configs["network_list"])), $(length(configs["pn_waveforms"])), $(configs["mcmc_samples"]), but got $(size(posterior_dist_deltaphi_conditioned))."))
     end
 end
 

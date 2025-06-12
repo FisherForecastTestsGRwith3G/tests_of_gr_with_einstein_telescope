@@ -10,6 +10,12 @@ The plotDeltaPhiPosterior function plots the posterior distributions ('marginali
 - plot_conditioned_distribution is a float that indicates whether to plot the conditioned distribution (default is false)
 - posterior_dist_deltaphi_conditioned should be either nothing, if plot_conditioned_distribution == false, or a 3D array with dimensions (number of networks, number of PN orders, number of samples) otherwise
 - subplots_pn_order_grouping should be either nothing (for automatically plotting all provided PN orders in the same subplot), or a 2D vector if you want to plot all different PN orders in different subplots (in that case, each subvector should contain the index for the corresponding PN orders, as indexed in posterior_dist_deltaphi[:, ..., :]), e.g. [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]] for plotting all PN orders in the same plot (equivalent to nothing), or [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]] to obtain the LVK GWTC-3-like plot (figure 7).
+
+In the config files,
+"offset_x_axis_hierarchical_networks_upper_bounds": allows to offset the x-axis for the hierarchical upper bounds, so that they do not overlap if there are multiple networks [float, default 0.1]
+"impose_y_axis_limits": allows to impose the y-axis limits for the plot, so that they are not automatically set based on the data [true/false]
+"y_axis_limits": allows to set the y-axis limits for the plot, if impose_y_axis_limits is true [Nx2 vector, outer vector represent the N subplots, the inner vector represents the lower and upper limits, e.g. [[-1e-5, 1e-5],[-0.05, 0.05], [-1.0, 1.0]] ]
+"violin_plots_bandwidth_std_multiplier": allows to set the bandwidth for the kernel density estimation used in the violin plots, as a multiplier of the standard deviation of the data [float, default 0.4]
 """
 function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaphi::AbstractArray{Float64,3}; plot_conditioned_distribution::Bool = false, posterior_dist_deltaphi_conditioned::Union{Nothing, AbstractArray{Float64,3}} = nothing, subplots_pn_order_grouping::Union{Nothing, Vector{Vector{Int64}}} = nothing)
     
@@ -22,8 +28,8 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
     markers, markersize, pointColors = get_markers_and_palette()
 
     # Proper LaTeX labels
-    xlabel_str = L"\mathrm{PN\ Order}"  # Use \mathrm for proper LaTeX rendering
-    ylabel_str = L"\delta \varphi_i"
+    xlabel_str = "PN order" 
+    ylabel_str = L"\delta \varphi_{\!i}"
 
     # Perform some checks and set defaults
     if plot_conditioned_distribution && posterior_dist_deltaphi_conditioned === nothing
@@ -70,6 +76,8 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
     # I will create a vector of subplots, as specified in subplots_pn_order_grouping, which then will be combined into a single plot
     subplots = Vector{Plots.Plot{Plots.GRBackend}}(undef, length(subplots_pn_order_grouping))
 
+    small_margin_subplots = smaller_margins_subplots()  # Get the smaller margins for subplots
+
     # Loop over the subplots
     for (index_subplot, pn_order_indices) in enumerate(subplots_pn_order_grouping)
         # Create a new subplot for the current PN order grouping
@@ -77,25 +85,29 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
             #xlabel=xlabel_str, 
             ylabel=(index_subplot > 1 ? "" : ylabel_str),
             #title=plotTitle,
-            legend=:bottomright, 
+            legend=(index_subplot == length(subplots_pn_order_grouping) ? :bottomright : false),
             xticks=(1:length(pn_order_indices), PN_labels[pn_order_indices]),
             #yscale=:log10, 
             size=(plotWidth * length(pn_order_indices) / number_PN_orders_to_plot, plotHeight), 
             dpi=plotDpi,
-            xlims=(0.5, length(pn_order_indices) + 0.5),
-            grid=false,
+            xlims=(0.5 - configs["offset_x_axis_hierarchical_networks_upper_bounds"], length(pn_order_indices) + 0.5 + configs["offset_x_axis_hierarchical_networks_upper_bounds"]),
+            grid=true,
             framestyle=:box,
-            #ylims=(minimum(posterior_dist_deltaphi[:, pn_order_indices, :]), maximum(posterior_dist_deltaphi[:, pn_order_indices, :])),  #Should look for posterior_dist_deltaphi_conditioned as well, and add some margin
+            ylims=(configs["impose_y_axis_limits"] ? configs["y_axis_limits"][index_subplot] : :auto),  # Set y-axis limits if requested
             gridalpha=0.5, 
             gridcolor=:gray,  # Set grid lines to be transparent or gray
             yminorgrid=true, 
             minorgridalpha=0.3, 
             minorgridcolor=:gray,  # Enable minor grid lines
-            xminorgrid=false  # Disable minor grid lines for the x-axis
+            xminorgrid=false,  # Disable minor grid lines for the x-axis,        
+            left_margin = (index_subplot ==  1 ? small_margin_subplots.left_margin_with_ylabel : small_margin_subplots.left_margin),
+            right_margin = small_margin_subplots.right_margin,
+            top_margin = small_margin_subplots.top_margin,
+            bottom_margin = small_margin_subplots.bottom_margin
         )
 
         # Add horizontal line at y = 0
-        hline!(subplots[index_subplot], [0.], linecolor=:gray, linestyle=:dash, linewidth=4, label="")
+        hline!(subplots[index_subplot], [0.], linecolor=:gray, linestyle=:dash, linewidth=2, label="")
 
         # Add top labels for each x-tick
         # for (pnindex, pno) in enumerate(pn_order_indices)
@@ -110,7 +122,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                 # but it seems that in Plot.jl there is no way to set the width of the violin plots
                 violin!(
                     subplots[index_subplot], 
-                    fill(pnindex, length(posterior_dist_deltaphi[jj,pno,:])),
+                    fill(pnindex + configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names)), length(posterior_dist_deltaphi[jj,pno,:])),
                     posterior_dist_deltaphi[jj,pno,:],
                     label=(pnindex == 1 ? network_labels[jj] : nothing),
                     #marker=markers[jj],  # Cycle through marker list
@@ -119,17 +131,18 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                     #markerstrokewidth=1, 
                     #markerstrokecolor=:black,
                     orientation=:vertical,
-                    alpha=0.5,          # Slight fill transparency for overlapping violin plots
+                    alpha=0.2,          # Slight fill transparency for overlapping violin plots
                     linecolor=pointColors[jj],   # Outline color
                     linewidth=0,        # No outline thickness
-                    width=0.65,         # Violin width
+                    width=0.65,         # Violin width... does not seem to work!
+                    bandwidth=std(posterior_dist_deltaphi[jj,pno,:]) * configs["violin_plots_bandwidth_std_multiplier"] # Bandwidth for the kernel density estimation, to smooth out the (noisy) data
                 )
 
                 if plot_conditioned_distribution && posterior_dist_deltaphi_conditioned !== nothing
                     # Plot the conditioned distributions if requested
                     violin!(
                         subplots[index_subplot], 
-                        fill(pnindex, length(posterior_dist_deltaphi_conditioned[jj,pno,:])),
+                        fill(pnindex + configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names)), length(posterior_dist_deltaphi_conditioned[jj,pno,:])),
                         posterior_dist_deltaphi_conditioned[jj,pno,:],
                         label= nothing, # I set no labels at all here, just like in GWTC-3, you may explain in the caption that the conditioned distributions are plotted just as an outline
                         #marker=markers[jj],  # Cycle through marker list
@@ -140,7 +153,8 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                         orientation=:vertical,
                         linecolor=pointColors[jj],   # Outline color
                         linewidth= 10,        # Outline thickness -- does not seem to work!
-                        width=0.65,         # Violin width
+                        width=0.65,         # Violin width, does not seem to work!
+                        bandwidth=std(posterior_dist_deltaphi_conditioned[jj,pno,:]) * configs["violin_plots_bandwidth_std_multiplier"] # Bandwidth for the kernel density estimation, to smooth out the (noisy) data
                     )
                 end
             end

@@ -12,6 +12,9 @@ using SpecialFunctions
 
 # Distributions.logpdf(distr::_delta_phi_pdf, delta_phi::Real) = log(_evaluate_delta_phi_pdf(delta_phi, distr.params...))
 
+# Lock for plotting, needed to avoid multiple threads trying to plot at the same time (plot backend is not thread-safe)
+const plot_lock = ReentrantLock()
+
 function _evaluate_delta_phi_quantities_abcd(sigma::Float64, dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
     # This function evaluates the quantities needed to evaluate the distribution p(δφ_n | data) for a given value of σ
     # The function returns the values of the quantities a, b, c, d which appear in the integrand
@@ -56,9 +59,9 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     # Since this function is somewhat difficult to integrate, for improved accuracy I split the integral in three regions, using a guess for the spread of the distribution as a gauge of the order of magnitude over which the integrand varies
     guess_distributuion_spread = mean(delta_k)
 
-    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-7, atol = 0.)
-    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-7, atol = 0.)
-    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-7, atol = 0.)
+    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-5, atol = 0.)
+    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-5, atol = 0.)
+    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-5, atol = 0.)
 
     result = result1 + result2 + result3
     err = sqrt(err1^2 + err2^2 + err3^2)
@@ -188,6 +191,37 @@ function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{
     println("Internal log normalization value: ", _internal_log_normalization_value)
 
 
+    # Since I cannot use a more efficient sampler (like Hamiltonian MonteCarlo or NUTS, since quadgk seems to break automatic differentiation), I will at least cache the last two computed value of _evaluate_delta_phi_pdf.
+    # I do this because it seems that the MH() sampler in Turing does not cache the last computed values of the pdf, and so it recomputes them even when the last proposal was discarded, and so no move is made.
+    # Since we are using the MH algorithm, I expect it will be enough to cache just the last two computed values of the pdf.
+    local local_cache_evaluate_delta_phi_pdf = Tuple{Float64, Vector{Float64}, Vector{Float64}, Union{Nothing, Float64}, Float64}[]
+    function cached_evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k; _internal_log_normalization_value=nothing)
+        pdf_value = nothing
+        if( length(local_cache_evaluate_delta_phi_pdf) > 1 )
+            # I have cached enough values, I can start looking up the cached values
+            # I assume to have to compare only the oldest value out of two. I also pop the first element, to keep the cache size small (two elements at most)
+            values_two_evaluations_ago = popfirst!(local_cache_evaluate_delta_phi_pdf)
+            if values_two_evaluations_ago[1:4] == (delta_phi, dphi0_k, delta_k, _internal_log_normalization_value)
+                # The last cached value is the one I need
+                pdf_value = values_two_evaluations_ago[5]
+            else
+                # I will check also the last element in the cache, to see if it matches
+                if local_cache_evaluate_delta_phi_pdf[end][1:4] == (delta_phi, dphi0_k, delta_k, _internal_log_normalization_value)
+                    # The last cached value is the one I need
+                    pdf_value = local_cache_evaluate_delta_phi_pdf[end][5]
+                else
+                    # I have to compute the pdf value
+                    pdf_value = _evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k; _internal_log_normalization_value=_internal_log_normalization_value)
+                end
+            end
+        else
+            pdf_value = _evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k; _internal_log_normalization_value=_internal_log_normalization_value)            
+        end
+
+        push!(local_cache_evaluate_delta_phi_pdf, (delta_phi, dphi0_k, delta_k, _internal_log_normalization_value, pdf_value))
+
+        return pdf_value
+    end
 
     # Actually, to further automatize the MCMC, I will performa while loop, where I widen the prior range, if some samples fell to close to the prior boundaries during the previous MCMC sampling 
     MCMC_run_index = 0
@@ -259,7 +293,9 @@ function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{
             delta_phi ~ Uniform(uniform_prior_range...)
             
             # Add the posterior as a likelihood factor
-            pdf_value = _evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)
+            # pdf_value = _evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)
+            # I use the cached version of the pdf evaluation, to speed up the MCMC sampling
+            pdf_value = cached_evaluate_delta_phi_pdf(delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)
             
             # Add log(pdf_value) to the total log probability
             Turing.@addlogprob! log(pdf_value)
@@ -272,38 +308,41 @@ function obtain_samples_delta_phi_pdf(dphi0_k::Vector{Float64}, delta_k::Vector{
 
         # For debugging purposes, I will plot the trace plot of the chain, and histogram the points
         if debug_folder_name !== nothing && pnorder !== nothing
-            # Create the folder if it does not exist
-            mkpath(debug_folder_name)
-            # For debugging purposes, I will plot the chain, with a vertical line where the burn in ends
-            # Also, in the same plot, in the upper part of the figure, the samples from the posterior distribution p(δφ_n | data), with the uniform distribution range shown, and in the lower part the chain
-            # By visual inspection, the chain should be stable after the burn-in period, and the samples should be well distributed within the prior usable_prior_range
-            # Create the trace plot (chain)
-            trace_plot = plot(chain[:delta_phi], title = "Trace plot for the posterior distribution p(δφ_n | data)", xlabel = "Sample index", ylabel = "δφ_n value", label = "Chain samples")
-            vline!(trace_plot, [burn_in], label = "Burn-in end", color = :red, linestyle = :dash, lw = 3)
+            # Thread locking to avoid multiple threads trying to plot at the same time (plot backend is not thread-safe)
+            lock(plot_lock) do
+                # Create the folder if it does not exist
+                mkpath(debug_folder_name)
+                # For debugging purposes, I will plot the chain, with a vertical line where the burn in ends
+                # Also, in the same plot, in the upper part of the figure, the samples from the posterior distribution p(δφ_n | data), with the uniform distribution range shown, and in the lower part the chain
+                # By visual inspection, the chain should be stable after the burn-in period, and the samples should be well distributed within the prior usable_prior_range
+                # Create the trace plot (chain)
+                trace_plot = plot(chain[:delta_phi], title = "Trace plot for the posterior distribution p(δφ_n | data)", xlabel = "Sample index", ylabel = "δφ_n value", label = "Chain samples")
+                vline!(trace_plot, [burn_in], label = "Burn-in end", color = :red, linestyle = :dash, lw = 3)
 
-            # Create the histogram
-            hist_xmin = uniform_prior_range[1] - 0.03 * (uniform_prior_range[2] - uniform_prior_range[1])
-            hist_xmax = uniform_prior_range[2] + 0.03 * (uniform_prior_range[2] - uniform_prior_range[1])
-            
-            hist_plot = histogram(chain[:delta_phi][burn_in+1:end], title = "Posterior distribution p(δφ_n | data)", xlabel = "δφ_n value", ylabel = "Prob. density", label = "Posterior samples histogram (burn in removed)", legend = :topright, normalize = true, xlims = (hist_xmin, hist_xmax))
-            # Shade outside of prior range
-            vspan!(hist_plot, [hist_xmin, uniform_prior_range[1]], color = RGBA(0., 0., 0., 0.8), label = "Outside prior range")
-            vspan!(hist_plot, [uniform_prior_range[2], hist_xmax], color = RGBA(0., 0., 0., 0.8), label = "")
-            vspan!(hist_plot, [uniform_prior_range[1], uniform_prior_range[1] + prior_fraction_to_be_empty_per_side * (uniform_prior_range[2] - uniform_prior_range[1])], color = RGBA(0.7, 0.8, 1.0, 0.4), label = "Inside prior range, but wanted to be empty")
-            vspan!(hist_plot, [uniform_prior_range[2] - prior_fraction_to_be_empty_per_side * (uniform_prior_range[2] - uniform_prior_range[1]), uniform_prior_range[2]], color = RGBA(0.7, 0.8, 1.0, 0.4), label = "")
-            
-            # Overlay the distribution of the conditioned case
-            plot!(hist_plot, Normal(mu_conditioned_case, std_conditioned_case), color=:yellow, lw=4, label="Conditioned (sigma = 0) pdf for reference")
+                # Create the histogram
+                hist_xmin = uniform_prior_range[1] - 0.03 * (uniform_prior_range[2] - uniform_prior_range[1])
+                hist_xmax = uniform_prior_range[2] + 0.03 * (uniform_prior_range[2] - uniform_prior_range[1])
+                
+                hist_plot = histogram(chain[:delta_phi][burn_in+1:end], title = "Posterior distribution p(δφ_n | data)", xlabel = "δφ_n value", ylabel = "Prob. density", label = "Posterior samples histogram (burn in removed)", legend = :topright, normalize = true, xlims = (hist_xmin, hist_xmax))
+                # Shade outside of prior range
+                vspan!(hist_plot, [hist_xmin, uniform_prior_range[1]], color = RGBA(0., 0., 0., 0.8), label = "Outside prior range")
+                vspan!(hist_plot, [uniform_prior_range[2], hist_xmax], color = RGBA(0., 0., 0., 0.8), label = "")
+                vspan!(hist_plot, [uniform_prior_range[1], uniform_prior_range[1] + prior_fraction_to_be_empty_per_side * (uniform_prior_range[2] - uniform_prior_range[1])], color = RGBA(0.7, 0.8, 1.0, 0.4), label = "Inside prior range, but wanted to be empty")
+                vspan!(hist_plot, [uniform_prior_range[2] - prior_fraction_to_be_empty_per_side * (uniform_prior_range[2] - uniform_prior_range[1]), uniform_prior_range[2]], color = RGBA(0.7, 0.8, 1.0, 0.4), label = "")
+                
+                # Overlay the distribution of the conditioned case
+                plot!(hist_plot, Normal(mu_conditioned_case, std_conditioned_case), color=:yellow, lw=4, label="Conditioned (sigma = 0) pdf for reference")
 
-            # Draw vertical lines for the prior range
-            vline!(hist_plot, [uniform_prior_range[1], uniform_prior_range[2]], label = "Uniform prior range", color = :orange, linestyle = :dash, lw = 3)
-            
-            # Combine both plots in a vertical layout (2 rows, 1 column)
-            plt = plot(hist_plot, trace_plot, layout = @layout([a; b]), size = (2000, 2000))
+                # Draw vertical lines for the prior range
+                vline!(hist_plot, [uniform_prior_range[1], uniform_prior_range[2]], label = "Uniform prior range", color = :orange, linestyle = :dash, lw = 3)
+                
+                # Combine both plots in a vertical layout (2 rows, 1 column)
+                plt = plot(hist_plot, trace_plot, layout = @layout([a; b]), size = (2000, 2000))
 
-            # Save the combined figure
-            savefig(plt, joinpath(debug_folder_name, "MCMC_posterior_distribution_pn_$(pnorder)_run$(MCMC_run_index).pdf"))
-            println("Saved the trace plot of the chain and histogram of the posterior samples to: ", joinpath(debug_folder_name, "MCMC_posterior_distribution_pn_$(pnorder)_run$(MCMC_run_index).png"))
+                # Save the combined figure
+                savefig(plt, joinpath(debug_folder_name, "MCMC_posterior_distribution_pn_$(pnorder)_run$(MCMC_run_index).pdf"))
+                println("Saved the trace plot of the chain and histogram of the posterior samples to: ", joinpath(debug_folder_name, "MCMC_posterior_distribution_pn_$(pnorder)_run$(MCMC_run_index).png"))      
+            end
         else
             println("No debug folder and pnorder provided, skipping the debug plot of the chain.")
         end

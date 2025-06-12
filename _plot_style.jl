@@ -10,8 +10,8 @@ function set_common_plot_style()
         tickfontsize=16,
         legendfontsize=16,
         left_margin = 8mm,
-        bottom_margin = 8mm,
-        right_margin = 10mm,
+        right_margin = 2mm,
+        bottom_margin = 12mm,
         top_margin = 10mm,
         legend=:topright,
         framestyle=:box,
@@ -27,12 +27,19 @@ function default_plot_dimensions()
     return (plotHeight=800, plotWidth=1200, plotDpi=300, padding = (8mm, 5mm))
 end
 
+function smaller_margins_subplots()
+    # Set default plot margins for subplots
+    return (left_margin = 2mm, right_margin = 2mm, bottom_margin = 3mm, top_margin = 3mm, left_margin_with_ylabel = 8mm)
+end
+
 function labels_from_networks(network_names)
     # Define a dictionary to map network names to their labels
     network_labels = Dict(
-        "ETS" => L"\textbf{T}",
-        "network_45_15km" => L"\textbf{2L\_45}",
-        "network_0_15km" => L"\textbf{2L\_0}",
+        "ETS" => L"\texttt{T}",
+        "network_45_15km" => L"\texttt{2L\_45}",
+        "network_0_15km" => L"\texttt{2L\_0}",
+        "LHV" => L"\texttt{LHV}",
+        "LHVK" => L"\texttt{LHVK}",
     )
 
     # Map the network names to their corresponding labels
@@ -43,7 +50,7 @@ end
 function labels_from_PN_orders(PN_orders)
     # Define a dictionary to map PN orders to their labels
     PN_labels = Dict(
-        "-1" => L"\varphi_{-1}",
+        "-1" => L"\varphi_{-2}",
         "0" => L"\varphi_{0}",
         "0.5" => L"\varphi_{1}",
         "1" => L"\varphi_{2}",
@@ -71,6 +78,14 @@ function get_markers_and_palette()
     palette_var = ColorSchemes.seaborn_colorblind #[:orange, :blue, :green, :purple, :red, :cyan, :magenta, :yellow]    #viridis
 
     return markers, markersize, palette_var
+end
+
+function get_relative_x_offset_network(current_network_index, total_number_networks)
+    # Calculate the relative x offset (from -1.0 to 1.0) for each network, used to avoid overlap. I assume current_network_index starts from 1.
+    if total_number_networks == 1
+        return 0.0
+    end
+    return ((current_network_index - 1) / (total_number_networks - 1)) * 2.0 - 1.0
 end
 
 const labels_from_pn_orders = Dict(
