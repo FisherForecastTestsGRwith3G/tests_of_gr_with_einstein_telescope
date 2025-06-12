@@ -16,6 +16,7 @@ upperLimits[:, :, 2] should contain the standard deviation values
 printEventsAsHorizontalLinesOrDensityPlot should be a boolean indicating whether to plot individual events as horizontal lines or density plots
 upperLimitSingleEvents should be a 3D array with dimensions (number of networks, number of PN orders, number of events)
 plotLVK_GWTC3_results = True overlays the results for the LVK GWTC-3 results (yet it does not rescale the axis yet, so they may be out of the plotted region!)
+list_of_networks: used to get the name of the networks, to display the correct labels (mostly used when overloading the detector networks as waveform models)
 
 In the config files,
 "use_all_n_events_for_single_event_sample_distribution": allows to use (almost) all events for the single event sample distribution, instead of only the ones from a single realization [true/false] (default true)
@@ -27,7 +28,7 @@ In the config files,
 "violin_plots_bandwidth_std_multiplier": allows to set the bandwidth for the kernel density estimation used in the violin plots, as a multiplier of the standard deviation of the data [float, default 0.4]
 "compute_mean_std_dev_in_log_space": computes (and uses) the mean and standard deviation over different catalog and noise realization in log space, instead of linear space [true/false, default: true]
 """
-function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20, compute_mean_std_dev_in_log_space::Bool = true)
+function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsAsHorizontalLinesOrDensityPlot = false, upperLimitSingleEvents = nothing; plotLVK_GWTC3_results = false, plot_samples_distribution::Bool = false, plot_samples_min_n_events_for_violin_plots::Int64 = 20, compute_mean_std_dev_in_log_space::Bool = true, list_of_networks_names = nothing)
 
     # Settings:
 
@@ -69,7 +70,13 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
     # name_PN = collect(keys(pn_order_dic));
     PN_orders = configs["pn_waveforms"];
-    network_names = configs["network_list"];
+    if isnothing(network_names)
+        # If no network names are provided, use the default ones
+        println("Warning: No network names provided in plotConditionedUpperLimits, using the default ones from the config file.")
+        network_names = configs["network_names"];
+    else
+        network_names = list_of_networks_names;
+    end
     network_labels = labels_from_networks(network_names);
     PN_labels = labels_from_PN_orders(PN_orders);
 

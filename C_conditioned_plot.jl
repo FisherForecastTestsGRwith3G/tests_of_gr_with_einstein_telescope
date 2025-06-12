@@ -24,23 +24,31 @@ println("Using config file: $(config_file_name)\n")
 
 configs, simulation_tag = readConfigForC(config_file_name)
 
-# set up folder names
-data_folder_name = user_configs["path_output"]*simulation_tag*"/data/"
-output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
+# Fast modification of the script, to allow the possibility to plot several waveform models in the same plot (disguised as different detector networks)
+overload_detector_networks_as_waveform_models = false # Default should be false! Set to true only if you know what you are doing!
+if overload_detector_networks_as_waveform_models
+    println("Warning: overloading the detector networks as waveform models! Usually this is not the standard behavior! Also, several config settings must be appopriately overloaded directly in the script! Set list_header_simulation_tags accordingly! Are you sure you want to proceed? (y/n)")
+    # Ask for user input to confirm the change
+    answer = readline()
+    if answer != "y" && answer != "Y"
+        println("Exiting the script!")
+        exit(0)
+    end
 
-# get global index
+    # Settings to be correctly set in the script, if you want to overload the detector networks as waveform models
+    # both waveform models must have data for the same detector networks! I assume so in the following code!
+    list_header_simulation_tags = ["final_run_LVK", "final_run_LVK_PhenomD"] # As set in the config file, such that it indicates the correct folder where data is stored, list_header_simulation_tags = ["final_run_LVK", "final_run_LVK_PhenomD"]
+    
+    list_of_networks = [[x, y] for x in list_header_simulation_tags, y in configs["network_list"]]
+    list_of_networks = vcat(list_of_networks...) 
+else
+    list_of_networks = configs["network_list"]
+end
+
+# Dictionaries to store the global indices for each network
 global_index_fisher = Dict()
 global_index_snr = Dict()
 global_index_total = Dict()
-for nn in configs["network_list"]
-    file_name = data_folder_name * nn *"/global_indices.h5"
-    h5open(file_name, "r") do gi_file
-        global_index_fisher[nn] = read(gi_file, "fisher")  
-        global_index_snr[nn] = read(gi_file, "snr")
-        global_index_total[nn] = read(gi_file, "total")
-    end
-end
-
 
 # Settings to perform the average over several realization of a given experiment, assuming a fixed number of observations for each run
 averageOverSeveralRealizations = configs["averageOverSeveralRealizations"]
@@ -54,10 +62,10 @@ printEventsAsHorizontalLinesOrDensityPlot = true #I will do this only for the fi
 plotLVK_GWTC3_results = configs["LVK"] #Overlay the GWTC-3 results on the plot
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
-upperLimits = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
+upperLimits = zeros(length(list_of_networks), length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
 # Create an empty array to store the single events upper limits, if required.
 n_events_used = configs["n_events"]
-upperLimitSingleEvents = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), n_events_used)
+upperLimitSingleEvents = zeros(length(list_of_networks), length(configs["pn_waveforms"]), n_events_used)
 #For the moment I will fill the array with NaN, so that if the number of events used is lower than n_events_used, I can simply discard the NaN
 upperLimitSingleEvents .= NaN
 
@@ -68,10 +76,31 @@ else
 end
 
 # process all the plots
- for (index_nn, nn) in enumerate(configs["network_list"])
+ for (index_nn, name_network) in enumerate(list_of_networks)
 
     println("\n"*"#"^81)
     println("Processing Network = $(nn)\n")
+
+
+    # set up folder names
+    if overload_detector_networks_as_waveform_models # Overloading the detector networks as waveform models if requested
+        data_folder_name = user_configs["path_output"]*name_network[1]*"/data/"
+        output_folder_name =  user_configs["path_output"]*name_network[1]*"/plots/" 
+        file_name = data_folder_name * name_network[2] *"/global_indices.h5"
+        nn = name_network[2]
+    else 
+        data_folder_name = user_configs["path_output"]*simulation_tag*"/data/"
+        output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
+        file_name = data_folder_name * name_network *"/global_indices.h5"
+        nn = name_network
+    end
+
+    # get global index
+    h5open(file_name, "r") do gi_file
+        global_index_fisher[nn] = read(gi_file, "fisher")  
+        global_index_snr[nn] = read(gi_file, "snr")
+        global_index_total[nn] = read(gi_file, "total")
+    end
 
     for (index_pno, pno) in enumerate(configs["pn_waveforms"])
 
@@ -132,9 +161,18 @@ end
 # Call the specific plotting function
 # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
 title = configs["title"] == "" ? "" : latexstring(configs["title"])
-final_conditioned_plot = plotConditionedUpperLimits(title, upperLimits, printEventsAsHorizontalLinesOrDensityPlot, upperLimitSingleEvents, plotLVK_GWTC3_results = plotLVK_GWTC3_results, plot_samples_distribution = configs["plot_samples"], compute_mean_std_dev_in_log_space = configs["compute_mean_std_dev_in_log_space"])
+final_conditioned_plot = plotConditionedUpperLimits(title, 
+    upperLimits, 
+    printEventsAsHorizontalLinesOrDensityPlot, 
+    upperLimitSingleEvents, 
+    plotLVK_GWTC3_results = plotLVK_GWTC3_results, 
+    plot_samples_distribution = configs["plot_samples"], 
+    compute_mean_std_dev_in_log_space = configs["compute_mean_std_dev_in_log_space"], 
+    list_of_networks = (overload_detector_networks_as_waveform_models ? list_of_networks[:,1] .* "_" .* list_of_networks[:,2] : list_of_networks)
+)
 
 # Save the combined plot to file
+output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
 mkpath(output_folder_name)
 println("Saving the conditioned upper limits plot to file: ", output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")
 savefig(final_conditioned_plot, output_folder_name * "plot_conditioned_delta_phi_upper_limits_" * simulation_tag * ".pdf")

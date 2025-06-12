@@ -40,6 +40,8 @@ function labels_from_networks(network_names)
         "network_0_15km" => L"\texttt{2L\_0}",
         "LHV" => L"\texttt{LHV}",
         "LHVK" => L"\texttt{LHVK}",
+        "final_run_LVK_LHV" => L"\texttt{LHV\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_LVK_PhenomD_LHV" => L"\texttt{LHV\ (PhenomD)}" # Needed when overloading the detector networks as waveform models in plot C
     )
 
     # Map the network names to their corresponding labels
