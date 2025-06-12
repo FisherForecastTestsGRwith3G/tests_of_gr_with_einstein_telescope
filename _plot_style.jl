@@ -51,7 +51,7 @@ end
 function labels_from_PN_orders(PN_orders)
     # Define a dictionary to map PN orders to their labels
     PN_labels = Dict(
-        "-1" => L"\varphi_{-1}",
+        "-1" => L"\varphi_{-2}",
         "0" => L"\varphi_{0}",
         "0.5" => L"\varphi_{1}",
         "1" => L"\varphi_{2}",
