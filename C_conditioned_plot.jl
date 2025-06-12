@@ -88,68 +88,43 @@ end
             end
         end
 
-        # extract only valid data-points via global index
-        local n_events_used = configs["n_events"]
-        if n_events_used > sum(global_index_total[nn])
-            println("Warning: There are at most $(sum(global_index_total[nn]))-datapoints available")
-            n_events_used = sum(global_index_total[nn])
-        else
-            println("Events used: $(n_events_used)")
-        end
-        dphi0_k = data["dphi0_k"][global_index_total[nn]]
-        dphi0_k = dphi0_k[1:n_events_used] 
-        delta_k = data["delta_k"][global_index_total[nn]]
-        delta_k = delta_k[1:n_events_used]
-        if averageOverSeveralRealizations
-            numberOfRealization = Int(floor(n_events_used / numberOfEventsSingleRealization))
-            if numberOfRealization == 0
-                @error "Not enough events to perform the average over several realizations. Please decrease the numberOfEventsSingleRealization in the config file, or increase the number of total events."
-            end
-            n_events_used = numberOfEventsSingleRealization * numberOfRealization
-            dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
-            delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, numberOfEventsSingleRealization)
+        vectorUpperLimits, upperLimitSingleEventsTemp, number_events_single_realization, numberOfEventsSingleRealizationUsed = obtain_conditioned_upper_bounds(
+            configs["n_events"], 
+            global_index_total[nn], 
+            data["dphi0_k"], 
+            data["delta_k"], 
+            averageOverSeveralRealizations = averageOverSeveralRealizations, 
+            numberOfEventsSingleRealization = numberOfEventsSingleRealization, 
+            n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"],
+            printEventsAsHorizontalLinesOrDensityPlot = printEventsAsHorizontalLinesOrDensityPlot,
+            use_all_n_events_for_single_event_sample_distribution = configs["use_all_n_events_for_single_event_sample_distribution"]
+            )
 
-            println("Splitting the dataset into $(numberOfRealization) realizations of $(numberOfEventsSingleRealization) events")
-            println("Number of events used effectively: $(n_events_used)")
-            
-        else
-            numberOfRealization = 1
-            dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  n_events_used)
-            delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, n_events_used)
+        # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            
+        # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
+        if !(configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"])
+            println("Number of realizations: ", length(number_events_single_realization))
+            println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
+            println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
+            println("Average number of events observed per realization: ", mean(number_events_single_realization))
+            println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
         end
 
-        vectorUpperLimits = zeros(numberOfRealization)
-        for realization_index in 1:numberOfRealization
-             # Access the realization for dphi0_k_realization
-            dphi0_k_realization = dphi0_k[realization_index, :]
-            
-            # Access the realization for delta_k_realization
-            delta_k_realization = delta_k[realization_index, :]
-
-            #Evaluate the 90% upper limit given this single realization
-            vectorUpperLimits[realization_index] = get90PctUpperLimitMuDistTIGER(dphi0_k_realization, delta_k_realization, 0.9)
-
-            #Save the single events 90% upper limits for a given realization, if requested
-            if printEventsAsHorizontalLinesOrDensityPlot && realization_index == 1
-                # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
-                
-
-                if configs["use_all_n_events_for_single_event_sample_distribution"]
-                    # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
-                    #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
-                    upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vec(dphi0_k), vec(delta_k))
-                else
-                    # I use only a single realization to plot the single events upper limits
-                    upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization, delta_k_realization)
-                end
-                
-                upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
-                
-            end
-
+        if sum(number_events_single_realization .== 0) > 0
+            println("Warning! There are $(sum(number_events_single_realization .== 0)) realizations with zero number of events, so they will not be used to obtain the upper bounds (so will not influence the average upper bound, nor its error bars)!")
         end
+
+        # I will only select the realization with a non zero number of events, so with a upper limit that is not a NaN
+        vectorUpperLimits = vectorUpperLimits[.!isnan.(vectorUpperLimits)]
+
         # Evaluate the mean and std of the upper limits
         upperLimits[index_nn, index_pno, :] = [mean(vectorUpperLimits), std(vectorUpperLimits), exp(mean(log.(vectorUpperLimits))), exp(std(log.(vectorUpperLimits)))]
+
+        
+        # Save the single events upper limits if required
+        if printEventsAsHorizontalLinesOrDensityPlot
+            upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
+        end
 
     end
 end

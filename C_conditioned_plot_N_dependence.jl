@@ -6,7 +6,7 @@ using KernelDensity, Statistics
 using Serialization
 using Turing
 
-# Fast hack of script C, to produce a plot of the the trend of the hierarchical upper limits as a function of the number of events, conditioned on the delta phi distribution.  
+# Fast modification of the original script C, to produce a plot of the the trend of the hierarchical upper limits as a function of the number of events, conditioned on the delta phi distribution.  
 
 println("Running C_conditioned_plot_N_dependence.jl script: this script is a modified version of the C_conditioned_plot.jl script, not completely refined. You should look a the source code and set the correct parameters in the script (not just in the config files), to obtain the wanted result.")
 
@@ -48,15 +48,22 @@ end
 
 # Settings to perform the average over several realization of a given experiment, assuming a fixed number of observations for each run
 min_number_of_realizations = 1
-max_number_of_realizations = 10000
-number_of_points_trend_plot = 8
-averageOverSeveralRealizations = true
-printEventsAsHorizontalLinesOrDensityPlot = false
+max_number_of_realizations = 40000
+number_of_points_trend_plot = 20
+
 # For simplicity, also to not clutter too much the plot, I will iterate over a single detector network
 index_detector_network_to_use = 2
 
+# Some settings, but OVERLOADED here in the code just below!!!
+use_std_for_ribbon_in_log_space = configs["compute_mean_std_dev_in_log_space"]
 use_std_for_ribbon_in_log_space = true # If true, the std will be computed in log space, otherwise in linear space. This is useful to avoid negative values in the ribbon (which lead to errors), but is slightly different from the standard deviation in linear space plotted in plot 6.
+compute_mean_in_log_space = configs["compute_mean_std_dev_in_log_space"]
 compute_mean_in_log_space = true # If true, the mean will be computed in log space, otherwise in linear space (as in plot 6, so default = false).
+averageOverSeveralRealizations = configs["averageOverSeveralRealizations"]
+averageOverSeveralRealizations = true
+printEventsAsHorizontalLinesOrDensityPlot = false
+n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"]
+n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = true # If true, the n_events and numberOfEventsSingleRealization refer directly to the observed events, and there is not poissonian/binomial noise due to drawing observed events from the catalog of all events. This is useful to remove the poissonian/binomial noise contribution to the shown error bars/ribbons.
 
 #   Plot Settings (currently used for y labels only)
 min_y = 10^-8
@@ -84,7 +91,10 @@ else
     println("You are using the mean and std dev evaluated in linear space!")
 end
 
-# May be better to collect the for cycle below in a separate function, since it is quite similar to the one in C_conditioned_plot.jl (so any changes are carried over, as they should be)
+if !(n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events)
+    println("Warning: this may be the only plot where you may want to set n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = true, in order to remove the poissonian/binomial noise contribution to the shown error bars/ribbons!")
+end
+
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
 
@@ -101,8 +111,7 @@ end
         #Produce the plot evenly spaced in log scale        
         numberOfEventsSingleRealization = n_events_realizations[index_realization]
 
-        println("Processing realization = $(index_realization) uot of $(max_number_of_realizations) with $(numberOfEventsSingleRealization) events")
-
+        println("Processing realization = $(index_realization) out of $(number_of_points_trend_plot) with $(numberOfEventsSingleRealization) events")
 
         for (index_pno, pno) in enumerate(configs["pn_waveforms"])
 
@@ -119,69 +128,46 @@ end
                 end
             end
 
-            # extract only valid data-points via global index
-            local n_events_used = configs["n_events"]
-            if n_events_used > sum(global_index_total[nn])
-                println("Warning: There are at most $(sum(global_index_total[nn]))-datapoints available")
-                n_events_used = sum(global_index_total[nn])
-            else
-                println("Events used: $(n_events_used)")
-            end
-            dphi0_k = data["dphi0_k"][global_index_total[nn]]
-            dphi0_k = dphi0_k[1:n_events_used] 
-            delta_k = data["delta_k"][global_index_total[nn]]
-            delta_k = delta_k[1:n_events_used]
-            if averageOverSeveralRealizations
-                numberOfRealization = Int(floor(n_events_used / numberOfEventsSingleRealization))
-                if numberOfRealization == 0
-                    @error "Not enough events to perform the average over several realizations. Please decrease the numberOfEventsSingleRealization in the config file, or increase the number of total events."
-                end
-                n_events_used = numberOfEventsSingleRealization * numberOfRealization
-                dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
-                delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, numberOfEventsSingleRealization)
+            vectorUpperLimits, upperLimitSingleEventsTemp, number_events_single_realization, numberOfEventsSingleRealizationUsed = obtain_conditioned_upper_bounds(
+                configs["n_events"], 
+                global_index_total[nn], 
+                data["dphi0_k"], 
+                data["delta_k"], 
+                averageOverSeveralRealizations = averageOverSeveralRealizations, 
+                numberOfEventsSingleRealization = numberOfEventsSingleRealization, 
+                n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events,
+                printEventsAsHorizontalLinesOrDensityPlot = false, #I set this to false, as I will not plot the single events upper limits in this trend plot
+                use_all_n_events_for_single_event_sample_distribution = false # was configs["use_all_n_events_for_single_event_sample_distribution"], but this is irrelevant here
+                )
 
-                println("Splitting the dataset into $(numberOfRealization) realizations of $(numberOfEventsSingleRealization) events")
-                println("Number of events used effectively: $(n_events_used)")
-                
-            else
-                numberOfRealization = 1
-                dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  n_events_used)
-                delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, n_events_used)
-            end
+            # Skip printing the statistics, since this will be iterated many times, and you can just evaluate this as 
+            # N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
+            # since this is a binomial distribution (which for high N_events_used we may also approximate as a gaussian)
+            # # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)
+            # if !(configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"])
+            #     println("Number of realizations: ", length(number_events_single_realization))
+            #     println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
+            #     println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
+            #     println("Average number of events observed per realization: ", mean(number_events_single_realization))
+            #     println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
+            # end
 
-            vectorUpperLimits = zeros(numberOfRealization)
-            for realization_index in 1:numberOfRealization
-                # Access the realization for dphi0_k_realization
-                dphi0_k_realization = dphi0_k[realization_index, :]
-                
-                # Access the realization for delta_k_realization
-                delta_k_realization = delta_k[realization_index, :]
+            # Suppress the warning due to high numbre of iterations
+            # if sum(number_events_single_realization .== 0) > 0
+            #     println("Warning! There are $(sum(number_events_single_realization .== 0)) realizations with zero number of events, so they will not be used to obtain the upper bounds (so will not influence the average upper bound, nor its error bars)!")
+            # end
 
-                #Evaluate the 90% upper limit given this single realization
-                vectorUpperLimits[realization_index] = get90PctUpperLimitMuDistTIGER(dphi0_k_realization, delta_k_realization, 0.9)
+            # I will only select the realization with a non zero number of events, so with a upper limit that is not a NaN
+            vectorUpperLimits = vectorUpperLimits[.!isnan.(vectorUpperLimits)]
 
-                #Save the single events 90% upper limits for a given realization, if requested
-                if printEventsAsHorizontalLinesOrDensityPlot && realization_index == 1
-                    # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
-                    
-
-                    if configs["use_all_n_events_for_single_event_sample_distribution"]
-                        # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
-                        #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
-                        upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vec(dphi0_k), vec(delta_k))
-                    else
-                        # I use only a single realization to plot the single events upper limits
-                        upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization, delta_k_realization)
-                    end
-                    
-                    upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
-                    
-                end
-
-            end
             # Evaluate the mean and std of the upper limits
             upperLimits[index_nn, index_realization, index_pno, :] = [mean(vectorUpperLimits), std(vectorUpperLimits), exp(mean(log.(vectorUpperLimits))), exp(std(log.(vectorUpperLimits)))]
 
+            # Disable this
+            # # Save the single events upper limits if required
+            # if printEventsAsHorizontalLinesOrDensityPlot
+            #     upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
+            # end
         end
     end
 end
@@ -293,7 +279,7 @@ for (index_pno, pno) in enumerate(PN_orders)
     end
     
     if(any((upperLimits_pno .- ribbon_lower_upper_limits) .< 0))
-        @warn "Upper limits ribbon goes to negative values or below threshold ($(threshold_to_set_to_nan)), setting them to 0 so they will not produce an error (but the ribbon will appear as cut!)!"
+        println("Warning: upper limits ribbon goes to negative values, setting them to 0 so they will not produce an error (but the ribbon will appear as cut!)!")
         ribbon_lower_upper_limits[ribbon_lower_upper_limits[:,1] .< 0, 1] .= 0.
     end
 

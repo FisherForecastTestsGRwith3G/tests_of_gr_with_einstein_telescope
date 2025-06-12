@@ -64,6 +64,7 @@
          "n_events":1000,
          "averageOverSeveralRealizations":false,
          "numberOfEventsSingleRealization":100,
+        "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":false,
          "LVK":false,
          "plot_samples":true,
          "title":"",

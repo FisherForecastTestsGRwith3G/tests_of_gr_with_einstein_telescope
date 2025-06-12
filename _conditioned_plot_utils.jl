@@ -18,7 +18,8 @@ upperLimitSingleEvents should be a 3D array with dimensions (number of networks,
 plotLVK_GWTC3_results = True overlays the results for the LVK GWTC-3 results (yet it does not rescale the axis yet, so they may be out of the plotted region!)
 
 In the config files,
-"use_all_n_events_for_single_event_sample_distribution": allows to use (almost) all events for the single event sample distribution, instead of only the ones from a single realization [true/false]
+"use_all_n_events_for_single_event_sample_distribution": allows to use (almost) all events for the single event sample distribution, instead of only the ones from a single realization [true/false] (default true)
+"n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events": considers directly only the observed events (so works directly with n_events / numberOfEventsSingleRealization OBSERVED events), instead of drawing n_events / numberOfEventsSingleRealization events from the catalog and THEN keeping only the observed ones [true/false] (default false)
 "offset_x_axis_hierarchical_networks_upper_bounds": allows to offset the x-axis for the hierarchical upper bounds, so that they do not overlap if there are multiple networks [float, default 0.1]
 "offset_x_axis_single_event_networks_upper_bounds": allows to offset the x-axis for the single events upper bounds (e.g. violin plots), so that they do not overlap if there are multiple networks [float, default 0.0],
 "impose_y_axis_limits": allows to impose the y-axis limits for the plot, so that they are not automatically set based on the data [true/false]
@@ -305,7 +306,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
         scatter!(
             cc_sub, [1] .+ ( isnothing(configs["offset_x_axis_hierarchical_networks_upper_bounds"]) ? 0 : configs["offset_x_axis_hierarchical_networks_upper_bounds"] * get_relative_x_offset_network(jj,length(network_names))), 
             [upperLimits[jj, 1, 1]],
-            yerr= (lower[jj,1], upper[jj,1]),  # Add error bars
+            yerr= ([lower[jj,1]], [upper[jj,1]]),  # Add error bars
 
             label=network_labels[jj],
             marker=markers[jj],  # Cycle through marker list
