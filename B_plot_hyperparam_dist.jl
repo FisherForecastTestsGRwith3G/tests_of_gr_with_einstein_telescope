@@ -42,7 +42,7 @@ for nn in configs["network_list"]
 end
 
 # process all the plots
- for nn in configs["network_list"]
+for nn in configs["network_list"]
 
     for pno in configs["pn_waveforms"]
 
@@ -75,19 +75,23 @@ end
         ### calculate the hyper-parameter distribution
         # first estimate where to place it
         center_mu = sum(dphi0_k) / n_events_used
-        center_sig = max(0, sqrt.(sum(center_mu .- dphi0_k).^2 ./  n_events_used))
-        spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
+        center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
+        spread = sqrt.(1.0 ./ sum(1 ./ (center_sig.^2 .+ delta_k.^2) ))
 
         k_spread = configs["k_spread"]
         mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
         if !isnothing(configs["mu_lims"][pno]) # overwrite mu_lims
             mu_limit = (configs["mu_lims"][pno][1], configs["mu_lims"][pno][2])
+            
         end 
+        println("Mu-limits: $(mu_limit)")
          
-        sig_limit = (max(0, center_sig - k_spread*spread), center_sig + k_spread*spread)
+        sig_limit = (0, center_sig + k_spread*spread)
         if !isnothing(configs["sigma_lims"][pno]) # overwrite sig_lims
             sig_limit = (configs["sigma_lims"][pno][1], configs["sigma_lims"][pno][2])
+            
         end 
+        println("Sigma-limits: $(sig_limit)")
 
         # calculate the ranges 
         mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs["n_points"]))
@@ -108,7 +112,7 @@ end
         println("Injected values: ", configs["injected_values"][pno])
         title_str = "PN = $(pno)"
         splot = distributionSummaryPlot(mu_values, sig_values, p_mu_sig, p_sig, p_mu, val_inj=configs["injected_values"][pno], title = title_str)
-        
+
         # save plot
         pno_name = "pn_" *pn_order_dic[pno][2]
         mkpath(output_folder_name* nn * "/"*pno_name)
