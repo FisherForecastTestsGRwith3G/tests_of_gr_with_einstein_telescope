@@ -126,7 +126,8 @@ end
             numberOfEventsSingleRealization = numberOfEventsSingleRealization, 
             n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"],
             printEventsAsHorizontalLinesOrDensityPlot = printEventsAsHorizontalLinesOrDensityPlot,
-            use_all_n_events_for_single_event_sample_distribution = configs["use_all_n_events_for_single_event_sample_distribution"]
+            use_all_n_events_for_single_event_sample_distribution = configs["use_all_n_events_for_single_event_sample_distribution"],
+            print_info_catalog_realization = true
         )
 
         # # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            

@@ -479,7 +479,7 @@ end
 
 function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, printEventsAsHorizontalLinesOrDensityPlot::Bool = true, use_all_n_events_for_single_event_sample_distribution::Bool = true, print_info_catalog_realization::Bool = true)
 
-    dphi0_k_realization, delta_k_realization, number_events_single_realization = obtain_dphi0k_deltak_from_realizations(n_events, global_index_network, dphi0_k_full, delta_k_full; averageOverSeveralRealizations, numberOfEventsSingleRealization, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events, print_info_catalog_realization)
+    dphi0_k_realization, delta_k_realization, numberOfRealization, number_events_single_realization = obtain_dphi0k_deltak_from_realizations(n_events, global_index_network, dphi0_k_full, delta_k_full; averageOverSeveralRealizations, numberOfEventsSingleRealization, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events, print_info_catalog_realization)
 
     vectorUpperLimits = zeros(numberOfRealization)
     upperLimitSingleEventsTemp = nothing # This will be used to store the upper limits for the single events, if requested
@@ -601,5 +601,5 @@ function obtain_dphi0k_deltak_from_realizations(n_events::Integer, global_index_
         println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
     end
 
-    return dphi0_k_realization, delta_k_realization, numberOfEventsSingleRealization
+    return dphi0_k_realization, delta_k_realization, numberOfRealization, numberOfEventsSingleRealization
 end

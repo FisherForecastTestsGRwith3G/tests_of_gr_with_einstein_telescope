@@ -79,6 +79,10 @@
          
      "d_specific":{
         "n_events":1000,
+        "evaluate_different_realizations":false,
+        "number_of_events_single_realization":1000,
+        "n_events_and_number_of_events_single_realization_refer_directly_to_observed_events":false,
+        "average_posteriors_from_different_realizations":false,
      	"mcmc_samples":10000,
     	"mcmc_burnin":1000,
         "title":"",

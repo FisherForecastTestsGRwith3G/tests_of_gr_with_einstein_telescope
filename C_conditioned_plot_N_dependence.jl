@@ -146,8 +146,9 @@ end
                 numberOfEventsSingleRealization = numberOfEventsSingleRealization, 
                 n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events,
                 printEventsAsHorizontalLinesOrDensityPlot = false, #I set this to false, as I will not plot the single events upper limits in this trend plot
-                use_all_n_events_for_single_event_sample_distribution = false # was configs["use_all_n_events_for_single_event_sample_distribution"], but this is irrelevant here
-                )
+                use_all_n_events_for_single_event_sample_distribution = false, # was configs["use_all_n_events_for_single_event_sample_distribution"], but this is irrelevant here
+                print_info_catalog_realization = false # Skip printing the statistics, since this will be iterated many times, and you can just evaluate this as described below
+            )
 
             # Skip printing the statistics, since this will be iterated many times, and you can just evaluate this as 
             # N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
