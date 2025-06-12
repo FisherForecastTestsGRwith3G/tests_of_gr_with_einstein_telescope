@@ -131,7 +131,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
                     #markerstrokewidth=1, 
                     #markerstrokecolor=:black,
                     orientation=:vertical,
-                    alpha=0.2,          # Slight fill transparency for overlapping violin plots
+                    alpha=0.3,          # Slight fill transparency for overlapping violin plots
                     linecolor=pointColors[jj],   # Outline color
                     linewidth=0,        # No outline thickness
                     width=0.65,         # Violin width... does not seem to work!
