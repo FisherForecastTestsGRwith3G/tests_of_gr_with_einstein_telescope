@@ -59,9 +59,9 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     # Since this function is somewhat difficult to integrate, for improved accuracy I split the integral in three regions, using a guess for the spread of the distribution as a gauge of the order of magnitude over which the integrand varies
     guess_distributuion_spread = mean(delta_k)
 
-    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-5, atol = 0.)
-    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-5, atol = 0.)
-    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-5, atol = 0.)
+    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-3, atol = 0.)
+    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-2, atol = 0.)
+    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-2, atol = 0.)
 
     result = result1 + result2 + result3
     err = sqrt(err1^2 + err2^2 + err3^2)
@@ -596,10 +596,10 @@ function obtain_dphi0k_deltak_from_realizations(n_events::Integer, global_index_
     # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
         println("Number of realizations: ", length(number_events_single_realization))
         println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
-        println("Number of events requested per realization: ", numberOfEventsSingleRealizationUsed)
+        println("Number of events used per realization: ", numberOfEventsSingleRealization)
         println("Average number of events observed per realization: ", mean(number_events_single_realization))
         println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
     end
 
-    return dphi0_k_realization, delta_k_realization, numberOfRealization, numberOfEventsSingleRealization
+    return dphi0_k_realization, delta_k_realization, numberOfRealization, number_events_single_realization
 end

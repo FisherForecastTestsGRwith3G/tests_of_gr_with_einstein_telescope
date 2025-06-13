@@ -131,7 +131,7 @@ for (index_nn, nn) in enumerate(configs["network_list"])
                     end
 
                     # Obtain samples for posterior distributions for delta_phi
-                    posterior_dist_deltaphi[realization_index, index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k_realization[realization_index], delta_k_realization[realization_index]; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name * nn * "/realization_" * realization_index * "/", pnorder = pn_order_dic[pno][2])
+                    posterior_dist_deltaphi[realization_index, index_nn, index_pno, :] = obtain_samples_delta_phi_pdf(dphi0_k_realization[realization_index], delta_k_realization[realization_index]; n_samples = configs["mcmc_samples"], burn_in = configs["mcmc_burnin"], debug_folder_name = debug_folder_name * nn * "/realization_" * string(realization_index) * "/", pnorder = pn_order_dic[pno][2])
 
                     if configs["plot_conditioned_distribution"]
                         # Obtain samples for posterior distributions for delta_phi, condition on sigma = 0 in the hierarchical distribution
@@ -146,9 +146,9 @@ for (index_nn, nn) in enumerate(configs["network_list"])
         end
 
         for realization_index in 1:number_of_expected_realizations
-            filename_samples = data_folder_name * "script_D/" * nn  * "/realization_" * realization_index * "/posterior_distributions_deltaphi.h5"
+            filename_samples = data_folder_name * "script_D/" * nn  * "/realization_" * string(realization_index) * "/posterior_distributions_deltaphi.h5"
             println("Saving the posterior distribution for delta_phi to disk, in $(filename_samples)")
-            mkpath(data_folder_name * "script_D/" * nn  * "/realization_" * realization_index * "/")
+            mkpath(data_folder_name * "script_D/" * nn  * "/realization_" * string(realization_index) * "/")
             # save to .h5 file 
             h5open(filename_samples, "w") do file
                 write(file, "samples_posterior_dist_deltaphi", posterior_dist_deltaphi[realization_index, index_nn, :, :])
@@ -160,7 +160,7 @@ for (index_nn, nn) in enumerate(configs["network_list"])
 
     else
         for realization_index in 1:number_of_expected_realizations
-            filename_samples = data_folder_name * "script_D/" * nn  * "/realization_" * realization_index * "/posterior_distributions_deltaphi.h5"
+            filename_samples = data_folder_name * "script_D/" * nn  * "/realization_" * string(realization_index) * "/posterior_distributions_deltaphi.h5"
             # If we do not perform the MCMC sampling, I will load the results from disk
             println("Loading the posterior distribution for delta_phi from disk, from file $(filename_samples)")
             # Check if the file exists
@@ -196,7 +196,7 @@ mkpath(output_folder_name)
 # Call the specific plotting function
 if configs["average_posteriors_from_different_realizations"]
     # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
-    title = configs["title"] == "" ? "" : latexstring(configs["title"])
+    local title = configs["title"] == "" ? "" : latexstring(configs["title"])
 
     # Here, to perform the average, I translate each MCMC chain by its mean value, and then sum the different chains... most surely this is not the best way to do it, but it is the simplest one 
     # (yet we lose information about the variance of the position of the mean, even thought it should be also somehow encoded in the spread of the posterior itself, since we expect our results to not be biased)
@@ -219,7 +219,7 @@ if configs["average_posteriors_from_different_realizations"]
         println("Standard deviation of the means of the posterior distributions for delta_phi conditioned (over networks, PN orders): ", dropdims(std(means_posterior_dist_deltaphi_conditioned, dims=(1,4)),dims=(1,4)))
     end
 
-    delta_phi_posterior_plot = plotDeltaPhiPosterior(title, averaged_posterior_dist_deltaphi, plot_conditioned_distribution = configs["plot_conditioned_distribution"], posterior_dist_deltaphi_conditioned = averaged_posterior_dist_deltaphi_conditioned, subplots_pn_order_grouping = (configs["subplots_pn_order_grouping"] === nothing ? nothing : [Vector{Int}(x) for x in configs["subplots_pn_order_grouping"]]))
+    local delta_phi_posterior_plot = plotDeltaPhiPosterior(title, averaged_posterior_dist_deltaphi, plot_conditioned_distribution = configs["plot_conditioned_distribution"], posterior_dist_deltaphi_conditioned = averaged_posterior_dist_deltaphi_conditioned, subplots_pn_order_grouping = (configs["subplots_pn_order_grouping"] === nothing ? nothing : [Vector{Int}(x) for x in configs["subplots_pn_order_grouping"]]))
 
     # Save the combined plot to file
     println("Saving the plot to: ", output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * ".pdf")
@@ -228,11 +228,11 @@ else
     # I will plot all the posterior distributions separately, for each realization
     for realization_index in 1:number_of_expected_realizations
         # Pass the title as a LaTeXString, with L"\mathrm{Title\ text}"
-        title = configs["title"] == "" ? "" : latexstring(configs["title"])
-        delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi[realization_index], plot_conditioned_distribution = configs["plot_conditioned_distribution"], (isnothing(posterior_dist_deltaphi_conditioned) ? posterior_dist_deltaphi_conditioned : posterior_dist_deltaphi_conditioned = posterior_dist_deltaphi_conditioned[realization_index]), subplots_pn_order_grouping = (configs["subplots_pn_order_grouping"] === nothing ? nothing : [Vector{Int}(x) for x in configs["subplots_pn_order_grouping"]]))
+        local title = configs["title"] == "" ? "" : latexstring(configs["title"])
+        local delta_phi_posterior_plot = plotDeltaPhiPosterior(title, posterior_dist_deltaphi[realization_index, :, :, :], plot_conditioned_distribution = configs["plot_conditioned_distribution"], posterior_dist_deltaphi_conditioned = (isnothing(posterior_dist_deltaphi_conditioned) ? posterior_dist_deltaphi_conditioned : posterior_dist_deltaphi_conditioned[realization_index, :, :, :]), subplots_pn_order_grouping = (configs["subplots_pn_order_grouping"] === nothing ? nothing : [Vector{Int}(x) for x in configs["subplots_pn_order_grouping"]]))
 
         # Save the combined plot to file
-        println("Saving the plot to: ", output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * "_realization_" * realization_index * ".pdf")
-        savefig(delta_phi_posterior_plot, output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * "_realization_" * realization_index * ".pdf")
+        println("Saving the plot to: ", output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * "_realization_" * string(realization_index) * ".pdf")
+        savefig(delta_phi_posterior_plot, output_folder_name * "plot_delta_phi_posterior_dist_" * simulation_tag * "_realization_" * string(realization_index) * ".pdf")
     end
 end
