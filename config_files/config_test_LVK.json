@@ -64,6 +64,7 @@
             "n_events":1000,
             "averageOverSeveralRealizations":true,
             "numberOfEventsSingleRealization":12,
+            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":false,
             "LVK":false,
             "plot_samples":true,
             "title":"",
@@ -72,11 +73,16 @@
             "offset_x_axis_single_event_networks_upper_bounds":0.0,
             "impose_y_axis_limits":false,
             "y_axis_limits":[[1e-6, 1e-3],[1e-3, 1e1]],
-            "violin_plots_bandwidth_std_multiplier":0.4
+            "violin_plots_bandwidth_std_multiplier":0.4,
+            "compute_mean_std_dev_in_log_space":true
          },
          
         "d_specific":{
             "n_events":1000,
+            "evaluate_different_realizations":false,
+            "number_of_events_single_realization":1000,
+            "n_events_and_number_of_events_single_realization_refer_directly_to_observed_events":false,
+            "average_posteriors_from_different_realizations":false,
         	"mcmc_samples":20000,
 		    "mcmc_burnin":1000,
 		    "title":"",

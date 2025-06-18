@@ -96,7 +96,8 @@
             0.01
         ],
         "skips":70,
-        "n_median":150
+        "n_median":150,
+        "needToRunAveraging": false
     },
     "mcmc_settings": {
         "run_mcmc": false,

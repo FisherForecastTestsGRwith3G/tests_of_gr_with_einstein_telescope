@@ -64,6 +64,7 @@
             "n_events":200000,
             "averageOverSeveralRealizations":true,
             "numberOfEventsSingleRealization":10000,
+            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":false,
             "LVK":false,
             "plot_samples":true,
             "title":"",
@@ -71,13 +72,18 @@
             "offset_x_axis_hierarchical_networks_upper_bounds":0.1,
             "offset_x_axis_single_event_networks_upper_bounds":0.1,
             "impose_y_axis_limits":true,
-            "y_axis_limits":[[5e-9, 1e-3],[4e-6, 5e0]],
-            "violin_plots_bandwidth_std_multiplier":0.4
+            "y_axis_limits":[[1e-8, 5e-3],[4e-6, 1e1]],
+            "violin_plots_bandwidth_std_multiplier":0.4,
+            "compute_mean_std_dev_in_log_space":true
         },
          
         "d_specific":{
-            "n_events":200000,
-        	"mcmc_samples":30000,
+            "n_events":100000,
+            "evaluate_different_realizations":true,
+            "number_of_events_single_realization":10000,
+            "n_events_and_number_of_events_single_realization_refer_directly_to_observed_events":false,
+            "average_posteriors_from_different_realizations":false,
+        	"mcmc_samples":15000,
 		    "mcmc_burnin":1000,
         	"title":"",
 		    "plot_conditioned_distribution":true,
