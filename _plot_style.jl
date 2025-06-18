@@ -89,7 +89,7 @@ function get_relative_x_offset_network(current_network_index, total_number_netwo
 end
 
 const labels_from_pn_orders = Dict(
-        "-1" => L"\varphi_{-1}",
+        "-1" => L"\varphi_{-2}",
         "0" => L"\varphi_{0}",
         "0.5" => L"\varphi_{1}",
         "1" => L"\varphi_{2}",

@@ -183,7 +183,7 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
     # center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
     spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
 
-    k_spread = 5. #configs_B["k_spread"]
+    k_spread = configs_B["k_spread"]
     mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
     if !isnothing(configs_B["mu_lims"][pno]) # overwrite mu_lims
         mu_limit = (configs_B["mu_lims"][pno][1], configs_B["mu_lims"][pno][2])
@@ -197,8 +197,7 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
 
     # println("mu_limit: ", mu_limit)
     # println("sig_limit: ", sig_limit)
-    # sig_limit = (0., 0.05)
-    # mu_limit = (0., 0.05)
+
     # calculate the ranges 
     mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs_B["n_points"]))
     sig_values = collect(LinRange(sig_limit[1], sig_limit[2], configs_B["n_points"]))

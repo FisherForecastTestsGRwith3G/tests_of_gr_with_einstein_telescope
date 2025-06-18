@@ -54,6 +54,7 @@ function distributionSummaryPlot(
     title=""
     ) 
 
+    set_common_plot_style()
     # calculate limits
     mu_lim = [minimum(mu_values), maximum(mu_values)]
     sig_lim = [minimum(sig_values), maximum(sig_values)]

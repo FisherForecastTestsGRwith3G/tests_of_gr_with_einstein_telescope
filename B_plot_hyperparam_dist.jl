@@ -76,11 +76,7 @@ for nn in configs["network_list"]
         # first estimate where to place it
         center_mu = sum(dphi0_k) / n_events_used
         center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
-<<<<<<< HEAD
         spread = sqrt.(1.0 ./ sum(1 ./ (center_sig.^2 .+ delta_k.^2) ))
-=======
-        spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
->>>>>>> main
 
         k_spread = configs["k_spread"]
         mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)

@@ -1,6 +1,9 @@
 {
     "global": {
+        "use_inspiral_snr_thresh": false,
         "catalog_name": "BGR_TIGER_10k.h5",
+        "use_spinless_waveform": true,
+        "inspiral_snr_thresh": 6.0,
         "pn_waveforms": [
             "1"
         ],
@@ -83,6 +86,7 @@
         "PN_order": "1",
         "title": "",
         "n_events": 1400,
+        "n_median": 150,
         "mu": [
             0.001,
             0.002,

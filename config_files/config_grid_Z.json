@@ -7,6 +7,9 @@
             "network_45_15km"
         ],
         "use_hm_waveform": true,
+        "use_spinless_waveform": true,
+        "use_inspiral_snr_thresh": false,
+        "inspiral_snr_thresh":6.0,
         "source_type": "BBH"
     },
     "b_specific": {

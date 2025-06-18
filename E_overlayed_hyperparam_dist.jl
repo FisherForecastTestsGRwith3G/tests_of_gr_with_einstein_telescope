@@ -3,6 +3,8 @@ using Plots
 using Trapz
 using LaTeXStrings
 using Random 
+using Base.Threads
+using Plots.Measures
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -41,7 +43,7 @@ for nn in configs["network_list"]
     end
 end
 
-for nn in configs["network_list"]
+@threads for nn in configs["network_list"]
 
     contours = Dict()
     
@@ -103,6 +105,11 @@ for nn in configs["network_list"]
             center_mu = sum(dphi0_k) / n_events_used
             center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
             spread = sqrt.(1.0 ./ sum(1 ./ (center_sig.^2 .+ delta_k.^2) ))
+            println("center_sig: ", center_sig)
+            println("spread: ", spread)
+            println("center_mu: ", center_mu)
+            #spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
+
 
             k_spread = configs["k_spread"]
             mu_limit = (center_mu - k_spread*spread, center_mu + k_spread*spread)
@@ -145,8 +152,9 @@ for nn in configs["network_list"]
         end
 
         # create the overlayed plot 
+        set_common_plot_style()
 
-        overlayed_contour_plot = plot([0,0], sig_limit_overlay, linestyle = :dash, linecolor=:gray, label=false, legend=:topleft, left_margin = 3mm, bottom_margin = 3mm, right_margin = 3mm, top_margin = 3mm)
+        overlayed_contour_plot = plot([0,0], sig_limit_overlay, linestyle = :dash, linecolor=:gray, label=false, legend=:topleft, left_margin = 3mm, bottom_margin = 3mm, right_margin = 3mm, top_margin = 3mm, size = (800,600))
         plot!(overlayed_contour_plot, [0,0], sig_limit_overlay, linestyle = :dash, linecolor=:gray, label=false, inset=bbox(0.05, 0.05, 0.35, 0.35, :right), subplot=2, legend=false,)
         zoomed_in_contour_plot = overlayed_contour_plot[2]
         for pno in configs["pn_waveforms"]
@@ -179,6 +187,8 @@ for nn in configs["network_list"]
         ylabel!(overlayed_contour_plot[1],"σ")
         xlims!(overlayed_contour_plot[1], mu_limit_overlay...)
         ylims!(overlayed_contour_plot[1], sig_limit_overlay...)
+        plot!(overlayed_contour_plot[1], right_margin = 3mm)
+        plot!(overlayed_contour_plot[1], alpha = 1.)
 
         # create zoomed in overlayed plot
         #zoomed_in_contour_plot = plot([0,0], sig_limit_overlay_inset, linestyle = :dash, linecolor=:gray, label=false)
@@ -203,12 +213,17 @@ for nn in configs["network_list"]
                     x_data, 
                     y_data, 
                     color = color,
-                    linewidth=2)
+                    linewidth=2,
+                    xticks = [
+                        mu_limit_overlay_inset[1], 
+                        0.,
+                        mu_limit_overlay_inset[2]])
             end
         end
 
         xlims!(zoomed_in_contour_plot, mu_limit_overlay_inset...)
         ylims!(zoomed_in_contour_plot, sig_limit_overlay_inset...)
+        plot!(zoomed_in_contour_plot, alpha = 1.)
 
         # save plot
         mkpath(output_folder_name* nn * "/all_orders/")
