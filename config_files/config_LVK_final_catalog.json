@@ -63,8 +63,8 @@
        "c_specific":{
             "n_events":1000000,
             "averageOverSeveralRealizations":true,
-            "numberOfEventsSingleRealization":9,
-            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":true,
+            "numberOfEventsSingleRealization":12750,
+            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":false,
             "LVK":true,
             "plot_samples":true,
             "title":"",
