@@ -48,8 +48,8 @@ end
 
 # Settings to perform the average over several realization of a given experiment, assuming a fixed number of observations for each run
 min_number_of_realizations = 1
-max_number_of_realizations = 40000
-number_of_points_trend_plot = 20
+max_number_of_realizations = 20000
+number_of_points_trend_plot = 25
 
 # For simplicity, also to not clutter too much the plot, I will iterate over a single detector network
 index_detector_network_to_use = 2
