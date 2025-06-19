@@ -50,11 +50,20 @@ numberOfEventsSingleRealization = configs["number_of_events_single_realization"]
 println("Average over several realizations: $(averageOverSeveralRealizations)")
 println("Number of events per realization: $(numberOfEventsSingleRealization)")
 
-@threads for nn in configs["network_list"]
+minus1PNZoomFactor = 1000.0
+
+for nn in configs["network_list"]
 
     max_number_of_realizations = 1
     if averageOverSeveralRealizations
-        max_number_of_realizations = Int(floor(length(global_index_total[nn])/numberOfEventsSingleRealization))
+        max_number_of_events = configs["n_events"]
+        if length(global_index_total_full[nn]) < configs["n_events"]
+            println("Warning: There are at most $(length(global_index_total_full[nn])) catalog events available")
+            max_number_of_events = length(global_index_total_full[nn])
+        else
+            println("Total number of catalog events used: $(max_number_of_events)")
+        end
+        max_number_of_realizations = Int(floor(max_number_of_events/numberOfEventsSingleRealization))
     end
 
     for realization_index in 1:max_number_of_realizations
@@ -62,11 +71,16 @@ println("Number of events per realization: $(numberOfEventsSingleRealization)")
         println("\n"*"#"^81)
         println("Processing network: $(nn), realization index: $(realization_index) out of $(max_number_of_realizations)\n")
     
-        global_index_total[nn] = global_index_total_full[nn]
+        global_index_total = Dict()
+        global_index_total[nn] = deepcopy(global_index_total_full[nn])
         # I just set to false the events that are not in the current realization
         if averageOverSeveralRealizations
-            global_index_total[nn] .= false
-            global_index_total[nn][(realization_index-1)*numberOfEventsSingleRealization+1:realization_index*numberOfEventsSingleRealization] = global_index_total_full[nn][(realization_index-1)*numberOfEventsSingleRealization+1:realization_index*numberOfEventsSingleRealization]
+            if realization_index > 1
+                global_index_total[nn][1 : (realization_index-1)*numberOfEventsSingleRealization] .= false
+            end
+            if realization_index < max_number_of_realizations
+                global_index_total[nn][realization_index*numberOfEventsSingleRealization + 1 : end] .= false
+            end
         end
 
         contours = Dict()
@@ -89,7 +103,7 @@ println("Number of events per realization: $(numberOfEventsSingleRealization)")
             mu_limit_overlay_inset = [0., 0.]
             sig_limit_overlay_inset = [0., 0.]
 
-            for pno in configs["pn_waveforms"]
+            @threads for pno in configs["pn_waveforms"]
 
                 println("\n"*"#"^81)
                 println("Processing PN = $(pno), Noise seed = $(noise_seed)\n")
@@ -197,14 +211,14 @@ println("Number of events per realization: $(numberOfEventsSingleRealization)")
                 
 
                 if pno == "-1"
-                    label = label * L"\times(500)"
+                    label = label * L"\times(" * latexstring(Int(minus1PNZoomFactor)) * L")"
                 end
                 for idx_c in 1:n_countours
                     x_data = contours[noise_seed][pno][1][idx_c]
                     y_data = contours[noise_seed][pno][2][idx_c]
                     if pno == "-1"
-                        x_data = x_data*500
-                        y_data = y_data*500
+                        x_data = x_data*minus1PNZoomFactor
+                        y_data = y_data*minus1PNZoomFactor
                     end
                     plot!(
                         overlayed_contour_plot[1], 
@@ -232,14 +246,14 @@ println("Number of events per realization: $(numberOfEventsSingleRealization)")
                 
 
                 if pno == "-1"
-                    label = label * L"\times(500)"
+                    label = label * L"\times(" * latexstring(Int(minus1PNZoomFactor)) * L")"
                 end
                 for idx_c in 1:n_countours
                     x_data = contours[noise_seed][pno][1][idx_c]
                     y_data = contours[noise_seed][pno][2][idx_c]
                     if pno == "-1"
-                        x_data = x_data*500
-                        y_data = y_data*500
+                        x_data = x_data*minus1PNZoomFactor
+                        y_data = y_data*minus1PNZoomFactor
                     end
                     plot!(
                         zoomed_in_contour_plot, 
