@@ -7,6 +7,12 @@ using Serialization
 using Turing
 using Printf
 
+# Needed for the get_dL function
+using Pkg
+parentdir = dirname(pwd())
+Pkg.activate(string(parentdir)*"/GW.jl")
+using GW: get_dL
+
 # Fast modification of the original script C, to produce a plot of the the trend of SNR and other parameters (as colored scatter plots) as a function the hierarchical upper limits, conditioned on the delta phi distribution.  
 
 println("Running C_conditioned_plot_single_event_bounds_vs_parameters.jl script: this script is a modified version of the C_conditioned_plot.jl script, not completely refined. You should look a the source code and set the correct parameters in the script (not just in the config files), to obtain the wanted result.")
@@ -106,6 +112,29 @@ function auto_log_colorbar_ticks(z_axis_values; min_ticks=4, max_ticks=8)
     return tick_positions, tick_labels
 end
 
+function get_z(dL)
+    # use bisection method to find z
+    z=1
+    zmin = 0.
+    zmax = 30.
+    dL = dL*1e3 # convert to Mpc
+    iteration = 0
+    while abs.(dL - get_dL(z)[1]) .> 1e-3
+        iteration += 1
+        if iteration > 100
+            println("Could not find z")
+            break
+        end
+        z = 0.5(zmin + zmax)
+        if dL .> get_dL(z)[1]
+            zmin = z
+        else
+            zmax = z
+        end
+    end
+    return z
+end
+
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
 
@@ -153,6 +182,19 @@ end
             end
         end
 
+        # Evaluate some derived quantities
+        param_values["z"] = get_z.(param_values["dL"]) 
+        param_values["total_mass_binary"] = @. param_values["mc"] / (param_values["eta"])^(3. / 5.)  # Total mass of the binary system (in detector frame)
+        GMsun_over_c3 = 4.925491025543575903411922162094833998e-6 # seconds
+        param_values["tfrequency_end_inspiral"] = @. 0.018 / (  param_values["mc"] / param_values["eta"]^(3. /5.) ) / GMsun_over_c3 # Frequency at the end of the inspiral (in Hz), in detector frame
+        param_values["mc_source_frame"] = @. param_values["mc"] / (1 + param_values["z"])  # Chirp mass in source frame
+        param_values["total_mass_binary_source_frame"] = @. param_values["total_mass_binary"] / (1 + param_values["z"])  # Chirp mass in source frame
+        param_values["q"] = @. -((-1. + sqrt(1. - 4. * (param_values["eta"])) + 2. * (param_values["eta"]) ) / (2. * (param_values["eta"]) )) # mass ratio q = m2 / m1 
+        param_values["m1"] = @. param_values["mc"] * ((1. + param_values["q"] ) / param_values["q"]^3)^(1. / 5.) # detector frame mass of the primary component
+        param_values["m2"] = @. param_values["m1"] * param_values["q"] # detector frame mass of the secondary component
+        param_values["m1_source_frame"] = @. param_values["m1"] / (1 + param_values["z"]) # source frame mass of the primary component
+        param_values["m2_source_frame"] = @. param_values["m2"] / (1 + param_values["z"]) # source frame mass of the secondary component
+        
         # Load the SNR data
         snr_data = Dict()
         pno_name = "pn_"*pn_order_dic[pno][2]
@@ -182,19 +224,15 @@ end
 
         # Produce the plot: a scatter plot with the single event upper bounds on the x axis, the SNR distribution on the y axis, and the param_values[selected_parameter] on the color axis.
 
-        # Some quantities that may be useful to plot as the z axis
-        
-        total_mass_binary = @. param_values["mc"] / (param_values["eta"])^(3. / 5.)  # Total mass of the binary system
-        total_mass_binary = total_mass_binary[global_index_total[nn]]  # Select the global indices for the current network
-        GMsun_over_c3 = 4.92549e-6  # GMsun/c^3 in seconds
-        frequency_end_inspiral = @. 0.018 / (  param_values["mc"] / param_values["eta"]^(3. /5.) ) / GMsun_over_c3
-        frequency_end_inspiral = frequency_end_inspiral[global_index_total[nn]]
-
         # Quantities to be plotted
         x_axis_values = upperLimitSingleEventsTemp
-        y_axis_values = snr_data["values"][global_index_total[nn]]
-        z_axis_values = param_values["mc"][global_index_total[nn]]
+        y_axis_values = snr_data["values"]
+        z_axis_values = param_values["mc"]
         # z_axis_values = total_mass_binary
+
+        # Obtain correct array elements
+        y_axis_values = y_axis_values[global_index_total[nn]]
+        z_axis_values = z_axis_values[global_index_total[nn]]
         
         # Proper LaTeX labels
         xlabel_str =L"|\delta" * LaTeXString(PN_labels[index_pno]) * L"|"
@@ -220,6 +258,9 @@ end
             x_axis_values, 
             y_axis_values, 
             marker_z = z_axis_values,
+            # xlims = (xmin, xmax),
+            # ylims = (ymin, ymax),
+            # clims = (cmin, cmax), 
             color = :viridis,
             xlabel=xlabel_str,
             ylabel=ylabel_str, 
@@ -256,7 +297,7 @@ end
         hline!(final_plot, [configs["snr_thresh"]], linestyle=:dash, color=:gray, alpha = 1.0, label="SNR threshold = $(Int(configs["snr_thresh"]))")
 
         # Save the plot
-        output_folder_name_plot = output_folder_name * nn * "/parameters_vs_conditioned_delta_phi_upper_limits/"
+        output_folder_name_plot = output_folder_name * "parameters_vs_conditioned_delta_phi_upper_limits/" * nn * "/"
         mkpath(output_folder_name_plot)
         # I do not use pdfs but png instead, since there are about 150.000 points in each plot, and therefore the pdfs would be slow to load.
         plot_filename = output_folder_name_plot * "plot_parameters_vs_conditioned_delta_phi_upper_limits_" * simulation_tag * "_" * nn * "_" * pno_name * ".png"
