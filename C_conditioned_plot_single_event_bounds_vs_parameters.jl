@@ -5,6 +5,7 @@ using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
 using Turing
+using Printf
 
 # Fast modification of the original script C, to produce a plot of the the trend of SNR and other parameters (as colored scatter plots) as a function the hierarchical upper limits, conditioned on the delta phi distribution.  
 
@@ -50,15 +51,16 @@ end
 
 
 # For simplicity, also to not clutter too much the plot, I will iterate over a single detector network
-list_indices_detector_network_to_use = [2]
+list_indices_detector_network_to_use = [1,2,3]
 # and for the same reason, I will iteratre over only the few specified PN orders (creating a separate plot for each of them)
-list_indices_pn_order_to_use = [1]
+# list_indices_pn_order_to_use = [1]
+list_indices_pn_order_to_use = collect(1:length(configs["pn_waveforms"])) # Analyzes all PN orders
 
 # Create an empty array to store the results for the upper limits (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
 # upperLimits = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
 # Create an empty array to store the single events upper limits, if required.
 n_events_used = configs["n_events"]
-upperLimitSingleEvents = zeros(length(list_of_networks), length(configs["pn_waveforms"]), n_events_used)
+upperLimitSingleEvents = zeros(length(configs["network_list"]), length(configs["pn_waveforms"]), n_events_used)
 
 # Set up plots
 set_common_plot_style()
@@ -70,9 +72,39 @@ plotHeight, plotWidth, plotDpi, padding = default_plot_dimensions() # Get the de
 markers, markersize, pointColors = get_markers_and_palette()
 
 PN_orders = configs["pn_waveforms"];
-network_names = configs["network_names"];
+network_names = configs["network_list"];
 network_labels = labels_from_networks(network_names);
 PN_labels = labels_from_PN_orders(PN_orders);
+
+# not used in the end, since Plots.jl does not support log colorbars nor costum colorbar ticks
+function auto_log_colorbar_ticks(z_axis_values; min_ticks=4, max_ticks=8)
+    # Get min and max in linear space
+    zmin = minimum(z_axis_values)
+    zmax = maximum(z_axis_values)
+    # Convert back to linear
+    zmin_lin = 10.0^zmin
+    zmax_lin = 10.0^zmax
+
+    # Find the nearest powers of 10
+    pow_min = floor(Int, log10(zmin_lin))
+    pow_max = ceil(Int, log10(zmax_lin))
+
+    # Try different intervals
+    for interval in log10.((1000, 500, 200, 100, 50, 20, 10,5,2, 1, 0.5, 0.2, 0.1))
+        ticks = collect(pow_min:interval:pow_max)
+        if min_ticks <= length(ticks) <= max_ticks
+            tick_positions = ticks
+            tick_labels = [@sprintf("%.0f", 10.0^t) for t in ticks]
+            return tick_positions, tick_labels
+        end
+    end
+
+    # Fallback: just use 5 ticks
+    ticks = range(pow_min, pow_max; length=5)
+    tick_positions = collect(ticks)
+    tick_labels = [@sprintf("%.0f", 10.0^t) for t in ticks]
+    return tick_positions, tick_labels
+end
 
 # process all the plots
  for (index_nn, nn) in enumerate(configs["network_list"])
@@ -87,7 +119,7 @@ PN_labels = labels_from_PN_orders(PN_orders);
 
     # Loading the relevant parameters
     param_values = Dict()
-    file_name = data_folder_name * "/catalog_w_deviations.h5"
+    file_name = user_configs["path_output"]*simulation_tag* "/catalog_w_deviations.h5"
     h5open(file_name, "r") do catalog_file
         param_group = catalog_file["parameter"]
         
@@ -99,10 +131,7 @@ PN_labels = labels_from_PN_orders(PN_orders);
     end
 
 
-    #Produce the plot evenly spaced in log scale        
-    numberOfEventsSingleRealization = n_events_realizations[index_realization]
-
-    println("Processing realization = $(index_realization) out of $(number_of_points_trend_plot) with $(numberOfEventsSingleRealization) events")
+    #Produce the plot evenly spaced in log scale   
 
     for (index_pno, pno) in enumerate(configs["pn_waveforms"])
 
@@ -126,6 +155,7 @@ PN_labels = labels_from_PN_orders(PN_orders);
 
         # Load the SNR data
         snr_data = Dict()
+        pno_name = "pn_"*pn_order_dic[pno][2]
         folder_name = data_folder_name * nn * "/" * pno_name *"/"
         file_name = folder_name * "snrs.h5"
         h5open(file_name, "r") do snr_file
@@ -154,10 +184,10 @@ PN_labels = labels_from_PN_orders(PN_orders);
 
         # Some quantities that may be useful to plot as the z axis
         
-        total_mass_binary = @. param_values["mc"] / (param_values["η"])^(3. / 5.)  # Total mass of the binary system
+        total_mass_binary = @. param_values["mc"] / (param_values["eta"])^(3. / 5.)  # Total mass of the binary system
         total_mass_binary = total_mass_binary[global_index_total[nn]]  # Select the global indices for the current network
-
-        frequency_end_inspiral = @. 0.018 / (  param_values["mc"] / param_values["η"]^(3. /5.) ) / GMsun_over_c3
+        GMsun_over_c3 = 4.92549e-6  # GMsun/c^3 in seconds
+        frequency_end_inspiral = @. 0.018 / (  param_values["mc"] / param_values["eta"]^(3. /5.) ) / GMsun_over_c3
         frequency_end_inspiral = frequency_end_inspiral[global_index_total[nn]]
 
         # Quantities to be plotted
@@ -167,7 +197,7 @@ PN_labels = labels_from_PN_orders(PN_orders);
         # z_axis_values = total_mass_binary
         
         # Proper LaTeX labels
-        xlabel_str =L"|\delta" * LaTeXString(PN_labels[pno]) * L"|", 
+        xlabel_str =L"|\delta" * LaTeXString(PN_labels[index_pno]) * L"|"
         ylabel_str = "SNR" 
         zlabel_str = L"\mathcal{M}_c"  # or L"M_{tot}" for total mass
 
@@ -176,39 +206,60 @@ PN_labels = labels_from_PN_orders(PN_orders);
             error("The lengths of x, y, and z axis values must be the same. Got lengths: x=$(length(x_axis_values)), y=$(length(y_axis_values)), z=$(length(z_axis_values))")
         end
 
+        use_log_scale_z_axis = true
+
+        if use_log_scale_z_axis
+            println("Using log scale for the z axis. Plots.jl does not correctly support log scale, nor arbitrary colorbar ticks, so there is no concrete easy way to display log data on the z axis. I will just plot directly log_10() of the quantity")
+            z_axis_values = log10.(z_axis_values)
+            zlabel_str = L"\log_{10}("*LaTeXString(zlabel_str)*L")"
+            tick_positions, tick_labels = auto_log_colorbar_ticks(z_axis_values)
+        end
+
         # Now I produce the scatter plot, in log for all three axis
         final_plot = scatter(
             x_axis_values, 
             y_axis_values, 
-            z_axis_values,
+            marker_z = z_axis_values,
+            color = :viridis,
             xlabel=xlabel_str,
             ylabel=ylabel_str, 
-            zlabel=zlabel_str,  # or L"M_{tot}"
+            colorbar = true,
+            colorbar_title=zlabel_str,  # or L"M_{tot}"
             title="",
-            #color=:blues,  # Use a color gradient
-            markersize=5,
-            marker=:circle,
+            label = "Single events",
             xscale=:log10, 
             yscale=:log10, 
-            zscale=:log10,
-            #legend=:topright
-            size=(plotWidth, plotHeight), 
-            # padding = padding, 
-            # dpi=plotDpi,
-            # framestyle = :box,    
-            # minorgridcolor=:gray,  # Enable minor grid lines
-            # xminorgrid=true,  # Disable minor grid lines for the x-axis,     
-            # grid = true,
-            # gridalpha=0.4, 
-            # gridcolor=:gray,  # Set grid lines to be transparent or gray
-            # yminorgrid=true, 
-            # minorgridalpha=0.15
+            #zscale=:log10,
+            #colorbar_scale=:log10, # bug in Plots.jl, so I will not use it...
+            #zscale=:log10,
+            legend= :topright,
+            size=(plotWidth, plotHeight),
+            right_margin = 5mm, # Increase right_margin to avoid cut off labels 
+            padding = padding*1.2,  # Increase padding to avoid cut off labels
+            dpi=plotDpi*0.6, # Reduce DPI to decrease file size
+            framestyle = :box,    
+            minorgridcolor=:gray,  # Enable minor grid lines
+            xminorgrid=true,  # Disable minor grid lines for the x-axis,     
+            grid = true,
+            gridalpha=0.6, 
+            gridcolor=:gray,  # Set grid lines to be transparent or gray
+            yminorgrid=true, 
+            minorgridalpha=0.2,
+            markersize=2,
+            marker=:circle,
+            alpha=0.45,  # Set transparency for the markers
+            markerstrokewidth=0,
+            #colorbar_ticks = (tick_positions, tick_labels) # Not implemented in Plots.jl, so I will not use it...
         )
+
+        # overlay an horizontal dashed gray line at configs["snr_thresh"], which should be SNR = 12
+        hline!(final_plot, [configs["snr_thresh"]], linestyle=:dash, color=:gray, alpha = 1.0, label="SNR threshold = $(Int(configs["snr_thresh"]))")
 
         # Save the plot
         output_folder_name_plot = output_folder_name * nn * "/parameters_vs_conditioned_delta_phi_upper_limits/"
         mkpath(output_folder_name_plot)
-        plot_filename = output_folder_name_plot * "plot_parameters_vs_conditioned_delta_phi_upper_limits_" * simulation_tag * "_" * nn * "_" * pno_name * ".pdf"
+        # I do not use pdfs but png instead, since there are about 150.000 points in each plot, and therefore the pdfs would be slow to load.
+        plot_filename = output_folder_name_plot * "plot_parameters_vs_conditioned_delta_phi_upper_limits_" * simulation_tag * "_" * nn * "_" * pno_name * ".png"
         println("Saving the conditioned upper limits plot to file: ", plot_filename)
         savefig(final_plot, plot_filename)
 

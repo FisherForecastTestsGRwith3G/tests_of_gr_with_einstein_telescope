@@ -9,6 +9,7 @@ function set_common_plot_style()
         guidefontsize=10,
         tickfontsize=16,
         legendfontsize=16,
+        colorbar_titlefontsize = 18,
         left_margin = 8mm,
         right_margin = 2mm,
         bottom_margin = 12mm,

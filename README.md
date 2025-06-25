@@ -65,6 +65,13 @@ The script is called with one argument.
 
 `julia C_conditioned_plot_N_dependence.jl <config_file_name>`
 
+**C_conditioned_plot_single_event_bounds_vs_parameters.jl** <br> 
+Produces the plot showing the correlation between the single events 90% upper limits for the delta_phi PN deformation coefficients (evaluated from their posterior distributions obtained in hierarchical framework conditioned on sigma = 0), and other quantities (for example SNR on the y axis, and chirp mass on the z axis, represented with a colorbar).  
+The config from the config files are mostly overloaded in the script itself: therefore one should read the source code before using it, to make sure the results will be produced as intended.  
+The script is called with one argument.
+
+`julia C_conditioned_plot_single_event_bounds_vs_parameters.jl <config_file_name>`
+
 **D_delta_phi_dist_plot.jl** <br> 
 Produces the plot showing the posterior distribution for the delta_phi PN deformation coefficients, obtained in hierarchical framework.  
 The plot shows both the generic posterior distribution, and the distribution obtained by conditioning on the hyperparameter sigma = 0.  
