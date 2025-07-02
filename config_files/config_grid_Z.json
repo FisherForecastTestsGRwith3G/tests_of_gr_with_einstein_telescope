@@ -82,7 +82,7 @@
         ],
         "PN_order": "1",
         "title": "",
-        "n_events": 1400,
+        "n_events": 1300,
         "mu": [
             0.001,
             0.002,
@@ -95,7 +95,7 @@
             0.009,
             0.01
         ],
-        "skips":70,
+        "skips":0,
         "n_median":150
     },
     "mcmc_settings": {

@@ -66,7 +66,7 @@
     "header": "grid/grid_PN_one_n_80_mu_0.008_sigma_0.01",
     "a_specific": {
         "sigma": 0.01,
-        "n_events": 1400,
+        "n_events": 1300,
         "mu": 0.008
     },
     "z_specific": {
@@ -85,7 +85,7 @@
         "skips": 70,
         "PN_order": "1",
         "title": "",
-        "n_events": 1400,
+        "n_events": 1300,
         "n_median": 150,
         "mu": [
             0.001,

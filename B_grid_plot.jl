@@ -1,12 +1,11 @@
 using HDF5
-using Plots
 using Trapz
 using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
 using Turing
 using Base.Threads
-
+using Plots
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -28,9 +27,7 @@ configs, simulation_tag = readConfigForZ(config_file_name)
 configs_B, simulation_tag_B = readConfigForB(config_file_name)
 
 
-# set up folder names
-data_folder_name = user_configs["path_output"]*simulation_tag * "/"
-output_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/"
+
 
 mu_vec = configs["mu"]
 sigma_vec = configs["sigma"]
@@ -41,7 +38,14 @@ n_events = configs["n_events"]
 n_median = configs["n_median"]
 gridSize = length(mu_vec) * length(sigma_vec) 
 
+# set up folder names
+data_folder_name = user_configs["path_output"]*simulation_tag * "/"
+output_folder_name =  user_configs["path_output"]*simulation_tag*"/results/" * network * "/" *PN_name *"/"
+plot_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/" * network * "/" *PN_name *"/"
+
+
 println("\n Anlayzing grid composed of $gridSize grid points\n")
+println("\n Calculating $(n_median) median values for each grid point\n")
 
 # get global index
 global_index_fisher = Dict()
@@ -89,19 +93,70 @@ for i in 1:length(mu_vec)
         dphi0_k = data["dphi0_k"][global_index_total[network]]
         delta_k = data["delta_k"][global_index_total[network]]
 
-        res[i,j] = reshuffling_bisection(n_median, wrapper_3sigma, dphi0_k, delta_k, sigma)[1]
+        res[i,j] = reshuffling_bisection(n_median, wrapper_3sigma, dphi0_k, delta_k, sigma, mu)[1]
     end
 end
 
 # save data
+mkpath(output_folder_name)
+mkpath(plot_folder_name)
 
-h5open(data_folder_name*"results_.h5", "w") do file
+println("\nSaving results in: $(output_folder_name)")
+
+h5open(output_folder_name*"results.h5", "w") do file
     write(file, "results", res)
 end
 
-mkpath(output_folder_name* "/" * network * "/" *PN_name)
-fig_file_name = output_folder_name * "grid_plot.pdf"
+
+fig_file_name = plot_folder_name * "grid_plot.pdf"
 println("\nSaving grid plot in: $(fig_file_name)")
 
-splot = heatmap(mu_vec, sigma_vec, res')
-savefig(splot, fig_file_name)
+using CairoMakie
+
+### leave unchanged
+fontsize_theme = Makie.Theme(fontsize = 24)
+Makie.set_theme!(fontsize_theme)
+
+MT = Makie.MathTeXEngine
+mt_fonts_dir = joinpath(dirname(pathof(MT)), "..", "assets", "fonts", "NewComputerModern")
+
+Makie.set_theme!(fonts = (
+    regular = joinpath(mt_fonts_dir, "NewCM10-Regular.otf"),
+    bold = joinpath(mt_fonts_dir, "NewCM10-Bold.otf")
+))
+####
+tickfontsize_trio = 24
+titlefontsize_trio = 26
+labelfontsize_trio = 30
+lim = collect(0:0.4:3)
+lim_label = []
+for (i, lim_i) in enumerate(lim)
+    if lim_i < 10.
+
+        push!(lim_label, string.(Int.(round.(10 .^lim_i, sigdigits =1))))
+    else
+        push!(lim_label, string.(Int.(round.(10 .^lim_i, sigdigits =1))))
+    end
+
+end
+
+fig = Figure(size = (800, 600))
+ax = Axis(fig[1, 1], xlabel = L"\mu", ylabel = L"\sigma", title = "PN: "* string(pno))
+
+# Create a heatmap with the results
+hm = Makie.heatmap!(ax, mu_vec, sigma_vec , log10.(res), colormap = :viridis)
+Makie.Colorbar(fig[1, 2], hm,  size = 20,
+                     ticklabelsize = 20, ticks = (lim, lim_label))
+
+Makie.Label(fig[1, 2, Top()], L"n_{\text{events}}", fontsize = labelfontsize_trio)
+
+ax.titlesize = titlefontsize_trio
+ax.xlabelsize = labelfontsize_trio
+ax.ylabelsize = labelfontsize_trio
+
+ax.xticklabelsize = tickfontsize_trio
+ax.yticklabelsize = tickfontsize_trio
+ax.yticklabelspace = 50.
+
+
+Makie.save(fig_file_name, fig)

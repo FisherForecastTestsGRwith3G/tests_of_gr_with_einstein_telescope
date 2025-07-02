@@ -131,7 +131,7 @@ end
 #     return median(res)
 # end
 
-function reshuffling_bisection(n_reshuffling, ff, dphi0_k, delta_k, sigma)
+function reshuffling_bisection(n_reshuffling, ff, dphi0_k, delta_k, mu, sigma)
     res = zeros(n_reshuffling)
 
     n_events = length(delta_k)
@@ -142,7 +142,7 @@ function reshuffling_bisection(n_reshuffling, ff, dphi0_k, delta_k, sigma)
         dphi0_k_shuf = dphi0_k[p]
         delta_k_shuf = delta_k[p]
 
-        res[i] = bisection_method(ff, 3, n_events, tol=1,  args_f=(dphi0_k_shuf, delta_k_shuf, sigma))[1]
+        res[i] = bisection_method(ff, 3, n_events, tol=1,  args_f=(dphi0_k_shuf, delta_k_shuf, sigma, mu))[1]
     end
 
     return median(res), res
@@ -170,7 +170,7 @@ function sigmas_from_center(pdf::Matrix{Float64}, x::Float64, y::Float64)
 end
 
 
-function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
+function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_mu, center_sig)
 
     n_events_used = Int(round(n_events_used))
 
@@ -179,7 +179,7 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
 
     ### calculate the hyper-parameter distribution
     # first estimate where to place it
-    center_mu = sum(dphi0_k) / n_events_used
+    #center_mu = sum(dphi0_k) / n_events_used
     # center_sig = max(0, sqrt.(sum((center_mu .- dphi0_k).^2) ./  n_events_used))
     spread = sqrt.(1.0 ./ sum(1 ./ delta_k.^2) )
 
@@ -207,9 +207,15 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_sig)
     itp = interpolate((mu_values, sig_values), p_mu_sig, Gridded(Linear()))
     p_mu_sig_interp = extrapolate(itp, 0.0)
 
-    #try
-    level = calcPercentileLvl( p_mu_sig, [0.9889])
-    p_GR = p_mu_sig_interp(0., 0.)
+    local level, p_GR
+    try
+        level = calcPercentileLvl( p_mu_sig, [0.9889])
+        p_GR = p_mu_sig_interp(0., 0.)
+    catch e
+        println("Error in calculating percentiles: ", e)
+        # If the percentile calculation fails, return 1, # indicating that the point (0., 0.) is outside the 3 sigma level.
+        return 1.
+    end
 
     # out of the 3 sigma interval if level > p_GR
     res = level[1] - p_GR
