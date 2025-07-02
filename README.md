@@ -56,14 +56,21 @@ From the config files it is possible to:
 
 The script is called with one argument.
 
-`julia C_conditioned_plot <config_file_name>`
+`julia C_conditioned_plot.jl <config_file_name>`
+
+**C_conditioned_plot_N_dependence.jl** <br> 
+Produces the plot showing the trend of the 90% upper limits for the delta_phi PN deformation coefficients (evaluated from their posterior distributions obtained in hierarchical framework conditioned on sigma = 0) as a funcion of the number of (observed) events, for a single chosen detector.  
+The config from the config files are mostly overloaded in the script itself: therefore one should read the source code before using it, to make sure the results will be produced as intended.  
+The script is called with one argument.
+
+`julia C_conditioned_plot_N_dependence.jl <config_file_name>`
 
 **D_delta_phi_dist_plot.jl** <br> 
 Produces the plot showing the posterior distribution for the delta_phi PN deformation coefficients, obtained in hierarchical framework.  
 The plot shows both the generic posterior distribution, and the distribution obtained by conditioning on the hyperparameter sigma = 0.  
 The script is called with two arguments.
 
-`julia D_delta_phi_dist_plot <perform_MCMC_sampling> <config_file_name>`
+`julia D_delta_phi_dist_plot.jl <perform_MCMC_sampling> <config_file_name>`
 
 Here: 
 * `perform_MCMC_sampling` is either 1 or 0 (by default 1). Can be set to 0 to load precomputed MCMC sampling of the posterior distributions.

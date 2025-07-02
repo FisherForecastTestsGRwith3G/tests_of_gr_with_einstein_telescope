@@ -59,9 +59,9 @@ function _evaluate_delta_phi_pdf(delta_phi::Float64, dphi0_k::Vector{Float64}, d
     # Since this function is somewhat difficult to integrate, for improved accuracy I split the integral in three regions, using a guess for the spread of the distribution as a gauge of the order of magnitude over which the integrand varies
     guess_distributuion_spread = mean(delta_k)
 
-    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-5, atol = 0.)
-    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-5, atol = 0.)
-    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-5, atol = 0.)
+    result1, err1 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 0., guess_distributuion_spread, rtol = 1e-3, atol = 0.)
+    result2, err2 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), guess_distributuion_spread, 5. *guess_distributuion_spread, rtol = 1e-2, atol = 0.)
+    result3, err3 = quadgk(sigma -> exp(_evaluate_log_delta_phi_sigma_integrand(sigma, delta_phi, dphi0_k, delta_k, _internal_log_normalization_value = _internal_log_normalization_value)), 5. *guess_distributuion_spread, + Inf, rtol = 1e-2, atol = 0.)
 
     result = result1 + result2 + result3
     err = sqrt(err1^2 + err2^2 + err3^2)
@@ -477,3 +477,129 @@ function get90PctUpperLimitMuDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector
     return upper_limit
 end
 
+function obtain_conditioned_upper_bounds(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, printEventsAsHorizontalLinesOrDensityPlot::Bool = true, use_all_n_events_for_single_event_sample_distribution::Bool = true, print_info_catalog_realization::Bool = true)
+
+    dphi0_k_realization, delta_k_realization, numberOfRealization, number_events_single_realization = obtain_dphi0k_deltak_from_realizations(n_events, global_index_network, dphi0_k_full, delta_k_full; averageOverSeveralRealizations, numberOfEventsSingleRealization, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events, print_info_catalog_realization)
+
+    vectorUpperLimits = zeros(numberOfRealization)
+    upperLimitSingleEventsTemp = nothing # This will be used to store the upper limits for the single events, if requested
+
+    for realization_index in 1:numberOfRealization
+
+        # Now I iterate over each realization
+        if number_events_single_realization[realization_index] == 0
+            # No events in realization, so I will skip this realization and set the upper limit to NaN
+            vectorUpperLimits[realization_index] = NaN
+            continue
+        end
+
+        #Evaluate the 90% upper limit given this single realization
+        vectorUpperLimits[realization_index] = get90PctUpperLimitMuDistTIGER(dphi0_k_realization[realization_index], delta_k_realization[realization_index], 0.9)
+
+    end
+
+    #Save the single events 90% upper limits (eventually for a given realization), if requested
+    if printEventsAsHorizontalLinesOrDensityPlot
+        # The hierarchical analysis, conditioned on sigma = 0, implemented in getMuDistTIGER, should work just fine even if working with a single event
+
+        if use_all_n_events_for_single_event_sample_distribution
+            # I save all the single events upper limits for the first realization, so that if plotted as a density plot the fluctuactions are smaller
+            #I flatten dphi0_k and delta_k over the realization_index with vec, so that I can use all the event
+            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), vcat(dphi0_k_realization...), vcat(delta_k_realization...))
+        else
+            # I use only a single realization to plot the single events upper limits
+            # I look for the first realization_index which has at least one event
+            first_realization_with_events = findfirst(x -> x > 0, number_events_single_realization)
+            upperLimitSingleEventsTemp = map((x, y) -> get90PctUpperLimitMuDistTIGER([x], [y], 0.9), dphi0_k_realization[first_realization_with_events, :], delta_k_realization[first_realization_with_events, :])
+        end
+        
+    end
+
+    return vectorUpperLimits, upperLimitSingleEventsTemp, number_events_single_realization, numberOfEventsSingleRealization
+end
+
+function obtain_dphi0k_deltak_from_realizations(n_events::Integer, global_index_network::Vector{Bool}, dphi0_k_full::Vector{Float64}, delta_k_full::Vector{Float64}; averageOverSeveralRealizations::Bool = true, numberOfEventsSingleRealization::Union{Nothing, Int64} = nothing, n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events::Bool = false, print_info_catalog_realization::Bool = true)
+    if n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events
+        println("Considering directly observed events (i.e. not performing a random draw (which would introduce 'poissonian' noise - actually binomially distributed) from the catalog)! Therefore, selecting directly n_events = $(n_events) from the observed ones! This may not be what you want!")
+        # If the number of events refers to the observed events, then we select the events to be used (in practice dphi0_k and delta_k) directly only from observed events (i.e. with global_index_network == 1)
+        
+        # extract only valid data-points via global index
+        if n_events > sum(global_index_network)
+            println("Warning: There are at most $(sum(global_index_network))-observed events available")
+            n_events_used = sum(global_index_network)
+        else
+            n_events_used = n_events
+            println("Observed vents used: $(n_events_used)")
+        end
+
+        # Not meaningful here, since it will be just an array of ones, but I keep it for consistency because in the other if branch it contains non trivial information
+        global_index_network_effective = global_index_network[global_index_network]
+
+        dphi0_k = dphi0_k_full[global_index_network]
+        delta_k = delta_k_full[global_index_network]
+    else
+        println("Drawing events from the catalog (so with associated poissonian noise  - actually binomially distributed - on the counting of observed events)! So drawing a number of observed events starting from n_events = $(n_events) obtained from the catalog!")
+        if n_events > length(global_index_network)
+            println("Warning: There are at most $(length(global_index_network))-events in the catalog available")
+            n_events_used = length(global_index_network)
+        else
+            n_events_used = n_events
+            println("Events used (from the catalog): $(n_events_used)")
+        end
+        
+        # In this case it is useful, since it contains the information about which events will be considered as 'observed', after the draw from the catalog, and the several realizations
+        global_index_network_effective = global_index_network
+
+        dphi0_k = dphi0_k_full
+        delta_k = delta_k_full
+    end
+
+    global_index_network_effective = global_index_network_effective[1:n_events_used]
+    delta_k = delta_k[1:n_events_used]
+    dphi0_k = dphi0_k[1:n_events_used] 
+
+    if averageOverSeveralRealizations
+        if numberOfEventsSingleRealization === nothing
+           throw(ArgumentError("numberOfEventsSingleRealization must be specified when averageOverSeveralRealizations is true."))
+        end
+        numberOfRealization = Int(floor(n_events_used / numberOfEventsSingleRealization))
+        if numberOfRealization == 0
+            @error "Not enough events to perform the average over several realizations. Please decrease the numberOfEventsSingleRealization in the config file, or increase the number of total events."
+        end
+        n_events_used = numberOfEventsSingleRealization * numberOfRealization
+
+        println("Splitting the dataset into $(numberOfRealization) realizations of $(numberOfEventsSingleRealization) events")
+        println("Number of events used effectively: $(n_events_used)")
+        
+    else
+        numberOfRealization = 1
+        numberOfEventsSingleRealization = n_events_used
+    end
+
+    global_index_network_effective = reshape(global_index_network_effective[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
+    dphi0_k = reshape(dphi0_k[1:n_events_used], numberOfRealization,  numberOfEventsSingleRealization)
+    delta_k = reshape(delta_k[1:n_events_used], numberOfRealization, numberOfEventsSingleRealization)
+
+    dphi0_k_realization = Vector{Vector{Float64}}(undef, numberOfRealization)
+    delta_k_realization = Vector{Vector{Float64}}(undef, numberOfRealization)
+    number_events_single_realization = zeros(Int64, numberOfRealization)
+
+    for realization_index in 1:numberOfRealization
+        # I will select only the events which pass the selection cuts (SNR, invertible Fisher, eventually inspiral SNR thresholds), as indicated by global_index_network_effective
+        dphi0_k_realization[realization_index] = dphi0_k[realization_index, global_index_network_effective[realization_index, :]]
+        delta_k_realization[realization_index] = delta_k[realization_index, global_index_network_effective[realization_index, :]]
+        number_events_single_realization[realization_index] = sum(global_index_network_effective[realization_index, :])
+    end
+
+    if print_info_catalog_realization && !(n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events)
+    # Print statistics about the number_events_single_realization, if drawn from the catalog (since it induces a 'poissonian noise' - actually distributed as a binomial, given the high probability in ET - in the number of events per realization)            
+    # This should follow a binomial distribution (which for high N_events_used we may also approximate as a gaussian), with N_events_used = (N_events in catalog * probability_of_event_to_be_selected) +- (sqrt(N_events in catalog * probability_of_event_to_be_selected * (1 - probability_of_event_to_be_selected)))
+        println("Number of realizations: ", length(number_events_single_realization))
+        println("Number of realization with non-zero number of events (and so used to obtain and plot the 90% upper bounds): ", sum(number_events_single_realization .> 0))
+        println("Number of events used per realization: ", numberOfEventsSingleRealization)
+        println("Average number of events observed per realization: ", mean(number_events_single_realization))
+        println("Standard deviation of the number of events per realization: ", std(number_events_single_realization))
+    end
+
+    return dphi0_k_realization, delta_k_realization, numberOfRealization, number_events_single_realization
+end
