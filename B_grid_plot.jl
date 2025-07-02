@@ -5,7 +5,7 @@ using KernelDensity, Statistics
 using Serialization
 using Turing
 using Base.Threads
-using Plots
+using CairoMakie
 
 # include required scripts 
 include("_hierarchical_dist.jl")
@@ -43,6 +43,9 @@ gridSize = length(mu_vec) * length(sigma_vec)
 data_folder_name = user_configs["path_output"]*simulation_tag * "/"
 output_folder_name =  user_configs["path_output"]*simulation_tag*"/results/" * network * "/" *PN_name *"/"
 plot_folder_name =  user_configs["path_output"]*simulation_tag*"/plots/" * network * "/" *PN_name *"/"
+
+mkpath(output_folder_name)
+mkpath(plot_folder_name)
 
 
 println("\n Anlayzing grid composed of $gridSize grid points\n")
@@ -100,21 +103,19 @@ if needToRun == true
 
     # save data
 
-    h5open(data_folder_name*"results.h5", "w") do file
+    h5open(output_folder_name*"results.h5", "w") do file
         write(file, "results", res)
     end
 else
     println("The simulation will not be run!")
     # load the data
-    file_name = data_folder_name * "results.h5"
+    file_name = output_folder_name * "results.h5"
     h5open(file_name, "r") do file
         global res = read(file, "results")
     end
 end
 
-path_plot = output_folder_name* network * "/" *PN_name
-mkpath(output_folder_name * network * "/" *PN_name)
-fig_file_name = path_plot * "/grid_plot.pdf"
+fig_file_name = plot_folder_name * "grid_plot.pdf"
 println("\nSaving grid plot in: $(fig_file_name)")
 
 ### leave unchanged
