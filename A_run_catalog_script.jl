@@ -60,8 +60,8 @@ pn_deviation = deltaPnNormal(
     gr_parameter[9][1:n_events],
     gr_parameter[10][1:n_events],
     gr_parameter[11][1:n_events],
-    mu=configs["mu"]*ones(n_events),
-    sigma = configs["sigma"]*ones(n_events)
+    mu=configs["mu"],
+    sigma = configs["sigma"]
     )
 
 gr_deviation_dict = Dict(

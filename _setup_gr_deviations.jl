@@ -36,8 +36,8 @@ function deltaPnNormal(
     Φ_coal::Vector{Float64},
     lambda1::Union{Vector{Float64},Nothing}=nothing,
     lambda2::Union{Vector{Float64},Nothing}=nothing;
-    mu::Union{Vector{Float64},Nothing}=nothing,
-    sigma::Union{Vector{Float64},Nothing}=nothing
+    mu::Float64,
+    sigma::Float64
     )
 
     mu = mu*ones(Float64, 10)
@@ -64,7 +64,15 @@ function deltaPnNormal(
     )
 
     n_events = length(mc)
-    # TODO: add check that all inputs have the same length.
+
+    if length(η) != n_events || length(χ_1) != n_events || length(χ_2) != n_events ||
+       length(dL) != n_events || length(θ) != n_events || length(ϕ) != n_events ||
+       length(iota) != n_events || length(ψ) != n_events ||
+       length(tcoal) != n_events || length(Φ_coal) != n_events || 
+       (lambda1 !== nothing && length(lambda1) != n_events) ||
+       (lambda2 !== nothing && length(lambda2) != n_events)
+        error("All input vectors must have the same length as the number of events.")
+    end
 
     if mu === nothing
         mu = zeros(10)
