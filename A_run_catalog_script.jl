@@ -48,6 +48,8 @@ gr_parameter = ReadCatalog(configs["catalog_name"], folder=user_configs["path_ca
 n_events = configs["n_events"]
 println("Number of events: ", n_events)
 
+println("fmin = ", configs["fmin"])
+
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],
     gr_parameter[2][1:n_events],
@@ -202,12 +204,16 @@ for nn in keys(networks)
                 delta_pn, 
                 auto_save=false, 
                 return_SNR=true, 
-                useEarthMotion=true
+                useEarthMotion=true,
+                fmin = configs["fmin"]
             )
 
             println("Calculating inspiral SNRs")
             #I evaluate the SNR at the end of the "inspiral" phase, as defined in the Phenom waveform models
             f_inspiral_cutoff = @. 0.018 / (  mc / η^(3. /5.) ) / GMsun_over_c3
+
+            # I will check if f_inspiral_cutoff is not below fmin, otherwise the SNR calculation will fail
+            f_inspiral_cutoff = max.(f_inspiral_cutoff, configs["fmin"])
 
             @time inspiral_snrs = SNR(
                 wf,
@@ -225,7 +231,8 @@ for nn in keys(networks)
                 delta_pn, 
                 auto_save=false, 
                 useEarthMotion=true,
-                fmax = f_inspiral_cutoff
+                fmax = f_inspiral_cutoff,
+                fmin = configs["fmin"]
             )
             
         else

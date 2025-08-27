@@ -10,7 +10,8 @@
         "source_type":"BBH", 
         "snr_thresh":12.0,
         "use_inspiral_snr_thresh":true,
-        "inspiral_snr_thresh":6.0
+        "inspiral_snr_thresh":6.0,
+        "fmin":20.0
         }, 
     
     "mcmc_settings":{
