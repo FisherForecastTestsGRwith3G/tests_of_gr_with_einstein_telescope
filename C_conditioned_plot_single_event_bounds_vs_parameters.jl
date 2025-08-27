@@ -223,6 +223,10 @@ end
 
 
         # Produce the plot: a scatter plot with the single event upper bounds on the x axis, the SNR distribution on the y axis, and the param_values[selected_parameter] on the color axis.
+        
+        # Whether to overlay the scatter plot with markers for ill-conditioned events
+        # This does not make sense in the current setup below (so plot_ill_conditioned_events = false right now), but would for example make sense when plotting iota and mass ratio on x and y axis, with the PN bound coefficients on the z axis
+        plot_ill_conditioned_events = false 
 
         # Quantities to be plotted
         x_axis_values = upperLimitSingleEventsTemp
@@ -230,7 +234,22 @@ end
         z_axis_values = param_values["mc"]
         # z_axis_values = total_mass_binary
 
+        # Another set of parameters that could have been plotted (and would require disabling the SNR dashed line below)
+        # x_axis_values = param_values["iota"]
+        # y_axis_values = 1. ./ param_values["q"]
+        # z_axis_values = upperLimitSingleEventsTemp
+
+        if plot_ill_conditioned_events
+            # Saves also the values for the events that should have been used, but have not been used, due to ill-conditioned Fisher matrix
+            # So the events with global_index_snr[nn] set to true but global_index_fisher[nn] set to false
+            indices_ill_conditioned = global_index_snr[nn] .& .!global_index_fisher[nn]
+            x_ill_conditioned = x_axis_values[indices_ill_conditioned]
+            y_ill_conditioned = y_axis_values[indices_ill_conditioned]
+            #z_ill_conditioned = z_axis_values[indices_ill_conditioned]
+        end
+
         # Obtain correct array elements
+        # x_axis_values = x_axis_values[global_index_total[nn]]
         y_axis_values = y_axis_values[global_index_total[nn]]
         z_axis_values = z_axis_values[global_index_total[nn]]
         
@@ -239,7 +258,13 @@ end
         ylabel_str = "SNR" 
         zlabel_str = L"\mathcal{M}_c"  # or L"M_{tot}" for total mass
 
+        # Other set of possible parameters for example
+        # xlabel_str =L"\iota"
+        # ylabel_str = L"1/q" 
+        # zlabel_str = L"|\delta" * LaTeXString(PN_labels[index_pno]) * L"|"  # or L"M_{tot}" for total mass
+
         # Check that the length of the x, y, and z axis values are the same
+        # The code above and below must be accordingly modified, since some arrays just contain the observed events (like upperLimitSingleEventsTemp), some other contain all the events (like snr_data["values"] and param_values["mc"])
         if length(x_axis_values) != length(y_axis_values) || length(x_axis_values) != length(z_axis_values)
             error("The lengths of x, y, and z axis values must be the same. Got lengths: x=$(length(x_axis_values)), y=$(length(y_axis_values)), z=$(length(z_axis_values))")
         end
@@ -251,6 +276,15 @@ end
             z_axis_values = log10.(z_axis_values)
             zlabel_str = L"\log_{10}("*LaTeXString(zlabel_str)*L")"
             tick_positions, tick_labels = auto_log_colorbar_ticks(z_axis_values)
+        end
+
+        # Print log 10 of minimum and maximum values of the z axis, if use_log_scale_z_axis is true, otherwise print the minimum and maximum values
+        if use_log_scale_z_axis
+            println("Minimum value of z axis (log10): ", minimum(z_axis_values))
+            println("Maximum value of z axis (log10): ", maximum(z_axis_values))
+        else
+            println("Minimum value of z axis: ", minimum(z_axis_values))
+            println("Maximum value of z axis: ", maximum(z_axis_values))
         end
 
         # Now I produce the scatter plot, in log for all three axis
@@ -293,7 +327,23 @@ end
             #colorbar_ticks = (tick_positions, tick_labels) # Not implemented in Plots.jl, so I will not use it...
         )
 
+        if plot_ill_conditioned_events
+            # Overlay the scatter plot with purple "X" markers for ill-conditioned events
+            # The code above must be changed to have two parameters on the x and y which are evaluated before the Fisher matrix
+            # For example it makes sense to set plot_ill_conditioned_events = true when iota and mass ratio are on x and y axis, with the PN bound coefficients on the z axis
+            scatter!(
+                x_ill_conditioned,
+                y_ill_conditioned,
+                color = :darkorange,
+                marker = :x,
+                markersize = 2,
+                alpha=0.45,  # Set transparency for the markers
+                label = "Events with ill-conditioned FIM"
+            )
+        end
+
         # overlay an horizontal dashed gray line at configs["snr_thresh"], which should be SNR = 12
+        # Keep only if applicable!
         hline!(final_plot, [configs["snr_thresh"]], linestyle=:dash, color=:gray, alpha = 1.0, label="SNR threshold = $(Int(configs["snr_thresh"]))")
 
         # Save the plot

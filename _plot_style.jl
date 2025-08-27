@@ -3,13 +3,16 @@ using Plots.Measures
 using ColorSchemes
 
 function set_common_plot_style()
+    # Default value is scale = 1.0, but e.g. scale = 1.4 is better for side-by-side plots
+    scale = 1.0
     default(
         fontfamily="Computer Modern",
-        titlefontsize=19,
-        guidefontsize=10,
-        tickfontsize=16,
-        legendfontsize=16,
-        colorbar_titlefontsize = 18,
+        titlefontsize=round(Int, 19 * scale),
+        guidefontsize=round(Int, 10 * scale),
+        tickfontsize=round(Int, 16 * scale),
+        legendfontsize=round(Int, 16 * scale),
+        colorbar_titlefontsize = round(Int, 18 * scale),
+        labelfontsize=round(Int, 21 * scale),
         left_margin = 8mm,
         right_margin = 2mm,
         bottom_margin = 12mm,
@@ -18,8 +21,7 @@ function set_common_plot_style()
         framestyle=:box,
         minorgridalpha=.04,
         gridwidth=0.5,
-        gridalpha=0.5,
-        labelfontsize=21
+        gridalpha=0.5
     )
 end
 
