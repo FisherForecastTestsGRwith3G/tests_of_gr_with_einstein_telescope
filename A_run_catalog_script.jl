@@ -1,6 +1,7 @@
 using Pkg
 using HDF5
 import JSON
+using Distributions
 
 parentdir = dirname(pwd())
 Pkg.activate(string(parentdir)*"/GW.jl")
@@ -49,6 +50,72 @@ n_events = configs["n_events"]
 println("Number of events: ", n_events)
 
 println("fmin = ", configs["fmin"])
+
+
+# Code used to perform forecast for a specific event, e.g. GW150914-like
+# Set override_catalog_with_specific_event = true in the following, and modify the following lines accordingly, to override the catalog parameters with a single event
+
+override_catalog_with_specific_event = true
+
+if override_catalog_with_specific_event
+    println("CAREFUL! Overriding catalog with a specific event settings! Are you sure you want to continue? (y/n)")
+    input = readline()
+    if !(input in ["y", "Y", "yes", "Yes"])
+        throw(ArgumentError("Aborting execution!"))
+    end
+
+    # We may also to average over several detector noise realisations, and possibly parameter distribution, by keeping n_events > 1 in the config file, and producing a corresponding catalog
+    # Define the parameters of the event GW150914-like, from arxiv:1602.03840
+    # From arxiv:1811.12907, arxiv:1811.02042, arxiv:2506.21530: The prior distribution for the inclination angle is assumed to be uniform in its cosine. The priors for polarization angle time and phase of coalescence are uniform.
+    overriden_mc = 30.0 .* ones(n_events) # chirp mass at the detector frame in solar masses
+    overriden_η = 0.247 .* ones(n_events) # symmetric mass ratio, dimensionless 
+    overriden_χ_1 = 0.0 .* ones(n_events) # dimensionless spin of the most massive BH
+    overriden_χ_2 = 0.0 .* ones(n_events) # dimensionless spin of the least massive BH
+    overriden_dL = 0.4 .* ones(n_events) # luminosity distance in Gpc
+    overriden_θ = (45. * pi/180) .* ones(n_events) # inclination angle in radians
+    overriden_ϕ = (45. * pi/180) .* ones(n_events) # polarization angle in radians
+    overriden_ι = (30. * pi/180) .* ones(n_events) # inclination angle in radians
+    overriden_ψ = (45. * pi/180) .* ones(n_events) # polarisation angle in radians
+    overriden_tcoal = 0.0 .* ones(n_events) # time of coalescence in fraction of a day, [0,1]
+    overriden_Φ_coal = 0.0 .* ones(n_events) # phase of coalescence in radians
+
+    # We may also sample from some distribution over the least-constrained parameters, e.g. the angles and spin (here implemented quickly as a broad flat prior)
+    overriden_χ_1 = rand(Uniform(-0.3, 0.3), n_events) # dimensionless spin of the most massive BH
+    overriden_χ_2 = rand(Uniform(-0.3, 0.3), n_events) # dimensionless spin of the least massive BH
+    overriden_θ = acos.(rand(Uniform(-1, 1), n_events)) # inclination angle in radians, uniform in cos(theta)
+    overriden_ϕ = rand(Uniform(0, 2*pi), n_events) # polarization angle in radians, uniform in [0,2pi]
+    overriden_ι = acos.(rand(Uniform(-1, 1), n_events)) # inclination angle in radians, uniform in cos(iota) - should take into account correlation with luminosity distance, but for simplicity I will neglect that
+    # Actually, from fig 2 of https://arxiv.org/pdf/1602.03840 , it seems that the preferred inclination is between [0,45] and [135,180]. To keep it simple, I will sample uniformly from [135,180] 
+    overriden_ι = acos.(rand(Uniform(-1, cos(135 * pi/180)), n_events)) # inclination angle in radians, uniform in cos(iota) but limited to [135,180]
+    overriden_ψ = rand(Uniform(0, pi), n_events) # polarisation angle in radians, uniform in [0, pi] from arxiv:2506.21530
+    overriden_tcoal = rand(Uniform(0, 1), n_events) # time of coalescence in fraction of a day, uniform in [0,1]
+    overriden_Φ_coal = rand(Uniform(0, 2*pi), n_events) # phase of coalescence in radians, uniform in [0,2pi]
+
+
+    # override gr_parameter so its only element is the parameters array (single-event testing)
+    overriden_catalog_parameters = [
+        overriden_mc,      # mc
+        overriden_η,       # eta
+        overriden_χ_1,     # chi1
+        overriden_χ_2,     # chi2
+        overriden_dL,      # dL
+        overriden_θ,       # theta
+        overriden_ϕ,       # phi
+        overriden_ι,       # iota
+        overriden_ψ,       # psi
+        overriden_tcoal,   # tcoal
+        overriden_Φ_coal,  # phiCoal
+        zeros(n_events),   # lambda1
+        zeros(n_events)    # lambda2
+    ]
+
+    gr_parameter = overriden_catalog_parameters
+
+    println("Overriden catalog parameters!")
+    #println("overriden_catalog_parameters:", overriden_catalog_parameters )
+
+end
+
 
 pn_deviation = deltaPnNormal(
     gr_parameter[1][1:n_events],

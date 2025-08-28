@@ -39,6 +39,10 @@ if overload_detector_networks_as_waveform_models
     # both waveform models must have data for the same detector networks! I assume so in the following code!
     list_header_simulation_tags = ["final_run_LVK", "final_run_LVK_PhenomD"] # As set in the config file, such that it indicates the correct folder where data is stored, list_header_simulation_tags = ["final_run_LVK", "final_run_LVK_PhenomD"]
     
+    # The overload above can in full generality be used to load data (i.e. Fishers) evaluated separately from different config files, and so present in different folders. 
+    # For example, by uncommenting the line below, it is possible to produce the plot for the GW150914-like event, for different fmin frequencies
+    # list_header_simulation_tags = ["ET_GW150914_like_fmin_2Hz", "ET_GW150914_like_fmin_5Hz","ET_GW150914_like_fmin_10Hz","ET_GW150914_like_fmin_15Hz","ET_GW150914_like_fmin_20Hz"]
+
     list_of_networks = [[x, y] for x in list_header_simulation_tags, y in configs["network_list"]]
     # list_of_networks = vcat(list_of_networks...) 
 else
