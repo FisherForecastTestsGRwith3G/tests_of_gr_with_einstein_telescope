@@ -2,7 +2,7 @@
     "header":"final_run_ET_joined_plotC",
     
     "global":{
-        "network_list":["ETS", "network_45_15km", "network_0_15km"],
+        "network_list":["network_45_15km"],
         "catalog_name":"BGR_TIGER_200k.h5",
         "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
         "use_hm_waveform":true,
