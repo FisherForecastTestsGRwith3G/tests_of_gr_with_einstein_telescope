@@ -1,5 +1,5 @@
 {
-    "header":"ET_GW150914_like_fmin_5Hz",
+    "header":"ET_GW150914_like_fmin_2Hz",
     
     "global":{
         "network_list":["ETS"],
@@ -11,7 +11,7 @@
         "snr_thresh":12.0,
         "use_inspiral_snr_thresh":false,
         "inspiral_snr_thresh":6.0,
-        "fmin": 5.0
+        "fmin": 2.0
         }, 
     
     "mcmc_settings":{
