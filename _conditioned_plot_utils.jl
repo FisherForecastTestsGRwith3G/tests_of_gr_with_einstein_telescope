@@ -6,6 +6,26 @@ include("_plot_style.jl")
 
 #Results from figure 6 of https://arxiv.org/pdf/2112.06861
 LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
+LVK_GWTC3_label = "LVK GWTC-3"
+
+# Other results can be plotted as overlaid points instead of LVK GWTC-3 results, by overriding the code below. Set override_points_to_be_overlaid = true (false by default), and mofify the code accordingly
+override_points_to_be_overlaid = true
+
+if override_points_to_be_overlaid
+    println("CAREFUL! Overriding the points to be overlaid on the conditioned plot, using the ET GW150914-like injection results from arxiv:2503.12263. Are you sure you want to continue? (y/n)")
+    answer = readline()
+    if answer != "y"
+        println("Change the override_points_to_be_overlaid variable to false in _conditioned_plot_utils.jl if you do not want to override the points to be overlaid on the conditioned plot. Aborting.")
+        exit(1)
+    end
+    println("Overriding the points to be overlaid on the conditioned plot, using the ET GW150914-like injection results from arxiv:2503.12263")
+
+    # Results from figure 1.1 of https://arxiv.org/pdf/2503.12263 , for the injected signal into synthetic ET-T noise
+    ET_bluebook_injection = [4.5e-5, 0.0035, 0.011, 0.008, 0.004, 0.034, 0.012, 0.016, 0.088, 0.048] 
+    
+    LVK_GWTC3_results = ET_bluebook_injection
+    LVK_GWTC3_label = L"GW150914-like ET ($\texttt{T}$) injection"
+end
 
 """
 The plotConditionedUpperLimits function plots the cumulative error on PN order for different networks and PN orders
@@ -347,13 +367,13 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
         # Plot the GWTC-3 results in the main plot
         scatter!(
             cc_main, 2:length(PN_orders), LVK_GWTC3_results[2:end],
-            label="LVK GWTC-3", marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
+            label=LVK_GWTC3_label, marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
         )
 
         # Plot the first GWTC-3 result in the subplot
         scatter!(
             cc_sub, [1], [LVK_GWTC3_results[1]],
-            label="LVK GWTC-3", marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
+            label=LVK_GWTC3_label, marker=:diamond, markersize=markersize, markerstrokewidth=1, markerstrokecolor=:black, color=:darkblue
         )
     end
 

@@ -36,41 +36,34 @@ function deltaPnNormal(
     Φ_coal::Vector{Float64},
     lambda1::Union{Vector{Float64},Nothing}=nothing,
     lambda2::Union{Vector{Float64},Nothing}=nothing;
-    mu::Union{Vector{Float64},Nothing}=nothing,
-    sigma::Union{Vector{Float64},Nothing}=nothing
-    )
-
-    mu = mu*ones(Float64, 10)
-    sigma = sigma*ones(Float64, 10)
-    return deltaPnNormal(mc, η, χ_1, χ_2, dL, θ, ϕ, iota, ψ, tcoal, Φ_coal, lambda1, lambda2, mu=mu, sigma=sigma)
-end
-
-function deltaPnNormal(
-    mc::Vector{Float64}, 
-    η::Vector{Float64},
-    χ_1::Vector{Float64},
-    χ_2::Vector{Float64},
-    dL::Vector{Float64},
-    θ::Vector{Float64},
-    ϕ::Vector{Float64},
-    iota::Vector{Float64},
-    ψ::Vector{Float64},
-    tcoal::Vector{Float64},
-    Φ_coal::Vector{Float64},
-    lambda1::Union{Vector{Float64},Nothing}=nothing,
-    lambda2::Union{Vector{Float64},Nothing}=nothing;
-    mu::Union{Vector{Float64},Nothing}=nothing,
-    sigma::Union{Vector{Float64},Nothing}=nothing
+    mu::Union{Vector{Float64},Float64,Nothing}=nothing,
+    sigma::Union{Vector{Float64},Float64,Nothing}=nothing
     )
 
     n_events = length(mc)
-    # TODO: add check that all inputs have the same length.
+
+    if length(η) != n_events || length(χ_1) != n_events || length(χ_2) != n_events ||
+       length(dL) != n_events || length(θ) != n_events || length(ϕ) != n_events ||
+       length(iota) != n_events || length(ψ) != n_events ||
+       length(tcoal) != n_events || length(Φ_coal) != n_events || 
+       (lambda1 !== nothing && length(lambda1) != n_events) ||
+       (lambda2 !== nothing && length(lambda2) != n_events)
+        error("All input vectors must have the same length as the number of events.")
+    end
 
     if mu === nothing
         mu = zeros(10)
+    else
+        if isa(mu, Number)
+            mu = mu*ones(Float64, 10)
+        end
     end
     if sigma === nothing
         sigma = zeros(10)
+    else
+        if isa(sigma, Number)
+            sigma = sigma*ones(Float64, 10)
+        end
     end
     
     delta_pn = [

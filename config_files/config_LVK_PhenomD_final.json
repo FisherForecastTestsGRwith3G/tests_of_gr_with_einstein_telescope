@@ -1,11 +1,11 @@
 {
-    "header":"LVK",
+    "header":"final_run_LVK_PhenomD",
     
     "global":{
         "network_list":["LHV"],
         "catalog_name":"BGR_TIGER_1M.h5",
         "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
-        "use_hm_waveform":true,
+        "use_hm_waveform":false,
         "use_spinless_waveform":true,
         "source_type":"BBH", 
         "snr_thresh":12.0,

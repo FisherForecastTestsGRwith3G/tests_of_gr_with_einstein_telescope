@@ -1,9 +1,9 @@
 {
-    "header":"final_run_ET",
+    "header":"ET_GW150914_like_fmin_10Hz",
     
     "global":{
-        "network_list":["ETS", "network_45_15km", "network_0_15km"],
-        "catalog_name":"BGR_TIGER_200k.h5",
+        "network_list":["ETS"],
+        "catalog_name":"BGR_OVERRIDEN_CATALOG.h5",
         "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
         "use_hm_waveform":true,
         "use_spinless_waveform":true,
@@ -11,7 +11,7 @@
         "snr_thresh":12.0,
         "use_inspiral_snr_thresh":false,
         "inspiral_snr_thresh":6.0,
-        "fmin":2.0
+        "fmin": 10.0
         }, 
     
     "mcmc_settings":{
@@ -20,11 +20,11 @@
         },
      
     "alpha_specific":{
-        "n_events":200000
+        "n_events":100
         },
         
     "a_specific":{
-        "n_events":200000,
+        "n_events":100,
         "mu":0,
         "sigma":0
         },
@@ -62,11 +62,11 @@
         },
         
        "c_specific":{
-            "n_events":200000,
+            "n_events":100,
             "averageOverSeveralRealizations":true,
-            "numberOfEventsSingleRealization":10000,
-            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":false,
-            "LVK":false,
+            "numberOfEventsSingleRealization":1,
+            "n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events":true,
+            "LVK":true,
             "plot_samples":true,
             "title":"",
             "use_all_n_events_for_single_event_sample_distribution":true,

@@ -1,11 +1,11 @@
 {
-    "header":"final_run_ET",
+    "header":"final_run_ET_PhenomD",
     
     "global":{
         "network_list":["ETS", "network_45_15km", "network_0_15km"],
         "catalog_name":"BGR_TIGER_200k.h5",
         "pn_waveforms":["-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"],
-        "use_hm_waveform":true,
+        "use_hm_waveform":false,
         "use_spinless_waveform":true,
         "source_type":"BBH", 
         "snr_thresh":12.0,

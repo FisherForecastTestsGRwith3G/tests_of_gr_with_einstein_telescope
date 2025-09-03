@@ -3,12 +3,16 @@ using Plots.Measures
 using ColorSchemes
 
 function set_common_plot_style()
+    # Default value is scale = 1.0, but e.g. scale = 1.4 is better for side-by-side plots
+    scale = 1.0
     default(
         fontfamily="Computer Modern",
-        titlefontsize=19,
-        guidefontsize=10,
-        tickfontsize=16,
-        legendfontsize=16,
+        titlefontsize=round(Int, 19 * scale),
+        guidefontsize=round(Int, 10 * scale),
+        tickfontsize=round(Int, 16 * scale),
+        legendfontsize=round(Int, 16 * scale),
+        colorbar_titlefontsize = round(Int, 18 * scale),
+        labelfontsize=round(Int, 21 * scale),
         left_margin = 8mm,
         right_margin = 2mm,
         bottom_margin = 12mm,
@@ -17,8 +21,7 @@ function set_common_plot_style()
         framestyle=:box,
         minorgridalpha=.04,
         gridwidth=0.5,
-        gridalpha=0.5,
-        labelfontsize=21
+        gridalpha=0.5
     )
 end
 
@@ -38,10 +41,21 @@ function labels_from_networks(network_names)
         "ETS" => L"\texttt{T}",
         "network_45_15km" => L"\texttt{2L\_45}",
         "network_0_15km" => L"\texttt{2L\_0}",
-        "LHV" => L"\texttt{LHV}",
-        "LHVK" => L"\texttt{LHVK}",
-        "final_run_LVK_LHV" => L"\texttt{LHV\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
-        "final_run_LVK_PhenomD_LHV" => L"\texttt{LHV\ (PhenomD)}" # Needed when overloading the detector networks as waveform models in plot C
+        "LHV" => L"\texttt{HLV}",
+        "LHVK" => L"\texttt{HKLV}",
+        "final_run_LVK_LHV" => L"\texttt{HLV\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_LVK_PhenomD_LHV" => L"\texttt{HLV\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_ETS" => L"\texttt{T\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_PhenomD_ETS" => L"\texttt{T\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_network_45_15km" => L"\texttt{2L\_45\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_PhenomD_network_45_15km" => L"\texttt{2L\_45\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_network_0_15km" => L"\texttt{2L\_0\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_PhenomD_network_0_15km" => L"\texttt{2L\_0\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
+        "ET_GW150914_like_fmin_2Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 2$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_5Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 5$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_10Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 10$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_15Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 15$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_20Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 20$ Hz" # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
     )
 
     # Map the network names to their corresponding labels

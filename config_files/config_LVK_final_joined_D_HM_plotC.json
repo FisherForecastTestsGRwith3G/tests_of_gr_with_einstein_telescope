@@ -1,5 +1,5 @@
 {
-    "header":"LVK",
+    "header":"final_run_LVK_joined_plotC",
     
     "global":{
         "network_list":["LHV"],
@@ -70,10 +70,10 @@
             "plot_samples":true,
             "title":"",
             "use_all_n_events_for_single_event_sample_distribution":true,
-            "offset_x_axis_hierarchical_networks_upper_bounds":0.066,
-            "offset_x_axis_single_event_networks_upper_bounds":0.066,
+            "offset_x_axis_hierarchical_networks_upper_bounds":0.1,
+            "offset_x_axis_single_event_networks_upper_bounds":0.0,
             "impose_y_axis_limits":true,
-            "y_axis_limits":[[3e-6, 1e-1],[1e-3, 3e1]],
+            "y_axis_limits":[[2e-5, 3e-1],[2e-3, 3e1]],
             "violin_plots_bandwidth_std_multiplier":0.4,
             "compute_mean_std_dev_in_log_space":true
         },
