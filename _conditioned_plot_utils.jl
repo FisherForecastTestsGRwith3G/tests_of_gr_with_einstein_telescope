@@ -77,7 +77,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
     # Proper LaTeX labels
     xlabel_str = "PN order"  # Use \mathrm for proper LaTeX rendering
-    ylabel_str = L"|\delta\varphi_{\!i}|"
+    ylabel_str = L"|\delta\varphi_{\!p}|"
 
 
     println("\n"*"#"^81)
@@ -304,7 +304,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
                 scatter!(
                     cc_main, [NaN], [NaN],
-                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 1), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_labels[jj]*")"
+                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 1), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds "*network_labels[jj]
                 )
             end
             #else

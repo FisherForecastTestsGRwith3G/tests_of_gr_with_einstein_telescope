@@ -38,24 +38,24 @@ end
 function labels_from_networks(network_names)
     # Define a dictionary to map network names to their labels
     network_labels = Dict(
-        "ETS" => L"\texttt{T}",
+        "ETS" => L"\texttt{\Delta}",
         "network_45_15km" => L"\texttt{2L\_45}",
         "network_0_15km" => L"\texttt{2L\_0}",
         "LHV" => L"\texttt{HLV}",
         "LHVK" => L"\texttt{HKLV}",
         "final_run_LVK_LHV" => L"\texttt{HLV\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
         "final_run_LVK_PhenomD_LHV" => L"\texttt{HLV\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
-        "final_run_ET_ETS" => L"\texttt{T\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
-        "final_run_ET_PhenomD_ETS" => L"\texttt{T\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_ETS" => L"\texttt{\Delta\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
+        "final_run_ET_PhenomD_ETS" => L"\texttt{\Delta\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
         "final_run_ET_network_45_15km" => L"\texttt{2L\_45\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
         "final_run_ET_PhenomD_network_45_15km" => L"\texttt{2L\_45\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
         "final_run_ET_network_0_15km" => L"\texttt{2L\_0\ (PhenomHM)}", # Needed when overloading the detector networks as waveform models in plot C
         "final_run_ET_PhenomD_network_0_15km" => L"\texttt{2L\_0\ (PhenomD)}", # Needed when overloading the detector networks as waveform models in plot C
-        "ET_GW150914_like_fmin_2Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 2$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
-        "ET_GW150914_like_fmin_5Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 5$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
-        "ET_GW150914_like_fmin_10Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 10$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
-        "ET_GW150914_like_fmin_15Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 15$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
-        "ET_GW150914_like_fmin_20Hz_ETS" => L"GW150914-like, ET $(\texttt{T})$, $f_{\mathrm{min}} = 20$ Hz" # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_2Hz_ETS" => L"GW150914-like, ET $(\texttt{\Delta})$, $f_{\mathrm{min}} = 2$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_5Hz_ETS" => L"GW150914-like, ET $(\texttt{\Delta})$, $f_{\mathrm{min}} = 5$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_10Hz_ETS" => L"GW150914-like, ET $(\texttt{\Delta})$, $f_{\mathrm{min}} = 10$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_15Hz_ETS" => L"GW150914-like, ET $(\texttt{\Delta})$, $f_{\mathrm{min}} = 15$ Hz", # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
+        "ET_GW150914_like_fmin_20Hz_ETS" => L"GW150914-like, ET $(\texttt{\Delta})$, $f_{\mathrm{min}} = 20$ Hz" # Needed when overloading the detector networks as waveform models in plot C [For GW150914 like event]
     )
 
     # Map the network names to their corresponding labels
