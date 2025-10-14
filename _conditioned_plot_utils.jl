@@ -9,7 +9,7 @@ LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
 LVK_GWTC3_label = "LVK GWTC-3"
 
 # Other results can be plotted as overlaid points instead of LVK GWTC-3 results, by overriding the code below. Set override_points_to_be_overlaid = true (false by default), and mofify the code accordingly
-override_points_to_be_overlaid = true
+override_points_to_be_overlaid = false
 
 if override_points_to_be_overlaid
     println("CAREFUL! Overriding the points to be overlaid on the conditioned plot, using the ET GW150914-like injection results from arxiv:2503.12263. Are you sure you want to continue? (y/n)")

@@ -198,7 +198,7 @@ markers, markersize, pointColors = get_markers_and_palette()
 
 # Proper LaTeX labels
 xlabel_str = L"N_{obs}"
-ylabel_str = L"|\delta\varphi_{\!i}|" 
+ylabel_str = L"|\delta\varphi_{\!p}|" 
 plotTitle = ""
 
 # name_PN = collect(keys(pn_order_dic));

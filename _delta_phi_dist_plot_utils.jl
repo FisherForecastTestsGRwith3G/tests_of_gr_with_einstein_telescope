@@ -29,7 +29,7 @@ function plotDeltaPhiPosterior(plotTitle::AbstractString, posterior_dist_deltaph
 
     # Proper LaTeX labels
     xlabel_str = "PN order" 
-    ylabel_str = L"\delta \varphi_{\!i}"
+    ylabel_str = L"\delta \varphi_{\!p}"
 
     # Perform some checks and set defaults
     if plot_conditioned_distribution && posterior_dist_deltaphi_conditioned === nothing

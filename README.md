@@ -58,6 +58,26 @@ The script is called with one argument.
 
 `julia C_conditioned_plot.jl <config_file_name>`
 
+This script allows the possibility of overlaying the results from different waveform models and minimum frequency fmin, as explained in the following.
+
+To outline the procedure to overlay different waveform models, we take the plot for the comparison of PhenomD and PhenomHM results in the LVK network as a concrete example. This can be performed by:
+* if needed, create a catalog using `julia alpha_generate_catalog_script.jl config_files/config_LVK_final_joined_D_HM_plotC.json`.
+* Run `julia A_run_catalog_script.jl 1 config_files/config_LVK_final.json` to evaluate the PhenomHM Fisher results.
+* Run `julia A_run_catalog_script.jl 1 config_files/config_LVK_PhenomD_final.json` to evaluate the PhenomD Fisher results. 
+* Set `overload_detector_networks_as_waveform_models = true` in the script `C_conditioned_plot.jl`, and appropriately set `list_header_simulation_tags` to contain the value of the variable `header` reported the config files previously used. In particular, for this case, `list_header_simulation_tags = ["final_run_LVK", "final_run_LVK_PhenomD"]`.
+* Run `julia C_conditioned_plot.jl config_files/config_LVK_final_joined_D_HM_plotC.json`, answering `y` when prompted.
+* Undo the modification implemented in script `C_conditioned_plot.jl` if not needed anymore.
+
+With a similar procedure, it is possible also to create the plot for the GW150914 event, with varying fmin frequency. In this case, the procedure is:
+* create first a placeholder catalog structure with (for example) 100 events, running `julia alpha_generate_catalog_script.jl config_files/GW150914_like/config_ET_GW150914_like_fmin_joined_plotC.json`.
+* Overload such catalog with several realization of a GW150914-like event. To do so, it is necessary to modify script `A_run_catalog_script.jl`, setting `override_catalog_with_specific_event = true`, and eventually setting the `overriden_` variables to the needed values.
+* Run `julia A_run_catalog_script.jl 1 config_files/GW150914_like/_` for all the config files in folder `config_files/GW150914_like` except `config_ET_GW150914_like_fmin_joined_plotC.json`, in order to obtain the values of the Fishers for varying values of fmin. When prompted by the script, answer `y`.
+* Set `overload_detector_networks_as_waveform_models = true` in the script `C_conditioned_plot.jl`, and appropriately set `list_header_simulation_tags` to contain the value of the variable `header` reported the config files previously used. In particular, for this case, `list_header_simulation_tags = ["ET_GW150914_like_fmin_2Hz", "ET_GW150914_like_fmin_5Hz","ET_GW150914_like_fmin_10Hz","ET_GW150914_like_fmin_15Hz","ET_GW150914_like_fmin_20Hz"]`.
+* Run `julia C_conditioned_plot.jl config_files/GW150914_like/config_ET_GW150914_like_fmin_joined_plotC.json`, answering `y` when prompted.
+* Undo the modification implemented in script `A_run_catalog_script.jl` and `C_conditioned_plot.jl` if not needed anymore.
+
+When generalizing such procedures to different scenarios, it may be needed to update the `labels_from_networks` function in `_plot_style.jl`.
+
 **C_conditioned_plot_N_dependence.jl** <br> 
 Produces the plot showing the trend of the 90% upper limits for the delta_phi PN deformation coefficients (evaluated from their posterior distributions obtained in hierarchical framework conditioned on sigma = 0) as a funcion of the number of (observed) events, for a single chosen detector.  
 The config from the config files are mostly overloaded in the script itself: therefore one should read the source code before using it, to make sure the results will be produced as intended.  
