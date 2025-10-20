@@ -73,8 +73,9 @@ With a similar procedure, it is possible also to create the plot for the GW15091
 * Overload such catalog with several realization of a GW150914-like event. To do so, it is necessary to modify script `A_run_catalog_script.jl`, setting `override_catalog_with_specific_event = true`, and eventually setting the `overriden_` variables to the needed values.
 * Run `julia A_run_catalog_script.jl 1 config_files/GW150914_like/_` for all the config files in folder `config_files/GW150914_like` except `config_ET_GW150914_like_fmin_joined_plotC.json`, in order to obtain the values of the Fishers for varying values of fmin. When prompted by the script, answer `y`.
 * Set `overload_detector_networks_as_waveform_models = true` in the script `C_conditioned_plot.jl`, and appropriately set `list_header_simulation_tags` to contain the value of the variable `header` reported the config files previously used. In particular, for this case, `list_header_simulation_tags = ["ET_GW150914_like_fmin_2Hz", "ET_GW150914_like_fmin_5Hz","ET_GW150914_like_fmin_10Hz","ET_GW150914_like_fmin_15Hz","ET_GW150914_like_fmin_20Hz"]`.
+* Set `override_points_to_be_overlaid = true` in the script `_conditioned_plot_utils.jl`, and appropriately set the variable `LVK_GWTC3_results` to the contain the values of the upper bounds to be shown. For example `LVK_GWTC3_results = [4.5e-5, 0.0035, 0.011, 0.008, 0.004, 0.034, 0.012, 0.016, 0.088, 0.048]` to reproduce the ET bluebook injection.
 * Run `julia C_conditioned_plot.jl config_files/GW150914_like/config_ET_GW150914_like_fmin_joined_plotC.json`, answering `y` when prompted.
-* Undo the modification implemented in script `A_run_catalog_script.jl` and `C_conditioned_plot.jl` if not needed anymore.
+* Undo the modification implemented in script `A_run_catalog_script.jl`, `C_conditioned_plot.jl` and `_conditioned_plot_utils.jl` if not needed anymore.
 
 When generalizing such procedures to different scenarios, it may be needed to update the `labels_from_networks` function in `_plot_style.jl`.
 

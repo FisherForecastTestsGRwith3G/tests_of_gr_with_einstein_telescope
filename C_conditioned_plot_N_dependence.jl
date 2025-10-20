@@ -64,6 +64,7 @@ averageOverSeveralRealizations = true
 printEventsAsHorizontalLinesOrDensityPlot = false
 n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = configs["n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events"]
 n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = true # If true, the n_events and numberOfEventsSingleRealization refer directly to the observed events, and there is not poissonian/binomial noise due to drawing observed events from the catalog of all events. This is useful to remove the poissonian/binomial noise contribution to the shown error bars/ribbons.
+displayGoldenEventsUpperLimits = true # Set to true to also compute and display the best bound from single events (best golden events upper limits) in the trend plot.
 
 #   Plot Settings (currently used for y labels only)
 min_y = 10^-9
@@ -93,6 +94,9 @@ initial_height_square_roots_trend_line = (exp.(log(10^-9) .+ (log(10^4) - log(10
 upperLimits = zeros(length(configs["network_list"]), number_of_points_trend_plot, length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
 # Create an empty array to store the single events upper limits, if required.
 n_events_used = configs["n_events"]
+# Create an empty array to store the results for the mean and std dev of the value of the upper limits from the best golden event in the realiziations (mean and std for each of them... Eventually, if you have a single realization, the second parameter (std_dev) will be a NaN).
+resultGoldenEvents = zeros(length(configs["network_list"]), number_of_points_trend_plot, length(configs["pn_waveforms"]), 4) # 4 = mean, std_dev, mean_in_log_space, std_dev_in_log_space
+
 
 if configs["compute_mean_std_dev_in_log_space"]
     println("You are using the mean and std dev evaluated in log space!")
@@ -178,6 +182,44 @@ end
             # if printEventsAsHorizontalLinesOrDensityPlot
             #     upperLimitSingleEvents[index_nn, index_pno, 1:length(upperLimitSingleEventsTemp)] = upperLimitSingleEventsTemp
             # end
+
+            #Here, if required, I compute the mean and std dev of the value of the upper limits from the best golden event in the realizations
+            # I could just compute this once, and then simply group the single events into different subset and take the maximum in each subset, 
+            # but I recompute everything again each time, to at least average over different detector noise realizations, since I do not scramble randomly the events (at least this keeps consistency between golden event bounds and hierarchical bounds for each realization)
+            if displayGoldenEventsUpperLimits
+                println("Processing the golden events upper limits")
+
+                vectorResultGoldenEvents, resultGoldenEventsSingleEventsTemp, number_events_single_realization_golden_events, numberOfEventsSingleRealizationUsedGoldenEvents = obtain_conditioned_upper_bounds(
+                    configs["n_events"], 
+                    global_index_total[nn], 
+                    data["dphi0_k"], 
+                    data["delta_k"], 
+                    averageOverSeveralRealizations = averageOverSeveralRealizations, 
+                    numberOfEventsSingleRealization = 1, 
+                    n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events = n_events_and_numberOfEventsSingleRealization_refer_directly_to_observed_events,
+                    printEventsAsHorizontalLinesOrDensityPlot = false, #I set this to false, as I will not plot the single events upper limits in this trend plot
+                    use_all_n_events_for_single_event_sample_distribution = false, # was configs["use_all_n_events_for_single_event_sample_distribution"], but this is irrelevant here
+                    print_info_catalog_realization = false # Skip printing the statistics, since this will be iterated many times, and you can just evaluate this as described below
+                )
+
+                # I will only select the realization with a non zero number of events, so with a upper limit that is not a NaN
+                vectorResultGoldenEvents = vectorResultGoldenEvents[.!isnan.(vectorResultGoldenEvents)]
+
+                # I will now fold these events, in order to collect numberOfEventsSingleRealization events per realization.
+                # Then I will take the minimum of the upper limit for each realization, and will save this in vectorResultGoldenEventsFolded
+
+                # Reshape the vector into a matrix and take minimum along each row (Julia-style)
+                n_realizations = Int(floor(length(vectorResultGoldenEvents) / numberOfEventsSingleRealization))
+                n_elements_to_use = n_realizations * numberOfEventsSingleRealization
+                vectorResultGoldenEventsFolded = minimum(
+                    reshape(vectorResultGoldenEvents[1:n_elements_to_use], numberOfEventsSingleRealization, n_realizations), 
+                    dims=1
+                )[:]
+
+                # Evaluate the mean and std of the upper limits from the best golden event in the realizations
+                resultGoldenEvents[index_nn, index_realization, index_pno, :] = [mean(vectorResultGoldenEventsFolded), std(vectorResultGoldenEventsFolded), exp(mean(log.(vectorResultGoldenEventsFolded))), exp(std(log.(vectorResultGoldenEventsFolded)))]
+
+            end
         end
     end
 end
@@ -224,7 +266,8 @@ final_plot = plot(
     xlabel=xlabel_str, 
     ylabel=ylabel_str,
     title=plotTitle,
-    legend=:bottomright,
+    legend=:outerright,  # Move legend outside plot area to save space
+    #legend_background_color=RGBA(1, 1, 1, 0.8),  # White background with 80% opacity (20% transparent)
     #xticks=(1:length(pn_order_indices), PN_labels[pn_order_indices]),
     yscale=:log10, 
     xscale=:log10,
@@ -290,10 +333,45 @@ for (index_pno, pno) in enumerate(PN_orders)
         color=pointColors[index_pno], 
         marker=:none,#markers[index_pno], 
         markersize=markersize, 
-        fillalpha=0.2,
+        fillalpha=0.225,
         linewidth=3, 
         linestyle=:solid
     )
+
+    if displayGoldenEventsUpperLimits
+        # Extract the golden events upper limits for the current PN order
+        resultGoldenEvents_pno = resultGoldenEvents[index_detector_network_to_use, :, index_pno, (compute_mean_in_log_space ? 3 : 1)]  # Mean values
+        resultGoldenEvents_std_pno = resultGoldenEvents[index_detector_network_to_use, :, index_pno, (use_std_for_ribbon_in_log_space ? 4 : 2)]  # Standard deviation values
+
+        if use_std_for_ribbon_in_log_space
+            lower_golden = resultGoldenEvents_pno .- exp.(log.(resultGoldenEvents_pno) .- ErrorBarsIntervalMultiplier .* log.(resultGoldenEvents_std_pno))
+            upper_golden = exp.(log.(resultGoldenEvents_pno) .+ ErrorBarsIntervalMultiplier .* log.(resultGoldenEvents_std_pno)) .- resultGoldenEvents_pno
+            ribbon_lower_upper_limits_golden = hcat(lower_golden, upper_golden)
+        else
+            lower_golden = resultGoldenEvents_pno .- ErrorBarsIntervalMultiplier .* resultGoldenEvents_std_pno
+            upper_golden = resultGoldenEvents_pno .+ ErrorBarsIntervalMultiplier .* resultGoldenEvents_std_pno
+            ribbon_lower_upper_limits_golden = hcat(lower_golden, upper_golden)
+        end
+
+        # Plot the mean golden events upper limits with error bars (as a ribbon), but without markers
+        # To not clutter too much the plot, I will not plot the label in the legend, adding instead a single dashed line with written "$\varphi_p$ golden events" bounds
+        # I will not plot the label at all in the end, to avoid cluttering the legend
+        plot!(
+            n_events_realizations, 
+            resultGoldenEvents_pno[:], 
+            ribbon= (ribbon_lower_upper_limits_golden[:, 1], ribbon_lower_upper_limits_golden[:, 2]),
+            #label=PN_labels[index_pno] * " (golden events)", 
+            #label = (index_pno == 1 ? L"\delta\varphi_{p}\ \mathrm{golden\ events}" : ""),
+            label = "", # I will not plot the label at all, to avoid cluttering the legend
+            color=pointColors[index_pno], 
+            marker=:none,#markers[index_pno], 
+            markersize=markersize, 
+            fillalpha=0.1,
+            linewidth=2, 
+            linestyle=:dashdot
+        )        
+
+    end
 end
 
 # Save the combined plot to file
