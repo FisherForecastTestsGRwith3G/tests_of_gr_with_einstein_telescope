@@ -55,7 +55,7 @@ println("fmin = ", configs["fmin"])
 # Code used to perform forecast for a specific event, e.g. GW150914-like
 # Set override_catalog_with_specific_event = true in the following, and modify the following lines accordingly, to override the catalog parameters with a single event
 
-override_catalog_with_specific_event = true
+override_catalog_with_specific_event = false
 
 if override_catalog_with_specific_event
     println("CAREFUL! Overriding catalog with a specific event settings! Are you sure you want to continue? (y/n)")

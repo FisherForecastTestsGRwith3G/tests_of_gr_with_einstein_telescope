@@ -9,7 +9,7 @@ LVK_GWTC3_results = [0.75e-3, 0.06, 0.15, 0.1, 0.07, 0.55, 0.23, 0.48, 2.0, 1.0]
 LVK_GWTC3_label = "LVK GWTC-3"
 
 # Other results can be plotted as overlaid points instead of LVK GWTC-3 results, by overriding the code below. Set override_points_to_be_overlaid = true (false by default), and mofify the code accordingly
-override_points_to_be_overlaid = true
+override_points_to_be_overlaid = false
 
 if override_points_to_be_overlaid
     println("CAREFUL! Overriding the points to be overlaid on the conditioned plot, using the ET GW150914-like injection results from arxiv:2503.12263. Are you sure you want to continue? (y/n)")
@@ -77,7 +77,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
     # Proper LaTeX labels
     xlabel_str = "PN order"  # Use \mathrm for proper LaTeX rendering
-    ylabel_str = L"|\delta\varphi_{\!i}|"
+    ylabel_str = L"|\delta\varphi_{\!p}|"
 
 
     println("\n"*"#"^81)
@@ -304,7 +304,7 @@ function plotConditionedUpperLimits(plotTitle, upperLimitsOriginal, printEventsA
 
                 scatter!(
                     cc_main, [NaN], [NaN],
-                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 1), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds ("*network_labels[jj]*")"
+                    marker=:hline, markersize=15, markerstrokewidth=(toPlotDensity ? 20 : 1), alpha=alpha_level_single_events, color=horizontalLineColorNetworks[jj], label="Single event bounds "*network_labels[jj]
                 )
             end
             #else
