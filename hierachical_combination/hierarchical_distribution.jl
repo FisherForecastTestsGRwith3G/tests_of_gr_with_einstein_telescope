@@ -14,7 +14,12 @@ INPUT:
     dphi0_k    φ_k-values
     delta_k    Δ_k-values
 """
-function hyperparamDistTIGER(mu::Vector{Float64}, sigma::Vector{Float64}, dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
+function hyperparamDistTIGER(
+    mu::Vector{Float64}, 
+    sigma::Vector{Float64}, 
+    dphi0_k::Vector{Float64},  
+    delta_k::Vector{Float64} 
+    )
 
     n_mu = length(mu)
     n_sigma = length(sigma)
@@ -23,9 +28,11 @@ function hyperparamDistTIGER(mu::Vector{Float64}, sigma::Vector{Float64}, dphi0_
     log_p_mu_sigma = zeros(n_mu, n_sigma)  # 2d distribution, dim=1 ~ mu, dim=2 ~ sigma 
     log_p_sigma = zeros(n_sigma)           # 1d marginal distribution for sigma
 
-    a0 = sum(1.0 ./ delta_k.^2)
-    b0 = sum(dphi0_k ./ delta_k.^2)
-    c0 = -0.5 * sum(dphi0_k.^2 ./ delta_k.^2)
+    deltak2 = delta_k.^2
+    dphi0k2 = dphi0_k.^2
+    a0 = sum(1.0 ./ deltak2)
+    b0 = sum(dphi0_k ./ deltak2)
+    c0 = -0.5 * sum( dphi0k2 ./ deltak2)
     ln_a0 = log(a0) - log(2*pi)
     ln_norm_from_0 = 0.5*b0^2/a0 + c0 - 0.5*ln_a0 
 
@@ -36,11 +43,11 @@ function hyperparamDistTIGER(mu::Vector{Float64}, sigma::Vector{Float64}, dphi0_
         
         if sig >= 0
 
-            denom = sig.^2 .+ delta_k.^2 
+            denom = sig.^2 .+ deltak2
             a = sum(1.0 ./ denom) 
             b = sum(dphi0_k ./ denom)
-            c = -0.5 * sum(dphi0_k.^2 ./ denom)
-            ln_norm = 0.5*sum(log.(delta_k.^2 ./ denom))
+            c = -0.5 * sum(dphi0k2 ./ denom)
+            ln_norm = 0.5*sum(log.(deltak2 ./ denom))
             ln_a = log(a) - log(2*pi)
 
             log_p_mu_sigma[:, idx_sigma] = -0.5*mu.^2*a .+ b*mu .+ c .+ ln_norm .- ln_norm_from_0
@@ -91,11 +98,17 @@ INPUT:
     norm_max   Value of the maximum of the distribution. The distribution is normalized such that the maximum 
                value 1 by default. 
 """
-function naiveMuDistTIGER(mu::Vector{Float64}, dphi0_k::Vector{Float64}, delta_k::Vector{Float64}, norm_max::Float64=1.)
+function naiveMuDistTIGER(
+    mu::Vector{Float64}, 
+    dphi0_k::Vector{Float64}, 
+    delta_k::Vector{Float64}, 
+    norm_max::Float64=1.
+    )
     
-    a0 = sum(1.0 ./ delta_k.^2)
-    b0 = sum(dphi0_k ./ delta_k.^2)
-    c0 = -0.5 * sum(dphi0_k.^2 ./ delta_k.^2)
+    deltak2 = delta_k.^2
+    a0 = sum(1.0 ./ deltak2)
+    b0 = sum(dphi0_k ./ deltak2)
+    c0 = -0.5 * sum(dphi0_k.^2 ./ deltak2)
 
     log_p_mu =  -0.5*mu.^2*a0 .+ b0*mu .+ c0
     max_log_p_mu = maximum(log_p_mu)
