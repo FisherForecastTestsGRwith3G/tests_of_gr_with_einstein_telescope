@@ -1,0 +1,9 @@
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+GW = "12bfb5b4-b11b-482e-a53a-61106a071c3c"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
