@@ -4,3 +4,5 @@ config_files/user_configs.json
 output.txt
 nohup.txt
 config_files/grid/*
+.vscode/*
+*.h5
