@@ -14,6 +14,9 @@ function get_population_results_file(config::Dict)
     return joinpath(@__DIR__, config["outdir"], "population_results_$(config["bootstrap_tag"]).h5")
 end
 
+#----------------------------------------------------------------------------#
+# Auxiliary functions
+#----------------------------------------------------------------------------#
 """
     write_population_results_hdf5(
         population_results_file,
