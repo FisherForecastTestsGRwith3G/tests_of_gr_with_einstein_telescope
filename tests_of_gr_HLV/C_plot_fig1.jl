@@ -298,6 +298,9 @@ function make_panel(
     return plt
 end
 
+#----------------------------------------------------------------------------#
+# MAIN FUNCTION
+#----------------------------------------------------------------------------#
 """
     run_plot_fig1(config::Dict)
 
@@ -362,12 +365,19 @@ function run_plot_fig1(config::Dict)
     scatter!(final_plot[2], [NaN], [NaN], color=GWTC3_COLOR, markercolor=GWTC3_COLOR, markerstrokecolor=:white, markerstrokewidth=0.8, markershape=:diamond, markersize=9.28125, label="GWTC-3 TGR")
     plot!(final_plot[2], legend=:bottomright, legendfontsize=18)
 
-    mkpath(dirname(get_plot_output_file(config)))
-    output_file = get_plot_output_file(config)
-    savefig(final_plot, output_file)
-    println("Saved figure to $(output_file)")
+    configured_output_file = get_plot_output_file(config)
+    output_dir = joinpath(dirname(configured_output_file), "fig_1")
+    output_stem = splitext(basename(configured_output_file))[1]
+    png_output_file = joinpath(output_dir, output_stem * ".png")
+    pdf_output_file = joinpath(output_dir, output_stem * ".pdf")
 
-    return output_file
+    mkpath(output_dir)
+    savefig(final_plot, png_output_file)
+    savefig(final_plot, pdf_output_file)
+    println("Saved figure to $(png_output_file)")
+    println("Saved figure to $(pdf_output_file)")
+
+    return png_output_file
 end
 
 function main(args=ARGS)
