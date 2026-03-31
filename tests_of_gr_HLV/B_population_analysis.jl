@@ -14,6 +14,62 @@ function get_population_results_file(config::Dict)
     return joinpath(@__DIR__, config["outdir"], "population_results_$(config["bootstrap_tag"]).h5")
 end
 
+"""
+    write_population_results_hdf5(
+        population_results_file,
+        config,
+        summary_indices,
+        pn_indices,
+        phi90,
+        bootstrap_constraints,
+        selected_delta_k,
+        selected_dphi_k,
+        noninvertible_after_snr,
+    )
+
+Write population-analysis results to an HDF5 file.
+
+The file is created at `population_results_file`. Existing files at that path
+are overwritten. The function stores results in the following hierarchy:
+
+`/<network>/<waveform_family>/`
+- attribute `n_selected`     : number of events selected for the waveform family
+- dataset   `summary_indices`: Boolean selection mask for the waveform family
+
+`/<network>/<waveform_family>/<pn_order>/`
+- attribute `n_selected`              : number of events selected for this PN order
+- attribute `non_invertable_after_snr`: number of events passing SNR cuts but excluded
+                                        because the Fisher matrix could not be inverted
+- dataset   `pn_indices`              : Boolean selection mask for this PN order
+- dataset   `single_event_constraints`: per-event single-event constraints
+- dataset   `bootstrap_constraints`   : bootstrap population constraints
+- dataset   `selected_delta_k`        : selected `delta_k` values used in the population 
+                                        analysis.
+- dataset   `selected_dphi_k`         : selected `dphi_k` values used in the population
+                                        analysis
+
+Here `<network>` is `config["network"]`, each `<waveform_family>` comes from
+`config["waveform_families"]`, and each `<pn_order>` is the string produced by
+`createSED.pnoString(pno)` for `pno` in `config["pn_orders"]`.
+
+Arguments
+---------
+- `population_results_file`: Output HDF5 file path.
+- `config`                 : Analysis configuration dictionary containing the network, 
+                             waveform families, PN orders, and output settings.
+- `summary_indices`        : Per-waveform-family event masks after all selection cuts.
+- `pn_indices`             : Per-waveform-family, per-PN-order event masks.
+- `phi90`                  : Per-waveform-family, per-PN-order vectors of single-event 
+                             constraints.
+- `bootstrap_constraints`  : Per-waveform-family, per-PN-order vectors of bootstrap 
+                             constraints.
+- `selected_delta_k`       : Per-waveform-family, per-PN-order vectors of selected `delta_k` 
+                             values.
+- `selected_dphi_k`        : Per-waveform-family, per-PN-order vectors of selected `dphi_k` 
+                             values.
+- `noninvertible_after_snr`: Per-waveform-family, per-PN-order masks for events that 
+                            pass SNR cuts but fail the invertibility requirement.
+"""
 function write_population_results_hdf5(
     population_results_file::AbstractString,
     config::Dict,
@@ -50,6 +106,30 @@ function write_population_results_hdf5(
     end
 end
 
+"""
+    print_selection_summary(config, pn_indices, summary_indices, noninvertible_after_snr)
+
+Print a summary of event selection counts for each waveform family and PN order.
+
+The summary includes the number of selected events after PN-order-specific cuts,
+the number of events that pass the SNR cuts but become non-invertible, and the
+final number of events retained per waveform family. The function also computes
+and returns the event-selection mask shared across all waveform families.
+
+Arguments
+---------
+- `config`                 : Analysis configuration containing waveform families, 
+                             PN orders, and SNR thresholds.
+- `pn_indices`             : Per-waveform-family and per-PN-order selection masks.
+- `summary_indices`        : Final per-waveform-family selection masks.
+- `noninvertible_after_snr`: Per-waveform-family and per-PN-order masks for
+                             events that pass SNR cuts but are non-invertible.
+
+Returns
+-------
+- `shared_index`           : Bit vector containing the events selected in every 
+                             waveform family.
+"""
 function print_selection_summary(config::Dict, pn_indices::Dict{String, Dict{String, BitVector}}, summary_indices::Dict{String, BitVector}, noninvertible_after_snr::Dict{String, Dict{String, BitVector}})
     println("\nSelection summary")
     println("Applied SNR cuts: snr > $(config["snr_threshold"]), isnr > $(config["snr_inspiral_threshold"])")
