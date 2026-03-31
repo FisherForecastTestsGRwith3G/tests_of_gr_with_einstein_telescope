@@ -73,7 +73,8 @@ function computeSNRsFromCatalog(
     wf_model = getWaveformModel(wf_family, pno)
     zero_pn_deviation = zeros(Float64, length(catalog))
 
-    println("Calculating Fisher SNRs")
+    println("Starting SNR calculations for waveform family $(wf_family) on network $(network_name)")
+    println("Calculating network SNRs at zero deviation")
     @time _, snr = FisherMatrix(
         wf_model              ,
         network               ,
@@ -95,7 +96,7 @@ function computeSNRsFromCatalog(
         fmin           = fmin
     )
 
-    println("Calculating inspiral SNRs")
+    println("Calculating inspiral-only SNRs")
     f_inspiral_cutoff = @. 0.018 / (catalog.mc / catalog.eta^(3. / 5.)) / GMsun_over_c3
     f_inspiral_cutoff = max.(f_inspiral_cutoff, fmin)
 
@@ -166,18 +167,21 @@ function createSEDfromCatalog(
     seed::Int64;
     precomputed_snr::Union{Nothing, Vector{Float64}}=nothing,
     precomputed_isnr::Union{Nothing, Vector{Float64}}=nothing,
+    snr_threshold::Float64=0.0,
+    inspiral_snr_threshold::Float64=0.0,
     )
 
     n_events = length(catalog)
     network  = getNetwork(network_name)
     
     wf_model = getWaveformModel(wf_family, pno)
+    println("Running single-event Fisher analysis for PN order $(pno) and waveform family $(wf_family)")
 
     # --------------------------------------------------#
     # Fisher matrices and SNR                           #
     # --------------------------------------------------#
     if isnothing(precomputed_snr)
-        println("Calculating Fisher matrices and SNRs")
+        println("No precomputed SNRs were provided; calculating Fisher matrices and SNRs for all events")
         @time fisher, snr = FisherMatrix(
             wf_model              ,
             network               ,
@@ -198,36 +202,50 @@ function createSEDfromCatalog(
             useEarthMotion = true ,
             fmin           = fmin
         )
+        selected_idx = trues(n_events)
+
     else
-        println("Calculating Fisher matrices")
-        @time fisher = FisherMatrix(
-            wf_model              ,
-            network               ,
-            catalog.mc            , 
-            catalog.eta           , 
-            catalog.chi_1         , 
-            catalog.chi_2         ,  
-            catalog.dL            , 
-            catalog.theta         , 
-            catalog.phi           , 
-            catalog.iota          , 
-            catalog.psi           , 
-            catalog.t_coal        , 
-            catalog.phi_coal      , 
-            pn_deviation          , 
-            auto_save      = false, 
-            return_SNR     = false,
-            useEarthMotion = true ,
-            fmin           = fmin
-        )
         snr = precomputed_snr
+        selected_idx = (snr .> snr_threshold) .& (precomputed_isnr .> inspiral_snr_threshold)
+
+        println("Using precomputed SNRs with thresholds snr > $(snr_threshold) and isnr > $(inspiral_snr_threshold)")
+        println("Calculating Fisher matrices for $(sum(selected_idx)) / $(n_events) selected events")
+        if any(selected_idx)
+            @time fisher_selected = FisherMatrix(
+                wf_model                      ,
+                network                       ,
+                catalog.mc[selected_idx]      , 
+                catalog.eta[selected_idx]     , 
+                catalog.chi_1[selected_idx]   ,  
+                catalog.chi_2[selected_idx]   ,  
+                catalog.dL[selected_idx]      , 
+                catalog.theta[selected_idx]   , 
+                catalog.phi[selected_idx]     , 
+                catalog.iota[selected_idx]    , 
+                catalog.psi[selected_idx]     ,  
+                catalog.t_coal[selected_idx]  , 
+                catalog.phi_coal[selected_idx], 
+                pn_deviation[selected_idx]    , 
+                auto_save      = false        , 
+                return_SNR     = false        ,
+                useEarthMotion = true         ,
+                fmin           = fmin
+            )
+
+            n_parameters = size(fisher_selected, 2)
+            fisher = zeros(Float64, n_events, n_parameters, n_parameters)
+            fisher[selected_idx, :, :] = fisher_selected
+
+        else
+            fisher = zeros(Float64, n_events, 12, 12)
+        end
     end
 
     # --------------------------------------------------#
     # Inspiral SNR                                      #
     # --------------------------------------------------#
     if isnothing(precomputed_isnr)
-        println("Calculating inspiral SNRs")
+        println("No precomputed inspiral SNRs were provided; calculating them now")
         # Evaluate SNR only for the Inspiral part of the waveform
         # Truncate waveform in frequency space. For the definition 
         # of the inspiral phase see the paper for the Phenom waveform 
@@ -263,7 +281,10 @@ function createSEDfromCatalog(
     # --------------------------------------------------#
     # Inversion of Fisher matrices and estimate delta_k #
     # --------------------------------------------------#
-    cov_mat         = CovMatrix(fisher)
+    println("Building covariance matrices for the selected Fisher matrices")
+    cov_mat = zeros(Float64, size(fisher))
+    cov_mat[selected_idx, :, :] = CovMatrix(fisher[selected_idx, :, :])
+    
     delta_k         = Array{Float64}(undef, n_events)
     invc            = Array{Bool}(undef, n_events)
     n_not_inverted  = 0

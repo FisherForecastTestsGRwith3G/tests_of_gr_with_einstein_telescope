@@ -94,6 +94,8 @@ function run_fisher_analysis(config::Dict)
         reference_pno = first(config["pn_orders"])
 
         for wf_fam in config["waveform_families"]
+            println("\nProcessing waveform family: $(wf_fam)")
+            println("Preparing SNR and inspiral SNR calculations using reference PN order $(reference_pno)")
 
             # Calculate SNR and inspiral SNR first, as we are always evaluating 
             # the waveform in the point where the deviation vanishes.
@@ -108,6 +110,7 @@ function run_fisher_analysis(config::Dict)
             # Loop over the various PN orders to compute the Fisher matrices
             # and errors. 
             for (idx_pno, pno) in enumerate(config["pn_orders"])
+                println("\nComputing Fisher matrices for PN order $(pno) with waveform family $(wf_fam)")
                 mu = config["mu"][idx_pno]
                 sigma = config["sigma"][idx_pno]
                 pn_deviation = createSED.createBGRDeviations(catalog, mu, sigma, config["seed"])
@@ -122,6 +125,8 @@ function run_fisher_analysis(config::Dict)
                     config["seed"]   ;
                     precomputed_snr  = snr,
                     precomputed_isnr = isnr,
+                    snr_threshold = config["snr_threshold"],
+                    inspiral_snr_threshold = config["snr_inspiral_threshold"],
                 )
 
                 write_pn_results_to_hdf5(
