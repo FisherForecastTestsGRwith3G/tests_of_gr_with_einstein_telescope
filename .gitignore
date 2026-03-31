@@ -6,3 +6,5 @@ nohup.txt
 config_files/grid/*
 .vscode/*
 *.h5
+**/plot/*
+**/logs/*
