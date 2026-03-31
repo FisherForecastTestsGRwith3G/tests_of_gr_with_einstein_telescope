@@ -91,20 +91,37 @@ function run_fisher_analysis(config::Dict)
     h5open(output_file, "w") do file
         write_catalog_to_hdf5(file, catalog, config, initial_seed, next_seed)
 
-        for (idx_pno, pno) in enumerate(config["pn_orders"])
-            mu = config["mu"][idx_pno]
-            sigma = config["sigma"][idx_pno]
-            pn_deviation = createSED.createBGRDeviations(catalog, mu, sigma, config["seed"])
+        reference_pno = first(config["pn_orders"])
 
-            for wf_fam in config["waveform_families"]
-                _, snr, isnr, invc, delta_k, dphi_k = createSED.createSEDfromCatalog(
+        for wf_fam in config["waveform_families"]
+
+            # Calculate SNR and inspiral SNR first, as we are always evaluating 
+            # the waveform in the point where the deviation vanishes.
+            snr, isnr = createSED.computeSNRsFromCatalog(
+                catalog          ,
+                config["network"],
+                reference_pno    ,
+                wf_fam           ,
+                config["fmin"]   ,
+            )
+
+            # Loop over the various PN orders to compute the Fisher matrices
+            # and errors. 
+            for (idx_pno, pno) in enumerate(config["pn_orders"])
+                mu = config["mu"][idx_pno]
+                sigma = config["sigma"][idx_pno]
+                pn_deviation = createSED.createBGRDeviations(catalog, mu, sigma, config["seed"])
+
+                _, _, _, invc, delta_k, dphi_k = createSED.createSEDfromCatalog(
                     catalog          ,
                     config["network"],
                     pno              ,
                     pn_deviation     ,
                     wf_fam           ,
                     config["fmin"]   ,
-                    config["seed"]   ,
+                    config["seed"]   ;
+                    precomputed_snr  = snr,
+                    precomputed_isnr = isnr,
                 )
 
                 write_pn_results_to_hdf5(

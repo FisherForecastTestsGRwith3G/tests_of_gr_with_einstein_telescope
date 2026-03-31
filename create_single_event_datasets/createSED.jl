@@ -23,6 +23,7 @@ include("./_setup_catalog.jl")
 export BBHCatalog
 export applyRedshiftCut, truncateCatalog, merge, createBGRDeviations
 export createSEDfromCatalog
+export computeSNRsFromCatalog
 export pnoString, pnoNum, pnoLatex, pno_list 
 
 const pno_dict = Dict(
@@ -49,6 +50,76 @@ end
 
 function pnoLatex(pno)
     return pno_dict[pno][3]
+end
+
+function getWaveformModel(wf_family::String, pno::String)
+    if wf_family == "PhenomD"
+        return PhenomD_TIGER_spinless(pnoNum(pno))
+    elseif wf_family == "PhenomHM"
+        return PhenomHM_TIGER_spinless(pnoNum(pno))
+    else
+        error("Waveform family is not available: $(wf_family)")
+    end
+end
+
+function computeSNRsFromCatalog(
+    catalog::BBHCatalog,
+    network_name::String,
+    pno::String,
+    wf_family::String,
+    fmin::Float64,
+)
+    network = getNetwork(network_name)
+    wf_model = getWaveformModel(wf_family, pno)
+    zero_pn_deviation = zeros(Float64, length(catalog))
+
+    println("Calculating Fisher SNRs")
+    @time _, snr = FisherMatrix(
+        wf_model              ,
+        network               ,
+        catalog.mc            ,
+        catalog.eta           ,
+        catalog.chi_1         ,
+        catalog.chi_2         ,
+        catalog.dL            ,
+        catalog.theta         ,
+        catalog.phi           ,
+        catalog.iota          ,
+        catalog.psi           ,
+        catalog.t_coal        ,
+        catalog.phi_coal      ,
+        zero_pn_deviation     ,
+        auto_save      = false,
+        return_SNR     = true ,
+        useEarthMotion = true ,
+        fmin           = fmin
+    )
+
+    println("Calculating inspiral SNRs")
+    f_inspiral_cutoff = @. 0.018 / (catalog.mc / catalog.eta^(3. / 5.)) / GMsun_over_c3
+    f_inspiral_cutoff = max.(f_inspiral_cutoff, fmin)
+
+    @time isnr = SNR(
+        wf_model                           ,
+        network                            ,
+        catalog.mc                         ,
+        catalog.eta                        ,
+        catalog.chi_1                      ,
+        catalog.chi_2                      ,
+        catalog.dL                         ,
+        catalog.theta                      ,
+        catalog.phi                        ,
+        catalog.iota                       ,
+        catalog.psi                        ,
+        catalog.t_coal                     ,
+        zero_pn_deviation                  ,
+        auto_save       = false            ,
+        useEarthMotion  = true             ,
+        fmax            = f_inspiral_cutoff,
+        fmin            = fmin
+    )
+
+    return snr, isnr
 end
 
 # -------------------------------------------------------------------------- #
@@ -92,77 +163,102 @@ function createSEDfromCatalog(
     pn_deviation::Vector{Float64}, 
     wf_family::String, 
     fmin::Float64,
-    seed::Int64
+    seed::Int64;
+    precomputed_snr::Union{Nothing, Vector{Float64}}=nothing,
+    precomputed_isnr::Union{Nothing, Vector{Float64}}=nothing,
     )
 
     n_events = length(catalog)
     network  = getNetwork(network_name)
     
-    if wf_family == "PhenomD"
-        wf_model = PhenomD_TIGER_spinless(pnoNum(pno))
-    elseif wf_family == "PhenomHM"
-        wf_model = PhenomHM_TIGER_spinless(pnoNum(pno))
-    else
-        error("Waveform family is not available: $(wf_family)")
-    end
+    wf_model = getWaveformModel(wf_family, pno)
 
     # --------------------------------------------------#
     # Fisher matrices and SNR                           #
     # --------------------------------------------------#
-    println("Calculating Fisher matrices and SNRs")
-    @time fisher, snr = FisherMatrix(
-        wf_model              ,
-        network               ,
-        catalog.mc            , 
-        catalog.eta           , 
-        catalog.chi_1         , 
-        catalog.chi_2         ,  
-        catalog.dL            , 
-        catalog.theta         , 
-        catalog.phi           , 
-        catalog.iota          , 
-        catalog.psi           , 
-        catalog.t_coal        , 
-        catalog.phi_coal      , 
-        pn_deviation          , 
-        auto_save      = false, 
-        return_SNR     = true , 
-        useEarthMotion = true ,
-        fmin           = fmin
-    )
+    if isnothing(precomputed_snr)
+        println("Calculating Fisher matrices and SNRs")
+        @time fisher, snr = FisherMatrix(
+            wf_model              ,
+            network               ,
+            catalog.mc            , 
+            catalog.eta           , 
+            catalog.chi_1         , 
+            catalog.chi_2         ,  
+            catalog.dL            , 
+            catalog.theta         , 
+            catalog.phi           , 
+            catalog.iota          , 
+            catalog.psi           , 
+            catalog.t_coal        , 
+            catalog.phi_coal      , 
+            pn_deviation          , 
+            auto_save      = false, 
+            return_SNR     = true , 
+            useEarthMotion = true ,
+            fmin           = fmin
+        )
+    else
+        println("Calculating Fisher matrices")
+        @time fisher = FisherMatrix(
+            wf_model              ,
+            network               ,
+            catalog.mc            , 
+            catalog.eta           , 
+            catalog.chi_1         , 
+            catalog.chi_2         ,  
+            catalog.dL            , 
+            catalog.theta         , 
+            catalog.phi           , 
+            catalog.iota          , 
+            catalog.psi           , 
+            catalog.t_coal        , 
+            catalog.phi_coal      , 
+            pn_deviation          , 
+            auto_save      = false, 
+            return_SNR     = false,
+            useEarthMotion = true ,
+            fmin           = fmin
+        )
+        snr = precomputed_snr
+    end
 
     # --------------------------------------------------#
     # Inspiral SNR                                      #
     # --------------------------------------------------#
-    println("Calculating inspiral SNRs")
-    # Evaluate SNR only for the Inspiral part of the waveform
-    # Truncate waveform in frequency space. For the definition 
-    # of the inspiral phase see the paper for the Phenom waveform 
-    # models: 
-    f_inspiral_cutoff = @. 0.018 / (  catalog.mc / catalog.eta^(3. /5.) ) / GMsun_over_c3
+    if isnothing(precomputed_isnr)
+        println("Calculating inspiral SNRs")
+        # Evaluate SNR only for the Inspiral part of the waveform
+        # Truncate waveform in frequency space. For the definition 
+        # of the inspiral phase see the paper for the Phenom waveform 
+        # models: 
+        f_inspiral_cutoff = @. 0.018 / (  catalog.mc / catalog.eta^(3. /5.) ) / GMsun_over_c3
 
-    # Ensure that f_inspiral_cutoff is above fmin
-    f_inspiral_cutoff = max.(f_inspiral_cutoff, fmin)
+        # Ensure that f_inspiral_cutoff is above fmin
+        f_inspiral_cutoff = max.(f_inspiral_cutoff, fmin)
 
-    @time isnr = SNR(
-        wf_model                           ,
-        network                            ,
-        catalog.mc                         , 
-        catalog.eta                        , 
-        catalog.chi_1                      , 
-        catalog.chi_2                      ,  
-        catalog.dL                         , 
-        catalog.theta                      , 
-        catalog.phi                        , 
-        catalog.iota                       , 
-        catalog.psi                        , 
-        catalog.t_coal                     , 
-        pn_deviation                       , 
-        auto_save       = false            , 
-        useEarthMotion  = true             ,
-        fmax            = f_inspiral_cutoff,
-        fmin            = fmin
-    )    
+        @time isnr = SNR(
+            wf_model                           ,
+            network                            ,
+            catalog.mc                         , 
+            catalog.eta                        , 
+            catalog.chi_1                      , 
+            catalog.chi_2                      ,  
+            catalog.dL                         , 
+            catalog.theta                      , 
+            catalog.phi                        , 
+            catalog.iota                       , 
+            catalog.psi                        , 
+            catalog.t_coal                     , 
+            pn_deviation                       , 
+            auto_save       = false            , 
+            useEarthMotion  = true             ,
+            fmax            = f_inspiral_cutoff,
+            fmin            = fmin
+        )
+    else
+        isnr = precomputed_isnr
+    end
 
     # --------------------------------------------------#
     # Inversion of Fisher matrices and estimate delta_k #
