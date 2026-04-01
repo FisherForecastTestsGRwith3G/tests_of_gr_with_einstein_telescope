@@ -1,85 +1,39 @@
-# GWjulia BGR Pipeline
+# Tests of GR with HLV
 
 This pipeline generates a BBH catalog, injects beyond-GR post-Newtonian deviations, runs the Fisher analysis for the requested detector networks and waveform families, and stores the resulting summary products in an HDF5 file.
 
-## Storage structure
+The code can be used to produce Figure 1 of our paper. 
 
-```text
-fisher_results_<tag>.h5
-├── bbh_catalog
-│   ├── .attrs
-│   └── parameter
-└── <pn_order_name>
-    ├── .attrs
-    ├── delta_phi_pn
-    └── <network>
-        └── <waveform_family>
-            ├── snr
-            ├── isnr
-            ├── invc
-            ├── delta_k
-            └── dphi_k
+## Reproducing results
+
+Below, we provide instruction on how to rerun scripts in order to produce the plots in our paper. If a script with `A_` or `B_` has already been executed for a plot, it does not need to be run again. 
+
+### Figure 1
+
+```
+julia --project=. A_fisher_analysis config_files/config_catalog_200k.toml   
+julia --project=. B_population_analysis config_files/config_catalog_200k.toml   
+julia --project=. C_fig1 config_files/config_catalog_200k.toml   
 ```
 
-Example dataset path:
-`/minus_one/LHV/PhenomHM/snr`
+### Figure 9
+WIP
 
-## Config expectations
+## Performin additional checks
 
-The analysis expects a TOML config file with the following sections:
+### Gaussianity of bootstrap samples in log-space
 
-- `[general]`
-- `[catalog]`
-- `[deviations]`
-- `[detectors]`
-- `[fisher]`
+Checks the distribution of the samples of the 90% upper bounds, calculated from the bootstrapping analysis, resembles a log-normal distribution. Plots the distribution and  
 
-Important fields:
+```
+julia --project=. A_fisher_analysis config_files/config_catalog_200k.toml   
+julia --project=. B_population_analysis config_files/config_catalog_200k.toml   
+julia --project=. D_plot_log_normal_check.jl config_files/config_catalog_200k.toml   
+```
 
-- `catalog.n_events`: Number of events required in the final catalog.
-- `catalog.z_cut`: Optional redshift cut. If omitted, it defaults to `Inf`.
-- `deviations.pn_orders`: List of PN orders to analyze.
-- `deviations.mu`: List of Gaussian means, one per PN order.
-- `deviations.sigma`: List of Gaussian standard deviations, one per PN order.
-- `detectors.network`: List of detector networks.
-- `fisher.waveform`: Must be given as a list, for example `["PhenomHM"]`.
-- `fisher.fmin`: Lower frequency cutoff used in the Fisher analysis.
+## Other useful information
 
-## Attributes
-
-`/bbh_catalog/.attrs`
-
-- `catalog_tag`: Tag of the simulated catalog used in the run.
-- `requested_n_events`: Number of events requested in the config file.
-- `seed_initial`: First random seed used to generate the catalog.
-- `seed_final`: Last random seed used when extending the catalog after the redshift cut.
-- `z_cut`: Redshift threshold applied to the catalog. If no cut is requested, this is `Inf`.
-
-`/<pn_order_name>/.attrs`
-
-- `mu`: Mean of the Gaussian population distribution used to draw the beyond-GR deviation for this PN order.
-- `sigma`: Standard deviation of the Gaussian population distribution used to draw the beyond-GR deviation for this PN order.
-
-## Stored datasets
-
-The HDF5 file stores the full BBH catalog used in the Fisher study together with the injected beyond-GR deviations and the derived Fisher-analysis summary quantities for every requested PN order, detector network, and waveform family.
-
-### Catalog data
-
-`/bbh_catalog/parameter` contains the source catalog parameters for the events that actually enter the analysis after applying the redshift cut and any required catalog extension.
-
-### PN-order data
-
-`/<pn_order_name>/delta_phi_pn` contains the injected beyond-GR deviation values for that PN order, one value per event in the final catalog.
-
-### Per network / waveform outputs
-
-`/<pn_order_name>/<network>/<waveform_family>/snr` stores the full matched-filter signal-to-noise ratio for each event.
-
-`/<pn_order_name>/<network>/<waveform_family>/isnr` stores the inspiral-only signal-to-noise ratio for each event.
-
-`/<pn_order_name>/<network>/<waveform_family>/invc` is a Boolean array indicating whether the Fisher matrix inversion was successful for each event.
-
-`/<pn_order_name>/<network>/<waveform_family>/delta_k` stores the Fisher-estimated 1-sigma uncertainty on the deviation parameter for each event.
-
-`/<pn_order_name>/<network>/<waveform_family>/dphi_k` stores the expected measured deviation value for each event after combining the injected deviation with the Fisher uncertainty model.
+### Storage of results and script outputs.
+The output folder is always documented in the config files. 
+The results of the [fisher analysis](./A_fisher_analysis.jl)) are stored as `.h5` files and their keys to access the data are documented in the docstring of the functions [`write_catalog_to_hdf5()`](./A_fisher_analysis.jl#L31) and [`write_pn_results_to_hdf5()`](./A_fisher_analysis.jl#L74). 
+The results of the [population analysis](./B_population_analysis.jl) are stored as `.h5` files and their keys to access the data are documented in the docstring of [`write_population_results_hdf5()`](./B_population_analysis.jl#L76). d

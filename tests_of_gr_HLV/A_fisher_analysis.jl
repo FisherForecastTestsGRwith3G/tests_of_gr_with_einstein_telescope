@@ -7,6 +7,27 @@ include("../create_single_event_datasets/createSED.jl")
 #----------------------------------------------------------------------------#
 # Auxiliary functions
 #----------------------------------------------------------------------------#
+"""
+    write_catalog_to_hdf5(file, catalog, config, initial_seed, final_seed)
+
+Store the generated binary-black-hole catalog in the output HDF5 file.
+
+The function creates the `/bbh_catalog` group, records the catalog-generation
+metadata as attributes, and writes the event-wise source parameters into the
+`/bbh_catalog/parameter` subgroup. The stored attributes are intended to make
+the resulting file self-describing and include:
+
+- `catalog_tag`: label used to identify the catalog in downstream analyses
+- `requested_n_events`: target number of retained events after cuts
+- `seed_initial`: first random seed used to build the catalog
+- `seed_final`: last random seed needed to reach the requested sample size
+- `z_cut`: redshift threshold applied before truncation
+
+The parameter subgroup contains one dataset per catalog field and preserves the
+event ordering used throughout the Fisher-analysis pipeline. The dataset keys
+written under `/bbh_catalog/parameter` are `mc`, `eta`, `chi_1`, `chi_2`, `dL`,
+`theta`, `phi`, `iota`, `psi`, `t_coal`, `phi_coal`, and `z`.
+"""
 function write_catalog_to_hdf5(file, catalog, config, initial_seed, final_seed)
     catalog_grp = create_group(file, "bbh_catalog")
     attrs(catalog_grp)["catalog_tag"]        = config["catalog_tag"]
@@ -30,6 +51,26 @@ function write_catalog_to_hdf5(file, catalog, config, initial_seed, final_seed)
     write(param_grp, "z"       , catalog.z)
 end
 
+"""
+    write_pn_results_to_hdf5(file, pno, mu, sigma, pn_deviation, network, wf_fam,
+                             snr, isnr, invc, delta_k, dphi_k)
+
+Write the Fisher-analysis products associated with one post-Newtonian deviation
+order and one waveform family.
+
+Results are organized hierarchically as:
+
+- `/<pn_order>`: stores the deformation hyper-parameters `mu` and `sigma`
+- `/<pn_order>/delta_phi_pn`: stores the injected PN deviation for each event
+- `/<pn_order>/<network>/<waveform>`: stores the event-wise analysis outputs
+
+The waveform-level datasets contain the full-network signal-to-noise ratio
+(`snr`), inspiral-only signal-to-noise ratio (`isnr`), the Fisher-matrix
+invertibility flag (`invc`), the estimated 1-sigma uncertainty on the PN
+deformation parameter (`delta_k`), and the injected phase coefficient
+(`dphi_k`). Existing PN-order or network groups are reused so that multiple
+waveform families can be appended without rewriting shared data.
+"""
 function write_pn_results_to_hdf5(file, pno, mu, sigma, pn_deviation, network, 
     wf_fam, snr, isnr, invc, delta_k, dphi_k)
     
@@ -54,6 +95,31 @@ end
 #----------------------------------------------------------------------------#
 # MAIN FUNCTION
 #----------------------------------------------------------------------------#
+"""
+    run_fisher_analysis(config::Dict)
+
+Execute the full Fisher-analysis stage for the HLV tests-of-GR workflow.
+
+The routine performs four steps:
+
+1. Build a binary-black-hole catalog from the configured random seed.
+2. Apply the redshift cut and extend the catalog with additional seeds until
+   the requested number of surviving events is available.
+3. For each requested waveform family, compute the baseline SNR and inspiral
+   SNR using the reference PN order.
+4. For every configured PN order, generate synthetic deviations, evaluate the
+   single-event Fisher analysis, and write all products to an HDF5 file.
+
+Expected configuration entries include the catalog size and tag, redshift cut,
+random seed, PN orders, deviation hyper-parameters (`mu`, `sigma`), detector
+network name, waveform families, lower frequency cutoff, SNR thresholds, and
+the output directory. The function returns the absolute path of the generated
+HDF5 file.
+
+The output file contains both the catalog that was analyzed and all Fisher
+products needed by later population-level and plotting scripts, allowing the
+downstream stages to run without regenerating the single-event analysis.
+"""
 function run_fisher_analysis(config::Dict)
     println("Initializing BBH catalog")
 
