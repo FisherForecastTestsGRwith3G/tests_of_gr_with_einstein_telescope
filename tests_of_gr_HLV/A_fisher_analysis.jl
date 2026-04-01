@@ -191,8 +191,7 @@ function run_fisher_analysis(config::Dict)
                     config["seed"]   ;
                     precomputed_snr  = snr,
                     precomputed_isnr = isnr,
-                    snr_threshold = config["snr_threshold"],
-                    inspiral_snr_threshold = config["snr_inspiral_threshold"],
+                    snr_threshold = config["snr_threshold"]
                 )
 
                 write_pn_results_to_hdf5(

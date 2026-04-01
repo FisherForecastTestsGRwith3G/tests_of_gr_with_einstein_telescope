@@ -3,20 +3,23 @@ using HDF5
 using KernelDensity
 using Plots
 using LaTeXStrings
+using Colors
 
 include("_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
 
 const CONTOUR_FILL_COLORS = [:aliceblue, :lightblue, :cornflowerblue]
 const CONTOUR_LINE_COLOR = :royalblue4
+const OBSERVABLE_COLORMAP = :viridis
+const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \Delta k_{\mathrm{D}}\right)"
 
 function get_fisher_results_file(config::Dict)
     return joinpath(@__DIR__, config["outdir"], "fisher_results_$(config["catalog_tag"]).h5")
 end
 
 function get_plot_output_files(config::Dict)
-    output_dir = joinpath(@__DIR__, config["plot_outdir"])
-    stem = "pop_prob_$(config["plot_tag"])"
+    output_dir = joinpath(@__DIR__, config["plot_outdir"], "fig_9")
+    stem = "fig9_$(config["plot_tag"])"
     return (
         joinpath(output_dir, stem * ".png"),
         joinpath(output_dir, stem * ".pdf"),
@@ -152,16 +155,17 @@ Construct the event-selection masks used to classify injections from the
 per-waveform Fisher-analysis results.
 
 The returned dictionary contains the following event-aligned `BitVector`s:
-- `"both_sufficient_snr"`: above the network SNR threshold for both waveform families
+- `"both_fisher_selected"`: selected by the Fisher/SNR cut for both waveform families
 - `"both_observable"`: selected by the full observable cut for both waveform families
-- `"potentially_problematic"`: sufficient SNR for both waveforms but not observable for both
+- `"potentially_problematic"`: Fisher-selected for both waveforms but not observable for both
 - `"d_only"`: observable with `PhenomD` only
 - `"hm_only"`: observable with `PhenomHM` only
 
-A waveform-level event is marked as `"sufficient_snr"` when its network SNR is
-above `config["snr_threshold"]`. A waveform-level event is marked as
-`"observable"` when the Fisher matrix is invertible, `delta_k` is finite and
-positive, and its inspiral SNR is above `config["snr_inspiral_threshold"]`.
+A waveform-level event is marked as `"fisher_selected"` when its network SNR is
+above `config["snr_threshold"]`, the Fisher matrix is invertible, and `delta_k`
+is finite and positive. A waveform-level event is marked as `"observable"` when
+it is Fisher-selected and its inspiral SNR is above
+`config["snr_inspiral_threshold"]`.
 
 The combined masks are then formed across the two waveform families. The
 `"d_only"` and `"hm_only"` classes are derived from the waveform-level
@@ -169,7 +173,7 @@ The combined masks are then formed across the two waveform families. The
 """
 function build_selection_indices(results::Dict{String, Dict{String, Vector}}, config::Dict)
     fisher_valid = Dict{String, BitVector}()
-    sufficient_snr = Dict{String, BitVector}()
+    fisher_selected = Dict{String, BitVector}()
     observable = Dict{String, BitVector}()
 
     for wf_name in ("PhenomD", "PhenomHM")
@@ -179,31 +183,33 @@ function build_selection_indices(results::Dict{String, Dict{String, Vector}}, co
         invc = BitVector(results[wf_name]["invc"])
 
         fisher_valid[wf_name] = BitVector(invc .& isfinite.(delta_k) .& (delta_k .> 0.0))
-        sufficient_snr[wf_name] = BitVector(snr .> config["snr_threshold"])
-        observable[wf_name] = BitVector(
-            fisher_valid[wf_name] .&
-            (isnr .> config["snr_inspiral_threshold"]) .&
-            sufficient_snr[wf_name]
-        )
+        fisher_selected[wf_name] = BitVector((snr .> config["snr_threshold"]) .& fisher_valid[wf_name])
+        observable[wf_name] = BitVector(fisher_selected[wf_name] .& (isnr .> config["snr_inspiral_threshold"]))
     end
 
-    idx_bsnr = sufficient_snr["PhenomD"] .& sufficient_snr["PhenomHM"]
+    idx_bfisher = fisher_selected["PhenomD"] .& fisher_selected["PhenomHM"]
     idx_bobs = observable["PhenomD"] .& observable["PhenomHM"]
-    idx_prob = idx_bsnr .& .!idx_bobs
+    idx_prob = idx_bfisher .& .!idx_bobs
     idx_do = observable["PhenomD"] .& .!observable["PhenomHM"]
     idx_hmo = .!observable["PhenomD"] .& observable["PhenomHM"]
 
     return Dict(
-        "PhenomD_sufficient_snr" => sufficient_snr["PhenomD"],
-        "PhenomHM_sufficient_snr" => sufficient_snr["PhenomHM"],
+        "PhenomD_fisher_selected" => fisher_selected["PhenomD"],
+        "PhenomHM_fisher_selected" => fisher_selected["PhenomHM"],
         "PhenomD_observable" => observable["PhenomD"],
         "PhenomHM_observable" => observable["PhenomHM"],
-        "both_sufficient_snr" => idx_bsnr,
+        "both_fisher_selected" => idx_bfisher,
         "both_observable" => idx_bobs,
         "potentially_problematic" => idx_prob,
         "d_only" => idx_do,
         "hm_only" => idx_hmo,
     )
+end
+
+function delta_ratio(results::Dict{String, Dict{String, Vector}})
+    delta_hm = Float64.(results["PhenomHM"]["delta_k"])
+    delta_d = Float64.(results["PhenomD"]["delta_k"])
+    return log10.(delta_hm ./ delta_d)
 end
 
 """
@@ -320,13 +326,75 @@ function build_contour_panel(catalog::Dict{String, Vector{Float64}}, x_key::Stri
     return plt
 end
 
-function build_plot(catalog::Dict{String, Vector{Float64}})
+function problematic_box_halfwidth(xlim::Tuple{<:Real, <:Real}; halfheight::Float64=1.5)
+    chirp_mass_range = 80.0 - 5.0
+    panel_height_over_width = 1.6
+    return halfheight * panel_height_over_width * (Float64(xlim[2]) - Float64(xlim[1])) / chirp_mass_range
+end
+
+function add_problematic_boxes!(plt, x::Vector{Float64}, y::Vector{Float64}, xlim::Tuple{<:Real, <:Real})
+    halfheight = 0.9
+    halfwidth = problematic_box_halfwidth(xlim; halfheight=halfheight)
+
+    for idx in eachindex(x)
+        box = Shape(
+            [x[idx] - halfwidth, x[idx] + halfwidth, x[idx] + halfwidth, x[idx] - halfwidth],
+            [y[idx] - halfheight, y[idx] - halfheight, y[idx] + halfheight, y[idx] + halfheight],
+        )
+        plot!(
+            plt,
+            box;
+            fillalpha=0.0,
+            linecolor=:black,
+            linewidth=1.4,
+            label=false,
+        )
+    end
+
+    return plt
+end
+
+function add_fisher_selected_scatter!(plt, x::Vector{Float64}, y::Vector{Float64}, ratio::Vector{Float64},
+    selected::BitVector, fisher_selected::BitVector, problematic::BitVector, color_lims,
+    xlim::Tuple{<:Real, <:Real}; show_colorbar::Bool=false)
+
+    idx = BitVector(selected .& fisher_selected)
+    idx_problematic = BitVector(selected .& problematic)
+    scatter!(
+        plt,
+        x[idx],
+        y[idx];
+        marker_z=ratio[idx],
+        color=OBSERVABLE_COLORMAP,
+        clims=color_lims,
+        markersize=6.75,
+        markerstrokewidth=0.0,
+        alpha=0.95,
+        colorbar=show_colorbar,
+        colorbar_title=show_colorbar ? IMPROVEMENT_COLORBAR_TITLE : "",
+        label=false,
+    )
+    add_problematic_boxes!(plt, x[idx_problematic], y[idx_problematic], xlim)
+
+    return plt
+end
+
+function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String, Dict{String, Vector}}, indices::Dict{String, BitVector})
     extend_catalog!(catalog)
     labels = build_labels()
+    selected = BitVector(catalog["z"] .< 0.5)
+    ratio = delta_ratio(results)
+    valid_ratio = ratio[selected .& indices["both_fisher_selected"]]
+    color_lims = isempty(valid_ratio) ? (-1.0, 1.0) : (minimum(valid_ratio), maximum(valid_ratio))
+
     p1 = build_contour_panel(catalog, "invq"; xlabel=labels["invq"], ylabel=labels["mc"], xlim=(0.0, 1.0), show_yticks=true, left_margin_mm=12, right_margin_mm=5)
+    add_fisher_selected_scatter!(p1, catalog["invq"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, 1.0))
     p2 = build_contour_panel(catalog, "iota"; xlabel=labels["iota"], xlim=(0.0, π), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    add_fisher_selected_scatter!(p2, catalog["iota"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, π))
     p3 = build_contour_panel(catalog, "chi_eff"; xlabel=labels["chi_eff"], xlim=(-1.0, 1.0), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    add_fisher_selected_scatter!(p3, catalog["chi_eff"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (-1.0, 1.0))
     p4 = build_contour_panel(catalog, "z"; xlabel=labels["z"], xlim=(0.0, 0.5), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=10)
+    add_fisher_selected_scatter!(p4, catalog["z"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, 0.5); show_colorbar=true)
 
     return plot(
         p1, p2, p3, p4;
@@ -349,13 +417,13 @@ function run_pop_prob(config::Dict)
     results = read_results(fisher_results_file, config, pno)
     indices = build_selection_indices(results, config)
     observable_redshifts = catalog["z"][indices["both_observable"]]
-    sufficient_snr_redshifts = catalog["z"][indices["both_sufficient_snr"]]
+    fisher_selected_redshifts = catalog["z"][indices["both_fisher_selected"]]
     max_observable_z = isempty(observable_redshifts) ? NaN : maximum(observable_redshifts)
-    max_sufficient_snr_z = isempty(sufficient_snr_redshifts) ? NaN : maximum(sufficient_snr_redshifts)
+    max_fisher_selected_z = isempty(fisher_selected_redshifts) ? NaN : maximum(fisher_selected_redshifts)
     println("Maximum redshift among observable events: $(max_observable_z)")
-    println("Maximum redshift among sufficient-SNR events: $(max_sufficient_snr_z)")
+    println("Maximum redshift among Fisher-selected events: $(max_fisher_selected_z)")
 
-    plt = build_plot(catalog)
+    plt = build_plot(catalog, results, indices)
 
     png_output_file, pdf_output_file = get_plot_output_files(config)
     mkpath(dirname(png_output_file))
