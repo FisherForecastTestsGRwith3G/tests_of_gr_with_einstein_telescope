@@ -258,6 +258,8 @@ function make_panel(
     bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}};
     title_text::String,
     width_scale::Real,
+    left_margin_mm::Real=14,
+    right_margin_mm::Real=14,
 )
     xticks = collect(1:length(pn_orders))
     labels = createSED.pnoLatex.(pn_orders)
@@ -273,15 +275,15 @@ function make_panel(
         framestyle=:box,
         xlim=(0.5, length(pn_orders) + 0.5),
         xticks=(xticks, labels),
-        size=(round(Int, 900 * width_scale), 760),
+        size=(round(Int, 990 * width_scale), 760),
         dpi=200,
         titlefont=font(TITLE_FONT_SIZE),
         guidefont=font(GUIDE_FONT_SIZE),
         tickfont=font(TICK_FONT_SIZE),
-        bottom_margin=18Plots.mm,
-        top_margin=8Plots.mm,
-        left_margin=8Plots.mm,
-        right_margin=8Plots.mm,
+        bottom_margin=22Plots.mm,
+        top_margin=34Plots.mm,
+        left_margin=left_margin_mm * Plots.mm,
+        right_margin=right_margin_mm * Plots.mm,
     )
 
     for (idx, pno) in enumerate(pn_orders)
@@ -296,6 +298,69 @@ function make_panel(
     end
 
     return plt
+end
+
+function histogram_limits(
+    pn_orders::AbstractVector{<:AbstractString},
+    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    waveform_families::AbstractVector{<:AbstractString},
+)
+    y_min = Inf
+    y_max = 0.0
+
+    for pno in pn_orders
+        for wf_fam in waveform_families
+            samples = get(get(single_event_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
+            edges = get_histogram_edges(samples)
+            edges === nothing && continue
+            y_min = min(y_min, first(edges))
+            y_max = max(y_max, last(edges))
+        end
+    end
+
+    isfinite(y_min) || return nothing
+    return (y_min, y_max)
+end
+
+function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.08, upper_pad_decades::Real=0.08)
+    y_min, y_max = y_limits
+    log_y_min = log10(y_min)
+    log_y_max = log10(y_max)
+    return (
+        exp10(log_y_min - lower_pad_decades),
+        exp10(log_y_max + upper_pad_decades),
+    )
+end
+
+function decade_ticks(y_limits::Tuple{<:Real, <:Real})
+    y_min, y_max = y_limits
+    decade_min = floor(Int, log10(y_min))
+    decade_max = ceil(Int, log10(y_max))
+    exponents = collect(decade_min:decade_max)
+    if length(exponents) > 2
+        exponents = exponents[2:end-1]
+    end
+    values = exp10.(exponents)
+    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
+    return values, labels
+end
+
+function top_pno_label(pno::AbstractString)
+    if startswith(pno, "log(") && endswith(pno, ")")
+        order = chop(chop(pno; head=4); tail=1)
+        endswith(order, ".") && (order = chop(order; tail=1))
+        return latexstring(order, raw"\,\mathrm{PN}^{(\ell)}")
+    end
+
+    return latexstring(pno, raw"\,\mathrm{PN}")
+end
+
+function add_top_pno_labels!(plt, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real})
+    n_orders = length(pn_orders)
+    for (idx, pno) in enumerate(pn_orders)
+        x_pos = (idx - 0.5) / n_orders
+        annotate!(plt, ((x_pos, 1.03), text(top_pno_label(pno), TICK_FONT_SIZE, :center, :bottom)))
+    end
 end
 
 #----------------------------------------------------------------------------#
@@ -320,12 +385,24 @@ function run_plot_fig1(config::Dict)
 
     left_orders = ["-1"]
     right_orders = filter(pno -> pno != "-1", config["pn_orders"])
+    panel_width_scale_per_order = 0.15
 
-    left_panel = make_panel(left_orders, single_event_constraints, bootstrap_constraints; title_text="PN order -1", width_scale=0.45)
-    right_panel = make_panel(right_orders, single_event_constraints, bootstrap_constraints; title_text="Higher PN orders", width_scale=1.35)
-    left_limits = ylims(left_panel)
-    aligned_left_limits = (left_limits[1] / 10, left_limits[2])
-
+    left_panel = make_panel(
+        left_orders,
+        single_event_constraints,
+        bootstrap_constraints;
+        title_text="PN order -1",
+        width_scale=panel_width_scale_per_order * length(left_orders),
+        left_margin_mm=14,
+    )
+    right_panel = make_panel(
+        right_orders,
+        single_event_constraints,
+        bootstrap_constraints;
+        title_text="Higher PN orders",
+        width_scale=panel_width_scale_per_order * length(right_orders),
+        right_margin_mm=104,
+    )
     bootstrap_medians = Dict{String, Float64}()
     for pno in ("-1", "0")
         positive_samples = Float64[]
@@ -344,18 +421,47 @@ function run_plot_fig1(config::Dict)
         end
     end
 
+    left_hist_limits = histogram_limits(left_orders, single_event_constraints, config["waveform_families"])
+    right_hist_limits = histogram_limits(right_orders, single_event_constraints, config["waveform_families"])
+    left_limits = ylims(left_panel)
+    aligned_left_limits = (left_limits[1] / 10, left_limits[2])
+
+    if left_hist_limits !== nothing
+        aligned_left_limits = (
+            min(aligned_left_limits[1], left_hist_limits[1]),
+            max(aligned_left_limits[2], left_hist_limits[2]),
+        )
+    end
+
+    if right_hist_limits !== nothing
+        aligned_left_limits = (
+            min(aligned_left_limits[1], right_hist_limits[1] * right_scale),
+            max(aligned_left_limits[2], right_hist_limits[2] * right_scale),
+        )
+    end
+
+    aligned_left_limits = expand_log_limits(aligned_left_limits)
+
     ylims!(left_panel, aligned_left_limits...)
     ylims!(right_panel, aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale)
+    yticks!(left_panel, decade_ticks(aligned_left_limits))
+    yticks!(right_panel, decade_ticks((aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale)))
+    ylabel!(left_panel, L"|\delta\varphi_p|")
+    add_top_pno_labels!(left_panel, left_orders, aligned_left_limits)
+    add_top_pno_labels!(right_panel, right_orders, (aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale))
+
+    panel_width_weights = Float64[length(left_orders), length(right_orders)]
+    panel_widths = panel_width_weights ./ sum(panel_width_weights)
 
     final_plot = plot(
         left_panel,
         right_panel;
-        layout=grid(1, 2, widths=[0.18, 0.82]),
+        layout=grid(1, 2, widths=panel_widths),
         size=(1800, 760),
-        bottom_margin=18Plots.mm,
-        top_margin=8Plots.mm,
-        left_margin=8Plots.mm,
-        right_margin=8Plots.mm,
+        bottom_margin=22Plots.mm,
+        top_margin=26Plots.mm,
+        left_margin=18Plots.mm,
+        right_margin=18Plots.mm,
     )
 
     plot!(final_plot[2], [NaN], [NaN], seriestype=:shape, c=PHENOM_D_COLOR, linecolor=false, fillalpha=0.45, label="PhenomD")
