@@ -12,6 +12,8 @@ const CONTOUR_FILL_COLORS = [:aliceblue, :lightblue, :cornflowerblue]
 const CONTOUR_LINE_COLOR = :royalblue4
 const OBSERVABLE_COLORMAP = :viridis
 const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \Delta k_{\mathrm{D}}\right)"
+const FIG9_Z_THRESHOLD = 0.5
+const FIG9_MC_LIMITS = (5.0, 80.0)
 
 function get_fisher_results_file(config::Dict)
     return joinpath(@__DIR__, config["outdir"], "fisher_results_$(config["catalog_tag"]).h5")
@@ -60,6 +62,51 @@ end
 
 function mc_tick_spec()
     return ([5.0, 20.0, 35.0, 50.0, 65.0, 80.0], ["5", "20", "35", "50", "65", "80"])
+end
+
+function build_top_histogram_panel(values::Vector{Float64};
+    xlabel, ylabel="", xlim=nothing, xticks_spec=nothing, show_yticks::Bool=true,
+    show_ytick_labels::Bool=true, show_xtick_labels::Bool=true,
+    left_margin_mm::Real=6, right_margin_mm::Real=4)
+
+    plt = histogram(
+        values;
+        bins=30,
+        normalize=:pdf,
+        color=CONTOUR_FILL_COLORS[2],
+        linecolor=CONTOUR_LINE_COLOR,
+        linewidth=1.0,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        legend=false,
+        grid=false,
+        framestyle=:box,
+        tick_direction=:out,
+        dpi=200,
+        left_margin=left_margin_mm * Plots.mm,
+        right_margin=right_margin_mm * Plots.mm,
+        bottom_margin=2Plots.mm,
+        top_margin=3Plots.mm,
+    )
+    xlim === nothing || xlims!(plt, xlim)
+    xticks_spec === nothing || xticks!(plt, xticks_spec...)
+    if !show_xtick_labels
+        if xticks_spec !== nothing
+            xticks!(plt, first(xticks_spec), fill("", length(first(xticks_spec))))
+        else
+            xmin, xmax = Plots.xlims(plt)
+            current_ticks = collect(range(xmin, xmax; length=4))
+            xticks!(plt, current_ticks, fill("", length(current_ticks)))
+        end
+    end
+    if !show_yticks
+        yticks!(plt, (Float64[], String[]))
+    elseif !show_ytick_labels
+        ymin, ymax = Plots.ylims(plt)
+        current_ticks = collect(range(ymin, ymax; length=4))
+        yticks!(plt, current_ticks, fill("", length(current_ticks)))
+    end
+    return plt
 end
 
 #----------------------------------------------------------------------------#
@@ -258,7 +305,7 @@ grid, and `levels` are contour thresholds corresponding to the requested
 enclosed probability masses.
 """
 function kde_catalog_contours(catalog::Dict{String, Vector{Float64}}, x_key::String;
-    z_threshold::Float64=0.5, npoints::Int=70, enclosed_masses=(0.98, 0.90, 0.30))
+    z_threshold::Float64=FIG9_Z_THRESHOLD, npoints::Int=70, enclosed_masses=(0.98, 0.90, 0.30))
 
     haskey(catalog, x_key) || throw(ArgumentError("Catalog does not contain key: $(x_key)"))
 
@@ -277,9 +324,9 @@ end
 
 function build_contour_panel(catalog::Dict{String, Vector{Float64}}, x_key::String;
     xlabel, ylabel="", xlim=nothing, show_yticks::Bool=true, show_ytick_labels::Bool=true,
-    left_margin_mm::Real=6, right_margin_mm::Real=4)
+    left_margin_mm::Real=6, right_margin_mm::Real=4, z_threshold::Float64=FIG9_Z_THRESHOLD)
 
-    x_grid, y_grid, density, levels = kde_catalog_contours(catalog, x_key)
+    x_grid, y_grid, density, levels = kde_catalog_contours(catalog, x_key; z_threshold=z_threshold)
 
     plt = contourf(
         x_grid,
@@ -297,7 +344,7 @@ function build_contour_panel(catalog::Dict{String, Vector{Float64}}, x_key::Stri
         left_margin=left_margin_mm * Plots.mm,
         right_margin=right_margin_mm * Plots.mm,
         bottom_margin=10Plots.mm,
-        top_margin=4Plots.mm,
+        top_margin=1Plots.mm,
     )
     contour!(
         plt,
@@ -311,6 +358,7 @@ function build_contour_panel(catalog::Dict{String, Vector{Float64}}, x_key::Stri
         label=false,
     )
     xlim === nothing || xlims!(plt, xlim)
+    ylims!(plt, FIG9_MC_LIMITS)
     tick_spec = xtick_spec(x_key)
     tick_spec === nothing || xticks!(plt, tick_spec...)
     if !show_yticks
@@ -323,6 +371,37 @@ function build_contour_panel(catalog::Dict{String, Vector{Float64}}, x_key::Stri
             yticks!(plt, first(y_tick_spec), fill("", length(first(y_tick_spec))))
         end
     end
+    return plt
+end
+
+function build_colorbar_panel(color_lims)
+    midpoint = 0.5 * (color_lims[1] + color_lims[2])
+    plt = scatter(
+        [0.0],
+        [0.0];
+        marker_z=[midpoint],
+        color=OBSERVABLE_COLORMAP,
+        clims=color_lims,
+        markersize=0,
+        markerstrokewidth=0,
+        alpha=0.0,
+        colorbar=true,
+        colorbar_title=IMPROVEMENT_COLORBAR_TITLE,
+        framestyle=:none,
+        grid=false,
+        xticks=false,
+        yticks=false,
+        xlims=(0.0, 1.0),
+        ylims=(0.0, 1.0),
+        dpi=200,
+        left_margin=4Plots.mm,
+        right_margin=12Plots.mm,
+        bottom_margin=10Plots.mm,
+        top_margin=1Plots.mm,
+        label=false,
+        foreground_color_subplot=:white,
+        background_color_subplot=:white,
+    )
     return plt
 end
 
@@ -382,29 +461,41 @@ end
 function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String, Dict{String, Vector}}, indices::Dict{String, BitVector})
     extend_catalog!(catalog)
     labels = build_labels()
-    selected = BitVector(catalog["z"] .< 0.5)
+    kde_selected = BitVector(catalog["z"] .< FIG9_Z_THRESHOLD)
+    selected = BitVector(kde_selected .& indices["both_fisher_selected"])
     ratio = delta_ratio(results)
-    valid_ratio = ratio[selected .& indices["both_fisher_selected"]]
+    valid_ratio = ratio[selected]
     color_lims = isempty(valid_ratio) ? (-1.0, 1.0) : (minimum(valid_ratio), maximum(valid_ratio))
 
-    p1 = build_contour_panel(catalog, "invq"; xlabel=labels["invq"], ylabel=labels["mc"], xlim=(0.0, 1.0), show_yticks=true, left_margin_mm=12, right_margin_mm=5)
+    h1 = build_top_histogram_panel(catalog["invq"][kde_selected]; xlabel="", ylabel="", xlim=(0.0, 1.0), xticks_spec=xtick_spec("invq"), show_yticks=false, show_xtick_labels=false, left_margin_mm=12, right_margin_mm=5)
+    h2 = build_top_histogram_panel(catalog["iota"][kde_selected]; xlabel="", ylabel="", xlim=(0.0, π), xticks_spec=xtick_spec("iota"), show_yticks=false, show_xtick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    h3 = build_top_histogram_panel(catalog["chi_eff"][kde_selected]; xlabel="", ylabel="", xlim=(-1.0, 1.0), show_yticks=false, show_xtick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    h4 = build_top_histogram_panel(catalog["z"][kde_selected]; xlabel="", ylabel="", xlim=(0.0, FIG9_Z_THRESHOLD), xticks_spec=xtick_spec("z"), show_yticks=false, show_xtick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    h5 = build_top_histogram_panel(catalog["mc"][kde_selected]; xlabel=labels["mc"], ylabel="", xlim=(5.0, 80.0), xticks_spec=mc_tick_spec(), show_yticks=false, left_margin_mm=4, right_margin_mm=10)
+
+    p1 = build_contour_panel(catalog, "invq"; xlabel=labels["invq"], ylabel=labels["mc"], xlim=(0.0, 1.0), show_yticks=true, left_margin_mm=12, right_margin_mm=5, z_threshold=FIG9_Z_THRESHOLD)
     add_fisher_selected_scatter!(p1, catalog["invq"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, 1.0))
-    p2 = build_contour_panel(catalog, "iota"; xlabel=labels["iota"], xlim=(0.0, π), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    ylims!(p1, FIG9_MC_LIMITS)
+    p2 = build_contour_panel(catalog, "iota"; xlabel=labels["iota"], xlim=(0.0, π), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4, z_threshold=FIG9_Z_THRESHOLD)
     add_fisher_selected_scatter!(p2, catalog["iota"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, π))
-    p3 = build_contour_panel(catalog, "chi_eff"; xlabel=labels["chi_eff"], xlim=(-1.0, 1.0), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4)
+    ylims!(p2, FIG9_MC_LIMITS)
+    p3 = build_contour_panel(catalog, "chi_eff"; xlabel=labels["chi_eff"], xlim=(-1.0, 1.0), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4, z_threshold=FIG9_Z_THRESHOLD)
     add_fisher_selected_scatter!(p3, catalog["chi_eff"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (-1.0, 1.0))
-    p4 = build_contour_panel(catalog, "z"; xlabel=labels["z"], xlim=(0.0, 0.5), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=10)
-    add_fisher_selected_scatter!(p4, catalog["z"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, 0.5); show_colorbar=true)
+    ylims!(p3, FIG9_MC_LIMITS)
+    p4 = build_contour_panel(catalog, "z"; xlabel=labels["z"], xlim=(0.0, FIG9_Z_THRESHOLD), show_yticks=true, show_ytick_labels=false, left_margin_mm=4, right_margin_mm=4, z_threshold=FIG9_Z_THRESHOLD)
+    add_fisher_selected_scatter!(p4, catalog["z"], catalog["mc"], ratio, selected, indices["both_fisher_selected"], indices["potentially_problematic"], color_lims, (0.0, FIG9_Z_THRESHOLD))
+    ylims!(p4, FIG9_MC_LIMITS)
+    p5 = build_colorbar_panel(color_lims)
 
     return plot(
-        p1, p2, p3, p4;
-        layout=(1, 4),
-        size=(1600, 650),
-        link=:y,
+        h1, h2, h3, h4, h5,
+        p1, p2, p3, p4, p5;
+        layout=grid(2, 5, heights=[0.34, 0.66]),
+        size=(1900, 900),
         left_margin=6Plots.mm,
         right_margin=6Plots.mm,
         bottom_margin=8Plots.mm,
-        top_margin=4Plots.mm,
+        top_margin=2Plots.mm,
     )
 end
 
