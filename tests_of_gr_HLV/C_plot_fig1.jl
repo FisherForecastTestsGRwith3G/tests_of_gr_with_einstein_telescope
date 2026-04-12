@@ -359,7 +359,13 @@ function add_fig1_legend!(fig::Figure, target_slot)
         LineElement(color=:black, linewidth=3),
         MarkerElement(color=GWTC3_COLOR, marker=:diamond, markersize=18, strokecolor=:white, strokewidth=1.0),
     ]
-    labels = ["PhenomD", "PhenomHM", "Bootstrap median", "Bootstrap 90% CI", "GWTC-3 TGR"]
+    labels = [
+        L"\text{IMRPhenomD}",
+        L"\text{IMRPhenomHM}", 
+        L"\text{Bootstrap median}", 
+        L"\text{Bootstrap 90\% CI}", 
+        L"\text{GWTC-3 TGR (SEOBNRv4\_ROM)}"
+    ]
     Legend(target_slot, elements, labels;
         tellwidth=false,
         tellheight=false,
