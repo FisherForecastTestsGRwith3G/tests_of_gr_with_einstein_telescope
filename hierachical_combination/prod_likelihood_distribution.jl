@@ -42,3 +42,7 @@ function muStdEff4ProdNormal(mu::Vector{Float64}, sig::Vector{Float64})
     
     return mu_eff, sig_eff
 end 
+
+function muStdEff4ProdNormal(hyper::hyperparamDistTIGER)
+    return muStdEff4ProdNormal(hyper.dphi0_k, hyper.delta_k)
+end
