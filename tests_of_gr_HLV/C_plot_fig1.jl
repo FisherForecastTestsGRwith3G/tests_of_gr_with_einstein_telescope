@@ -1,6 +1,6 @@
 using TOML
 using HDF5
-using Plots
+using CairoMakie
 using LaTeXStrings
 using Statistics
 import JSON
@@ -12,8 +12,15 @@ const PHENOM_D_COLOR  = "#ff7f0e"
 const PHENOM_HM_COLOR = "#1f77b4"
 const GWTC3_COLOR     = :black
 const TITLE_FONT_SIZE = 28
-const GUIDE_FONT_SIZE = 24
-const TICK_FONT_SIZE  = 22
+const GUIDE_FONT_SIZE = 32
+const TICK_FONT_SIZE  = 32
+const LEGEND_FONT_SIZE = 28
+const FIG1_SIZE = (1800, 760)
+const FIG1_TOP_ROW_FRACTION = 0.11
+const FIG1_COL_GAP = 20
+const FIG1_LABEL_ROW_GAP = 10
+const HIST_FILL_ALPHA = 0.4
+const HIST_EDGE_ALPHA = 0.8
 const GWTC3_REFERENCE_FILE = joinpath(@__DIR__, "lvk_gwtc_3_results_2025.json")
 
 function load_gwtc3_reference()
@@ -27,17 +34,27 @@ const GWTC3_REFERENCE = load_gwtc3_reference()
 
 function get_population_results_file(config::Dict)
     return joinpath(
-        @__DIR__, 
-        config["bootstrap_outdir"], 
+        @__DIR__,
+        config["bootstrap_outdir"],
         "population_results_$(config["bootstrap_tag"]).h5"
     )
 end
 
 function get_plot_output_file(config::Dict)
     return joinpath(
-        @__DIR__, 
-        config["plot_outdir"], 
+        @__DIR__,
+        config["plot_outdir"],
         "fig1_$(config["plot_tag"]).pdf"
+    )
+end
+
+function get_plot_output_files(config::Dict)
+    configured_output_file = get_plot_output_file(config)
+    output_dir = joinpath(dirname(configured_output_file), "fig_1")
+    output_stem = splitext(basename(configured_output_file))[1]
+    return (
+        joinpath(output_dir, output_stem * ".png"),
+        joinpath(output_dir, output_stem * ".pdf"),
     )
 end
 
@@ -49,7 +66,7 @@ end
 
 Return logarithmically spaced histogram bin edges for the positive entries in
 `samples`. Returns `nothing` when no positive samples are present.
-Lower (upper) bound of the bins is given by the smallest (largest) sample handed. 
+Lower (upper) bound of the bins is given by the smallest (largest) sample handed.
 """
 function get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
     positive_samples = samples[samples .> 0.0]
@@ -59,15 +76,15 @@ function get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, In
 
     y_min = minimum(positive_samples)
     y_max = maximum(positive_samples)
-    if y_min == y_max 
-        return exp10.(range(log10(y_min) - 0.25, log10(y_max) + 0.25, length = 11))
+    if y_min == y_max
+        return exp10.(range(log10(y_min) - 0.25, log10(y_max) + 0.25, length=11))
     end
 
     if isnothing(n_bins)
         n_bins = clamp(round(Int, sqrt(length(positive_samples))), 8, 40)
     end
 
-    return exp10.(range(log10(y_min), log10(y_max), length = n_bins + 1))
+    return exp10.(range(log10(y_min), log10(y_max), length=n_bins + 1))
 end
 
 """
@@ -79,7 +96,7 @@ samples are available, otherwise returns `(edges, counts)`.
 """
 function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
     edges = get_histogram_edges(samples; n_bins=n_bins)
-    if edges === nothing 
+    if edges === nothing
         return nothing
     end
 
@@ -97,44 +114,16 @@ function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}
     return edges, counts
 end
 
-"""
-    mirrored_histogram_bars!(plt, x0, samples, side, color; max_width=0.38, n_bins=nothing)
-
-Draw a mirrored horizontal histogram of `samples` onto `plt`.
-
-The histogram is anchored at the vertical line `x = x0` and drawn either to the
-left or right depending on `side`, which should be `:left` or `:right`. Each bar
-spans one histogram bin in the y-direction and is filled with `color`. The bar
-widths are normalized by the largest bin count so that the widest bar has width
-`max_width`.
-
-Arguments:
-- `plt`: plot object that is updated in place with the histogram bars.
-- `x0`: x-position of the center line from which the mirrored bars extend.
-- `samples`: one-dimensional sample values used to build the histogram along the
-  y-axis. The function assumes these values are finite and non-negative; they are
-  binned into contiguous intervals, and the resulting counts determine the bar
-  widths after normalization. An empty vector is allowed and leaves `plt`
-  unchanged.
-- `side`: selects the drawing direction, expected to be `:left` or `:right`.
-- `color`: fill color used for every histogram bar.
-
-Keyword arguments:
-- `max_width`: maximum horizontal extent of the widest histogram bar.
-- `n_bins`: optional number of histogram bins; if omitted, an automatic choice is used.
-
-Returns `nothing` when `samples` is empty or all bins have zero count; otherwise
-the bars are added to `plt` in place.
-"""
-function mirrored_histogram_bars!(plt, x0::Real, samples::Vector{Float64}, side::Symbol, color; max_width::Float64 = 0.38, n_bins::Union{Nothing, Int}=nothing)
+function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, color;
+    max_width::Float64=0.38, n_bins::Union{Nothing, Int}=nothing)
     profile = histogram_profile(samples; n_bins=n_bins)
-    if profile === nothing 
+    if profile === nothing
         return nothing
     end
 
     edges, counts = profile
     max_count = maximum(counts)
-    if max_count == 0 
+    if max_count == 0
         return nothing
     end
 
@@ -145,8 +134,8 @@ function mirrored_histogram_bars!(plt, x0::Real, samples::Vector{Float64}, side:
         x2 = side == :left ? x0 : x0 + widths[idx]
         y1 = edges[idx]
         y2 = edges[idx + 1]
-        rect = Shape([x1, x2, x2, x1], [y1, y1, y2, y2])
-        plot!(plt, rect, c=color, linecolor=false, fillalpha=0.45, label=false)
+        poly!(ax, Point2f[(x1, y1), (x2, y1), (x2, y2), (x1, y2)];
+            color=(color, HIST_FILL_ALPHA), strokecolor=:transparent)
     end
 
     outer_x = Float64[]
@@ -156,55 +145,42 @@ function mirrored_histogram_bars!(plt, x0::Real, samples::Vector{Float64}, side:
         x_outer = side == :left ? x0 - widths[idx] : x0 + widths[idx]
         push!(outer_x, x_outer, x_outer)
     end
-    plot!(plt, outer_x, outer_y, color=color, lw=2.0, label=false)
+    lines!(ax, outer_x, outer_y; color=(color, HIST_EDGE_ALPHA), linewidth=2)
+    return nothing
 end
 
-"""
-    add_histogram_pair!(plt, x0, data_d, data_l)
-
-Add mirrored histograms for the `data_r` and `data_l` samples at `x0`, with a
-faint vertical line spanning their combined positive range.
-"""
-function add_histogram_pair!(plt, x0::Real, data_r::Vector{Float64}, data_l::Vector{Float64})
-    mirrored_histogram_bars!(plt, x0, data_r, :right, PHENOM_D_COLOR)
-    mirrored_histogram_bars!(plt, x0, data_l, :left, PHENOM_HM_COLOR)
+function add_histogram_pair!(ax::Axis, x0::Real, data_r::Vector{Float64}, data_l::Vector{Float64})
+    mirrored_histogram_bars!(ax, x0, data_r, :right, PHENOM_D_COLOR)
+    mirrored_histogram_bars!(ax, x0, data_l, :left, PHENOM_HM_COLOR)
 
     combined = vcat(data_r, data_l)
     combined = combined[combined .> 0.0]
     if !isempty(combined)
-        plot!(plt, [x0, x0], [minimum(combined), maximum(combined)], color=:black, lw=1.0, alpha=0.45, label=false)
+        lines!(ax, [x0, x0], [minimum(combined), maximum(combined)]; color=(:black, 0.45), linewidth=1)
     end
+    return nothing
 end
 
-"""
-    add_bootstrap_summary!(plt, x0, samples, side, color)
-
-Add a compact bootstrap summary for `samples` at horizontal position `x0` on
-`plt`, drawing the 5th to 95th percentile interval and the median on the
-requested `side`.
-"""
-function add_bootstrap_summary!(plt, x0::Real, samples::Vector{Float64}, side::Symbol, color)
+function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, color)
     positive_samples = samples[samples .> 0.0]
-    isempty(positive_samples) && return
+    isempty(positive_samples) && return nothing
 
     q05 = quantile(positive_samples, 0.05)
     q50 = quantile(positive_samples, 0.50)
     q95 = quantile(positive_samples, 0.95)
     x_pos = side == :left ? x0 - 0.16 : x0 + 0.16
 
-    plot!(plt, [x_pos, x_pos], [q05, q95], color=color, lw=3.0, alpha=0.95, label=false)
-    scatter!(plt, [x_pos], [q50], color=color, markerstrokecolor=:white, markerstrokewidth=1.0, markersize=7.875, label=false)
+    lines!(ax, [x_pos, x_pos], [q05, q95]; color=color, linewidth=3)
+    scatter!(ax, [x_pos], [q50]; color=color, markersize=16, strokecolor=:white, strokewidth=1.0)
+    return nothing
 end
 
-"""
-    add_gwtc3_reference!(plt, x0, pno)
-
-Add the GWTC-3 reference value for post-Newtonian order `pno` at horizontal
-position `x0` on `plt`, if a reference entry is available.
-"""
-function add_gwtc3_reference!(plt, x0::Real, pno::String)
-    haskey(GWTC3_REFERENCE, pno) || return
-    scatter!(plt, [x0], [GWTC3_REFERENCE[pno]], color=GWTC3_COLOR, markercolor=GWTC3_COLOR, markerstrokecolor=:white, markerstrokewidth=0.8, markershape=:diamond, markersize=9.28125, label=false)
+function add_gwtc3_reference!(ax::Axis, x0::Real, pno::String)
+    haskey(GWTC3_REFERENCE, pno) || return nothing
+    scatter!(ax, [x0], [GWTC3_REFERENCE[pno]];
+        color=GWTC3_COLOR, marker=:diamond, markersize=18,
+        strokecolor=:white, strokewidth=1.0)
+    return nothing
 end
 
 """
@@ -238,68 +214,6 @@ function read_plot_data(population_results_file::AbstractString, config::Dict)
     return single_event_constraints, bootstrap_constraints
 end
 
-"""
-    make_panel(pn_orders, single_event_constraints, bootstrap_constraints; title_text, width_scale)
-
-Build a plot panel for the requested post-Newtonian orders using the
-single-event and bootstrap constraints for each waveform family.
-
-For each entry in `pn_orders`, the function adds mirrored histograms for the
-`"PhenomD"` and `"PhenomHM"` single-event samples, overlays the corresponding
-bootstrap summaries, and places the GWTC-3 reference marker when available.
-The constraint dictionaries are expected to be indexed as
-`constraints[waveform_family][pn_order]`.
-
-Returns the configured plot object.
-"""
-function make_panel(
-    pn_orders::Vector{String},
-    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}};
-    title_text::String,
-    width_scale::Real,
-    left_margin_mm::Real=14,
-    right_margin_mm::Real=14,
-)
-    xticks = collect(1:length(pn_orders))
-    labels = createSED.pnoLatex.(pn_orders)
-
-    plt = plot(
-        legend=false,
-        yscale=:log10,
-        xlabel="PN order",
-        ylabel="",
-        title="",
-        grid=true,
-        minorgrid=true,
-        framestyle=:box,
-        xlim=(0.5, length(pn_orders) + 0.5),
-        xticks=(xticks, labels),
-        size=(round(Int, 990 * width_scale), 760),
-        dpi=200,
-        titlefont=font(TITLE_FONT_SIZE),
-        guidefont=font(GUIDE_FONT_SIZE),
-        tickfont=font(TICK_FONT_SIZE),
-        bottom_margin=22Plots.mm,
-        top_margin=34Plots.mm,
-        left_margin=left_margin_mm * Plots.mm,
-        right_margin=right_margin_mm * Plots.mm,
-    )
-
-    for (idx, pno) in enumerate(pn_orders)
-        data_d = get(get(single_event_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
-        data_hm = get(get(single_event_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
-        boot_d = get(get(bootstrap_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
-        boot_hm = get(get(bootstrap_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
-        add_histogram_pair!(plt, idx, data_d, data_hm)
-        add_bootstrap_summary!(plt, idx, boot_d, :right, PHENOM_D_COLOR)
-        add_bootstrap_summary!(plt, idx, boot_hm, :left, PHENOM_HM_COLOR)
-        add_gwtc3_reference!(plt, idx, pno)
-    end
-
-    return plt
-end
-
 function histogram_limits(
     pn_orders::AbstractVector{<:AbstractString},
     single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
@@ -320,6 +234,35 @@ function histogram_limits(
 
     isfinite(y_min) || return nothing
     return (y_min, y_max)
+end
+
+function panel_data_limits(
+    pn_orders::AbstractVector{<:AbstractString},
+    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    waveform_families::AbstractVector{<:AbstractString},
+)
+    values = Float64[]
+
+    for pno in pn_orders
+        for wf_fam in waveform_families
+            single_event = get(get(single_event_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
+            append!(values, single_event[single_event .> 0.0])
+
+            bootstrap = get(get(bootstrap_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
+            positive_bootstrap = bootstrap[bootstrap .> 0.0]
+            if !isempty(positive_bootstrap)
+                append!(values, quantile(positive_bootstrap, [0.05, 0.50, 0.95]))
+            end
+        end
+
+        if haskey(GWTC3_REFERENCE, pno) && GWTC3_REFERENCE[pno] > 0.0
+            push!(values, GWTC3_REFERENCE[pno])
+        end
+    end
+
+    isempty(values) && return nothing
+    return (minimum(values), maximum(values))
 end
 
 function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.08, upper_pad_decades::Real=0.08)
@@ -355,12 +298,120 @@ function top_pno_label(pno::AbstractString)
     return latexstring(pno, raw"\,\mathrm{PN}")
 end
 
-function add_top_pno_labels!(plt, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real})
-    n_orders = length(pn_orders)
+function build_top_label_row!(grid::GridLayout, pn_orders::AbstractVector{<:AbstractString})
     for (idx, pno) in enumerate(pn_orders)
-        x_pos = (idx - 0.5) / n_orders
-        annotate!(plt, ((x_pos, 1.03), text(top_pno_label(pno), TICK_FONT_SIZE, :center, :bottom)))
+        Label(grid[1, idx], top_pno_label(pno);
+            fontsize=TICK_FONT_SIZE,
+            tellwidth=false,
+            tellheight=false,
+            halign=:center,
+            valign=:bottom)
+        colsize!(grid, idx, Relative(1.0 / length(pn_orders)))
     end
+    rowsize!(grid, 1, Relative(1.0))
+    return grid
+end
+
+function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real}, y_tick_spec;
+    ylabel="", show_ylabel::Bool=true)
+    ax.xlabel = "PN order"
+    ax.ylabel = show_ylabel ? ylabel : ""
+    ax.xlabelsize = GUIDE_FONT_SIZE
+    ax.ylabelsize = GUIDE_FONT_SIZE
+    ax.xticks = (collect(1:length(pn_orders)), createSED.pnoLatex.(pn_orders))
+    ax.yticks = y_tick_spec
+    ax.xticklabelsize = TICK_FONT_SIZE
+    ax.yticklabelsize = TICK_FONT_SIZE
+    ax.xgridvisible = true
+    ax.ygridvisible = true
+    ax.xminorgridvisible = false
+    ax.yminorgridvisible = true
+    ax.yminorgridcolor = (:gray70, 0.35)
+    ax.yminorticks = IntervalsBetween(9)
+    ax.xtickalign = 1
+    ax.ytickalign = 1
+    xlims!(ax, 0.5, length(pn_orders) + 0.5)
+    ylims!(ax, y_limits...)
+    return ax
+end
+
+function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
+    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}})
+    for (idx, pno) in enumerate(pn_orders)
+        data_d = get(get(single_event_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
+        data_hm = get(get(single_event_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
+        boot_d = get(get(bootstrap_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
+        boot_hm = get(get(bootstrap_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
+        add_histogram_pair!(ax, idx, data_d, data_hm)
+        add_bootstrap_summary!(ax, idx, boot_d, :right, PHENOM_D_COLOR)
+        add_bootstrap_summary!(ax, idx, boot_hm, :left, PHENOM_HM_COLOR)
+        add_gwtc3_reference!(ax, idx, pno)
+    end
+    return ax
+end
+
+function add_fig1_legend!(fig::Figure, target_slot)
+    elements = [
+        PolyElement(color=(PHENOM_D_COLOR, HIST_FILL_ALPHA), strokecolor=:transparent),
+        PolyElement(color=(PHENOM_HM_COLOR, HIST_FILL_ALPHA), strokecolor=:transparent),
+        MarkerElement(color=:black, marker=:circle, markersize=15, strokecolor=:white, strokewidth=1.0),
+        LineElement(color=:black, linewidth=3),
+        MarkerElement(color=GWTC3_COLOR, marker=:diamond, markersize=18, strokecolor=:white, strokewidth=1.0),
+    ]
+    labels = ["PhenomD", "PhenomHM", "Bootstrap median", "Bootstrap 90% CI", "GWTC-3 TGR"]
+    Legend(target_slot, elements, labels;
+        tellwidth=false,
+        tellheight=false,
+        halign=:right,
+        valign=:bottom,
+        margin=(10, 10, 10, 10),
+        framevisible=true,
+        backgroundcolor=(:white, 0.9),
+        labelsize=LEGEND_FONT_SIZE)
+    return fig
+end
+
+function build_figure(
+    left_orders::Vector{String},
+    right_orders::Vector{String},
+    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}},
+    aligned_left_limits::Tuple{<:Real, <:Real},
+    right_scale::Real,
+)
+    CairoMakie.activate!()
+
+    fig = Figure(size=FIG1_SIZE, backgroundcolor=:white)
+    left_top_grid = GridLayout(fig[1, 1])
+    right_top_grid = GridLayout(fig[1, 2])
+    left_ax = Axis(fig[2, 1], backgroundcolor=:white, yscale=log10)
+    right_ax = Axis(fig[2, 2], backgroundcolor=:white, yscale=log10)
+
+    panel_width_weights = Float64[length(left_orders), length(right_orders)]
+    width_total = sum(panel_width_weights)
+    colsize!(fig.layout, 1, Relative(panel_width_weights[1] / width_total))
+    colsize!(fig.layout, 2, Relative(panel_width_weights[2] / width_total))
+    rowsize!(fig.layout, 1, Relative(FIG1_TOP_ROW_FRACTION))
+    rowsize!(fig.layout, 2, Relative(1.0 - FIG1_TOP_ROW_FRACTION))
+    colgap!(fig.layout, FIG1_COL_GAP)
+    rowgap!(fig.layout, FIG1_LABEL_ROW_GAP)
+
+    build_top_label_row!(left_top_grid, left_orders)
+    build_top_label_row!(right_top_grid, right_orders)
+
+    configure_panel_axis!(left_ax, left_orders, aligned_left_limits, decade_ticks(aligned_left_limits);
+        ylabel=L"|\delta\varphi_p|", show_ylabel=true)
+    configure_panel_axis!(right_ax, right_orders,
+        (aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale),
+        decade_ticks((aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale));
+        ylabel="", show_ylabel=false)
+
+    build_panel!(left_ax, left_orders, single_event_constraints, bootstrap_constraints)
+    build_panel!(right_ax, right_orders, single_event_constraints, bootstrap_constraints)
+    add_fig1_legend!(fig, fig[2, 2])
+
+    return fig
 end
 
 #----------------------------------------------------------------------------#
@@ -385,24 +436,7 @@ function run_plot_fig1(config::Dict)
 
     left_orders = ["-1"]
     right_orders = filter(pno -> pno != "-1", config["pn_orders"])
-    panel_width_scale_per_order = 0.15
 
-    left_panel = make_panel(
-        left_orders,
-        single_event_constraints,
-        bootstrap_constraints;
-        title_text="PN order -1",
-        width_scale=panel_width_scale_per_order * length(left_orders),
-        left_margin_mm=14,
-    )
-    right_panel = make_panel(
-        right_orders,
-        single_event_constraints,
-        bootstrap_constraints;
-        title_text="Higher PN orders",
-        width_scale=panel_width_scale_per_order * length(right_orders),
-        right_margin_mm=104,
-    )
     bootstrap_medians = Dict{String, Float64}()
     for pno in ("-1", "0")
         positive_samples = Float64[]
@@ -423,8 +457,8 @@ function run_plot_fig1(config::Dict)
 
     left_hist_limits = histogram_limits(left_orders, single_event_constraints, config["waveform_families"])
     right_hist_limits = histogram_limits(right_orders, single_event_constraints, config["waveform_families"])
-    left_limits = ylims(left_panel)
-    aligned_left_limits = (left_limits[1] / 10, left_limits[2])
+    left_data_limits = panel_data_limits(left_orders, single_event_constraints, bootstrap_constraints, config["waveform_families"])
+    aligned_left_limits = isnothing(left_data_limits) ? (1e-5, 1.0) : (left_data_limits[1] / 10, left_data_limits[2])
 
     if left_hist_limits !== nothing
         aligned_left_limits = (
@@ -440,46 +474,29 @@ function run_plot_fig1(config::Dict)
         )
     end
 
+    right_data_limits = panel_data_limits(right_orders, single_event_constraints, bootstrap_constraints, config["waveform_families"])
+    if right_data_limits !== nothing
+        aligned_left_limits = (
+            min(aligned_left_limits[1], right_data_limits[1] * right_scale),
+            max(aligned_left_limits[2], right_data_limits[2] * right_scale),
+        )
+    end
+
     aligned_left_limits = expand_log_limits(aligned_left_limits)
 
-    ylims!(left_panel, aligned_left_limits...)
-    ylims!(right_panel, aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale)
-    yticks!(left_panel, decade_ticks(aligned_left_limits))
-    yticks!(right_panel, decade_ticks((aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale)))
-    ylabel!(left_panel, L"|\delta\varphi_p|")
-    add_top_pno_labels!(left_panel, left_orders, aligned_left_limits)
-    add_top_pno_labels!(right_panel, right_orders, (aligned_left_limits[1] / right_scale, aligned_left_limits[2] / right_scale))
-
-    panel_width_weights = Float64[length(left_orders), length(right_orders)]
-    panel_widths = panel_width_weights ./ sum(panel_width_weights)
-
-    final_plot = plot(
-        left_panel,
-        right_panel;
-        layout=grid(1, 2, widths=panel_widths),
-        size=(1800, 760),
-        bottom_margin=22Plots.mm,
-        top_margin=26Plots.mm,
-        left_margin=18Plots.mm,
-        right_margin=18Plots.mm,
+    fig = build_figure(
+        left_orders,
+        right_orders,
+        single_event_constraints,
+        bootstrap_constraints,
+        aligned_left_limits,
+        right_scale,
     )
 
-    plot!(final_plot[2], [NaN], [NaN], seriestype=:shape, c=PHENOM_D_COLOR, linecolor=false, fillalpha=0.45, label="PhenomD")
-    plot!(final_plot[2], [NaN], [NaN], seriestype=:shape, c=PHENOM_HM_COLOR, linecolor=false, fillalpha=0.45, label="PhenomHM")
-    scatter!(final_plot[2], [NaN], [NaN], color=:black, markersize=7.875, label="Bootstrap median")
-    plot!(final_plot[2], [NaN, NaN], [NaN, NaN], color=:black, lw=3.0, label="Bootstrap 90% CI")
-    scatter!(final_plot[2], [NaN], [NaN], color=GWTC3_COLOR, markercolor=GWTC3_COLOR, markerstrokecolor=:white, markerstrokewidth=0.8, markershape=:diamond, markersize=9.28125, label="GWTC-3 TGR")
-    plot!(final_plot[2], legend=:bottomright, legendfontsize=18)
-
-    configured_output_file = get_plot_output_file(config)
-    output_dir = joinpath(dirname(configured_output_file), "fig_1")
-    output_stem = splitext(basename(configured_output_file))[1]
-    png_output_file = joinpath(output_dir, output_stem * ".png")
-    pdf_output_file = joinpath(output_dir, output_stem * ".pdf")
-
-    mkpath(output_dir)
-    savefig(final_plot, png_output_file)
-    savefig(final_plot, pdf_output_file)
+    png_output_file, pdf_output_file = get_plot_output_files(config)
+    mkpath(dirname(png_output_file))
+    save(png_output_file, fig)
+    save(pdf_output_file, fig)
     println("Saved figure to $(png_output_file)")
     println("Saved figure to $(pdf_output_file)")
 
