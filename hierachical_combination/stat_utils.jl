@@ -184,8 +184,6 @@ function getEnclosedIsoVolProbOGD(
     weights=nothing,
     )
 
-    0.0 < CI < 1.0 || throw(ArgumentError("`CI` must be strictly between 0 and 1."))
-
     bin_values = if isnothing(weights)
         vec(Float64.(p_values))
     else
@@ -197,7 +195,7 @@ function getEnclosedIsoVolProbOGD(
     total_probability = sum(bin_values)
     total_probability > 0.0 || throw(ArgumentError("`p_values` must contain positive probability mass."))
 
-    enclosed_bins =  p_values .>= p_ref
+    enclosed_bins = vec(Float64.(p_values) .>= p_ref)
     enclose_probability_mass = sum(bin_values[enclosed_bins])
 
     enclosed_probability = enclose_probability_mass ./ total_probability

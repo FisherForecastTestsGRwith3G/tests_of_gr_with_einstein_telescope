@@ -4,8 +4,7 @@ using Distributions
 using Roots
 using Trapz
 using CairoMakie
-
-const con = CairoMakie.Contour
+import Contour as con
 
 export estimate0Symmetric90CiGaussian, muStdEff4ProdNormal
 export hyperparamDistTIGER, getDistributionOnGrid, getNaiveDistributionOnGrid
