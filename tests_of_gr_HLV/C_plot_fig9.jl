@@ -11,6 +11,7 @@ include("../create_single_event_datasets/createSED.jl")
 const CONTOUR_FILL_COLORS = [:aliceblue, :lightblue, :cornflowerblue]
 const CONTOUR_LINE_COLOR = :royalblue4
 const OBSERVABLE_COLORMAP = :viridis
+const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \Delta k_{\mathrm{D}}\right)"
 const FIG9_Z_THRESHOLD = 0.5
 const FIG9_MC_LIMITS = (5.0, 80.0)
 const FIG9_SIZE = (1800, 760)
@@ -18,6 +19,8 @@ const FIG9_HIST_FRACTION = 0.32
 const FIG9_COL_GAP = 6*5
 const FIG9_ROW_GAP = 4*5
 const FIG9_LABELSIZE =28
+const FIG9_MARKER_SIZE = 12
+const FIG9_PROBLEM_BOX_HALFHEIGHT = 0.9
 const HIST_BASE_COLOR = :lightblue
 const HIST_FISHER_COLOR = :crimson
 const HIST_OBSERVABLE_COLOR = :darkorange
@@ -339,7 +342,7 @@ function problematic_box_halfwidth(xlim::Tuple{<:Real, <:Real}; halfheight::Floa
 end
 
 function add_problematic_boxes!(ax::Axis, x::Vector{Float64}, y::Vector{Float64}, xlim::Tuple{<:Real, <:Real})
-    halfheight = 0.9
+    halfheight = FIG9_PROBLEM_BOX_HALFHEIGHT
     halfwidth = problematic_box_halfwidth(xlim; halfheight=halfheight)
 
     for idx in eachindex(x)
@@ -369,7 +372,7 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
     xvals = catalog[x_key][selected]
     yvals = catalog["mc"][selected]
     cvals = ratio[selected]
-    scatter!(ax, xvals, yvals; color=cvals, colormap=OBSERVABLE_COLORMAP, colorrange=color_lims, markersize=12)
+    scatterplot = scatter!(ax, xvals, yvals; color=cvals, colormap=OBSERVABLE_COLORMAP, colorrange=color_lims, markersize=FIG9_MARKER_SIZE)
     add_problematic_boxes!(ax, catalog[x_key][problematic], catalog["mc"][problematic], xlim)
 
     xlims!(ax, Float64(xlim[1]), Float64(xlim[2]))
@@ -395,7 +398,7 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
         hideydecorations!(ax; ticklabels=true, ticks=false, label=false)
     end
 
-    return ax
+    return scatterplot
 end
 
 function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String, Dict{String, Vector}}, indices::Dict{String, BitVector})
@@ -414,9 +417,7 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     main_width = (1.0 - fig9_side_width_fraction()) / 4.0
 
     top_axes = [Axis(fig[1, i], backgroundcolor=:transparent) for i in 1:4]
-    blank_ax = Axis(fig[1, 5], backgroundcolor=:transparent)
-    hide_hist_axis!(blank_ax; bottom_spine=false)
-
+    colorbar_grid = GridLayout(fig[1, 5])
     main_axes = [Axis(fig[2, i], backgroundcolor=:white) for i in 1:4]
     side_ax = Axis(fig[2, 5], backgroundcolor=:white)
 
@@ -435,7 +436,7 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     draw_top_histogram!(top_axes[4], catalog["z"][kde_selected], catalog["z"][fisher_hist_selected], catalog["z"][observable_hist_selected], (0.0, FIG9_Z_THRESHOLD))
     foreach(ax -> hide_hist_axis!(ax; bottom_spine=true), top_axes)
 
-    build_main_panel!(main_axes[1], catalog, results, indices, "invq", (0.0, 1.0), ratio, color_lims;
+    scatter_ref = build_main_panel!(main_axes[1], catalog, results, indices, "invq", (0.0, 1.0), ratio, color_lims;
         xlabel=labels["invq"], ylabel=labels["mc"], show_yticks=true, show_yticklabels=true)
     build_main_panel!(main_axes[2], catalog, results, indices, "iota", (0.0, π), ratio, color_lims;
         xlabel=labels["iota"], show_yticks=true, show_yticklabels=false)
@@ -448,6 +449,28 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     draw_side_histogram!(side_ax, catalog["mc"][kde_selected], catalog["mc"][fisher_hist_selected], catalog["mc"][observable_hist_selected])
     hide_hist_axis!(side_ax; left_spine=true, hide_x=true, hide_y=true)
     ylims!(side_ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
+
+    Label(
+        colorbar_grid[1, 1],
+        IMPROVEMENT_COLORBAR_TITLE;
+        fontsize=FIG9_LABELSIZE,
+        halign=:center,
+        valign=:bottom,
+        tellwidth=false,
+    )
+    Colorbar(
+        colorbar_grid[2, 1],
+        scatter_ref;
+        vertical=false,
+        flipaxis=false,
+        labelvisible=false,
+        tickalign=0,
+        ticklabelsize=18,
+        size=18,
+    )
+    rowsize!(colorbar_grid, 1, Auto(0.35))
+    rowsize!(colorbar_grid, 2, Auto(0.65))
+    rowgap!(colorbar_grid, 4)
 
     return fig
 end
