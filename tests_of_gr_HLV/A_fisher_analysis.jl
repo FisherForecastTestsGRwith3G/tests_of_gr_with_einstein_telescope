@@ -92,6 +92,18 @@ function write_pn_results_to_hdf5(file, pno, mu, sigma, pn_deviation, network,
     write(wf_grp, "dphi_k", dphi_k)
 end
 
+"""
+    derive_analysis_seed(base_seed::Integer, wf_idx::Integer, pno_idx::Integer, stream_idx::Integer)
+
+Build a deterministic per-step seed for the Fisher-analysis workflow.
+
+`stream_idx` is used to keep independent random processes, such as deviation
+generation and posterior sampling, on separate reproducible streams.
+"""
+function derive_analysis_seed(base_seed::Integer, wf_idx::Integer, pno_idx::Integer, stream_idx::Integer)
+    return Int(base_seed + 10_000 * (wf_idx - 1) + 100 * (pno_idx - 1) + stream_idx)
+end
+
 #----------------------------------------------------------------------------#
 # MAIN FUNCTION
 #----------------------------------------------------------------------------#
@@ -159,7 +171,7 @@ function run_fisher_analysis(config::Dict)
 
         reference_pno = first(config["pn_orders"])
 
-        for wf_fam in config["waveform_families"]
+        for (idx_wf, wf_fam) in enumerate(config["waveform_families"])
             println("\nProcessing waveform family: $(wf_fam)")
             println("Preparing SNR and inspiral SNR calculations using reference PN order $(reference_pno)")
 
@@ -179,7 +191,10 @@ function run_fisher_analysis(config::Dict)
                 println("\nComputing Fisher matrices for PN order $(pno) with waveform family $(wf_fam)")
                 mu = config["mu"][idx_pno]
                 sigma = config["sigma"][idx_pno]
-                pn_deviation = createSED.createBGRDeviations(catalog, mu, sigma, config["seed"])
+                deviation_seed = derive_analysis_seed(config["seed"], idx_wf, idx_pno, 1)
+                posterior_seed = derive_analysis_seed(config["seed"], idx_wf, idx_pno, 2)
+
+                pn_deviation = createSED.createBGRDeviations(catalog, mu, sigma, deviation_seed)
 
                 _, _, _, invc, delta_k, dphi_k = createSED.createSEDfromCatalog(
                     catalog          ,
@@ -188,7 +203,7 @@ function run_fisher_analysis(config::Dict)
                     pn_deviation     ,
                     wf_fam           ,
                     config["fmin"]   ,
-                    config["seed"]   ;
+                    posterior_seed   ;
                     precomputed_snr  = snr,
                     precomputed_isnr = isnr,
                     snr_threshold = config["snr_threshold"]

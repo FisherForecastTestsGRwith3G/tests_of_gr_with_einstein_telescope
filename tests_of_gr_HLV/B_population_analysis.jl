@@ -14,6 +14,10 @@ function get_population_results_file(config::Dict)
     return joinpath(@__DIR__, config["outdir"], "population_results_$(config["bootstrap_tag"]).h5")
 end
 
+function derive_population_seed(base_seed::Integer, wf_idx::Integer, pno_idx::Integer, stream_idx::Integer)
+    return Int(base_seed + 10_000 * (wf_idx - 1) + 100 * (pno_idx - 1) + stream_idx)
+end
+
 #----------------------------------------------------------------------------#
 # Auxiliary functions
 #----------------------------------------------------------------------------#
@@ -212,6 +216,7 @@ Arguments
 - `n_catalog`: Number of events drawn per bootstrap realization.
 - `n_samples`: Number of bootstrap realizations.
 - `method`   : Population-constraint method. Currently supported: `"prodL"`.
+- `seed`     : Random seed used for the bootstrap draws.
 
 Returns
 -------
@@ -222,7 +227,8 @@ function bootstrapPopConstraint(
     delta_k::Vector{Float64}, 
     n_catalog::Int, 
     n_samples::Int, 
-    method::String
+    method::String;
+    seed::Int=1234,
     )
 
     length(dphi_k) == length(delta_k) ||
@@ -244,11 +250,12 @@ function bootstrapPopConstraint(
         throw(ArgumentError("Unknown bootstrap method: $(method)"))
     end
 
+    rng = MersenneTwister(seed)
     constraints = Vector{Float64}(undef, n_samples)
     n_events = length(dphi_k)
 
     for idx_sample in 1:n_samples
-        selected_indices = randperm(n_events)[1:n_catalog]
+        selected_indices = randperm(rng, n_events)[1:n_catalog]
         constraints[idx_sample] = constraint(
             dphi_k[selected_indices],
             delta_k[selected_indices],
@@ -461,7 +468,7 @@ function run_population_analysis_select_before_bootstrap(file, config::Dict)
     bootstrap_constraints = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_observed_fractions = Dict{String, Dict{String, Vector{Float64}}}()
 
-    for wf_fam in config["waveform_families"]
+    for (idx_wf, wf_fam) in enumerate(config["waveform_families"])
         selected_delta_k[wf_fam] = Dict{String, Vector{Float64}}()
         selected_dphi_k[wf_fam] = Dict{String, Vector{Float64}}()
         phi90[wf_fam] = Dict{String, Vector{Float64}}()
@@ -469,7 +476,7 @@ function run_population_analysis_select_before_bootstrap(file, config::Dict)
         bootstrap_observed_fractions[wf_fam] = Dict{String, Vector{Float64}}()
         selection_index = summary_indices[wf_fam]
 
-        for pno in config["pn_orders"]
+        for (idx_pno, pno) in enumerate(config["pn_orders"])
             selected_delta_k[wf_fam][pno] = delta_k_data[wf_fam][pno][selection_index]
             selected_dphi_k[wf_fam][pno] = dphi_k_data[wf_fam][pno][selection_index]
 
@@ -484,6 +491,7 @@ function run_population_analysis_select_before_bootstrap(file, config::Dict)
                 config["n_catalog"],
                 config["n_sample"],
                 "prodL",
+                seed=derive_population_seed(config["seed"], idx_wf, idx_pno, 1),
             )
             bootstrap_observed_fractions[wf_fam][pno] = ones(Float64, config["n_sample"])
         end
@@ -535,7 +543,7 @@ function run_population_analysis_bootstrap_before_select(file, config::Dict)
     bootstrap_constraints = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_observed_fractions = Dict{String, Dict{String, Vector{Float64}}}()
 
-    for wf_fam in config["waveform_families"]
+    for (idx_wf, wf_fam) in enumerate(config["waveform_families"])
         selected_delta_k[wf_fam] = Dict{String, Vector{Float64}}()
         selected_dphi_k[wf_fam] = Dict{String, Vector{Float64}}()
         phi90[wf_fam] = Dict{String, Vector{Float64}}()
@@ -563,7 +571,7 @@ function run_population_analysis_bootstrap_before_select(file, config::Dict)
                 config["n_catalog"],
                 config["n_sample"],
                 "prodL";
-                seed=config["seed"] + idx_pno,
+                seed=derive_population_seed(config["seed"], idx_wf, idx_pno, 2),
             )
             bootstrap_constraints[wf_fam][pno] = constraints
             bootstrap_observed_fractions[wf_fam][pno] = observed_fractions
