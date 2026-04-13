@@ -10,10 +10,12 @@ export estimate0Symmetric90CiGaussian, muStdEff4ProdNormal
 export hyperparamDistTIGER, getDistributionOnGrid, getNaiveDistributionOnGrid
 export quantile1dOGD, getEnclosedIsoVolProbOGD
 export getContourLevelOGD, getCredibleContourOGD
+export checkPosteriorGridSuitability, findOptimalGrid
 
 include("hierarchical_distribution.jl")
 include("prod_likelihood_distribution.jl")
 include("stat_utils.jl")
+include("domain_utils.jl")
 include("plotting_utils.jl")
 
 end
