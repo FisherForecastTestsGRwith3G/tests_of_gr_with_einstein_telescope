@@ -20,6 +20,7 @@
 using TOML
 using HDF5
 using Random
+using Statistics
 using CairoMakie
 using Printf
 
@@ -27,18 +28,6 @@ include("_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
 include("../hierachical_combination/hierDist.jl")
 
-const GRID_LIMS = Dict(
-    "-1"       => (-0.01,0.01,0.01),
-    "0"        => (-0.5,0.5,0.5),
-    "0.5"      => (-1.0,1.0,1.0),
-    "1"        => (-0.8,0.8,0.8),
-    "1.5"      => (-0.5,0.5,0.5),
-    "2"        => (-5.0,5.0,5.0),
-    "log(2.5)" => (-2.0,2.0,2.0),
-    "3"        => (-2.0,2.0,2.0),
-    "log(3.)"  => (-15.0,15.0,15.0),
-    "3.5"      => (-8.0,8.0,8.0),
-)
 const CI_LEVELS_2D = (
     1.0 - exp(-0.5),
     1.0 - exp(-2.0),
@@ -67,32 +56,6 @@ function get_hyperparam_plot_output_files(config::Dict, pno::AbstractString)
         joinpath(output_dir, "hyperparam_dist.png"),
         joinpath(output_dir, "hyperparam_dist.pdf"),
     )
-end
-
-"""
-Build a `1000 x 1000` `(mu, sigma)` grid from the limits specified in
-`GRID_LIMS[pno]`.
-
-The tuple is interpreted as `(mu_min, mu_max, sigma_max)`. The `sigma` grid is
-always bounded from below by `0`.
-"""
-function build_hyperparam_grid(pno::AbstractString)
-    haskey(GRID_LIMS, pno) ||
-        throw(ArgumentError("Missing grid limits for PN order `$(pno)` in `GRID_LIMS`."))
-
-    mu_min, mu_max, sigma_max = Float64.(GRID_LIMS[pno])
-    mu_min < mu_max || throw(ArgumentError("For PN order `$(pno)`, `mu_min` must be smaller than `mu_max`."))
-    sigma_max > 0.0 || throw(ArgumentError("For PN order `$(pno)`, `sigma_max` must be positive."))
-
-    mu_spacing = (mu_max - mu_min) / 999.0
-    mu_neg = collect(0.0:-mu_spacing:mu_min)
-    mu_pos = collect(0.0:mu_spacing:mu_max)
-    mu = vcat(reverse(mu_neg[2:end]), mu_pos)
-    sigma = collect(range(0.0, sigma_max; length=1000))
-
-    0.0 in sigma || throw(ArgumentError("For PN order `$(pno)`, the generated sigma-grid does not contain 0.0 exactly. Adjust `GRID_LIMS` so that 0 lies on the grid."))
-
-    return mu, sigma
 end
 
 """
@@ -276,17 +239,26 @@ function run_hyperparam_dist(
 
     contour_dict = Dict{String, Dict{Float64, NamedTuple{(:level, :mu_lines, :sigma_lines), Tuple{Float64, Vector{Vector{Float64}}, Vector{Vector{Float64}}}}}}()
     for pno in config["pn_orders"] #["0"]#
+
+        println("  PN order $(pno): building hyperparamDistTIGER to evaluate the distribution on a 1000x1000 mu-sigma grid")
+
         hyperparam_dist = HierDist.hyperparamDistTIGER(
             dphi_k_dict[pno],
             delta_k_dict[pno],
         )
-        mu_grid, sigma_grid = build_hyperparam_grid(pno)
+        mu_box_min, mu_box_max, sigma_box_min, sigma_box_max = HierDist.findOptimalGrid(
+            hyperparam_dist,
+        )
+        println("  Optimal grid domain boundaries: (mu, sigma) in [$(mu_box_min), $(mu_box_max)]x[$(sigma_box_min), $(sigma_box_max)].")
 
+        mu_grid = HierDist.buildUniform1dGridWithCenter(mu_box_min, mu_box_max, 1000)
+        sigma_grid = HierDist.buildUniform1dGridWithCenter(sigma_box_min, sigma_box_max, 1000)
         p_mu_sigma, p_sigma, p_mu, _, _ = HierDist.getDistributionOnGrid(
             mu_grid,
             sigma_grid,
             hyperparam_dist,
         )
+        grid_check = HierDist.checkPosteriorGridSuitability(mu_grid, sigma_grid, p_mu_sigma)
 
         idx_mu_zero = findfirst(==(0.0), mu_grid)
         idx_sigma_zero = findfirst(==(0.0), sigma_grid)
@@ -314,7 +286,7 @@ function run_hyperparam_dist(
                 mu_grid,
                 sigma_grid,
                 p_mu_sigma,
-                CI,
+                CI
             )
             contour_dict[pno][CI] = (
                 level=contour_level,
@@ -336,9 +308,10 @@ function run_hyperparam_dist(
             summary_text,
         )
 
-        println("  PN order $(pno): built hyperparamDistTIGER, evaluated the distribution on a 1000x1000 mu-sigma grid, calculated the 1/2/3 sigma 2D contours, and saved")
+        
         println("    $(png_output_file)")
         println("    $(pdf_output_file)")
+        println(@sprintf("    Probability mass in trimmed grid = %.6f%%", 100.0 - grid_check.norm_change_percent))
     end
 
     return (
