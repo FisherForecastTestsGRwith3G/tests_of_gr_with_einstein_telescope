@@ -1,42 +1,4 @@
 """
-Determine effective bin widths for a one-dimensional, strictly increasing grid.
-"""
-function get1dGridWeights(x_values::AbstractVector{<:Real})
-
-    length(x_values) >= 2 ||
-        throw(ArgumentError("At least two grid points are required."))
-
-    x_grid = Float64.(x_values)
-    issorted(x_grid) || throw(ArgumentError("`x_values` must be sorted in increasing order."))
-
-    widths = zeros(length(x_grid))
-    widths[1] = 0.5 * (x_grid[2] - x_grid[1])
-    widths[end] = 0.5 * (x_grid[end] - x_grid[end - 1])
-
-    for idx in 2:length(x_grid) - 1
-        widths[idx] = 0.5 * (x_grid[idx + 1] - x_grid[idx - 1])
-    end
-
-    any(widths .<= 0.0) && throw(ArgumentError("`x_values` must be strictly increasing."))
-
-    return widths
-end
-
-"""
-Determine effective cell areas for a two-dimensional, strictly increasing grid.
-"""
-function get2dGridWeights(
-    x_values::AbstractVector{<:Real},
-    y_values::AbstractVector{<:Real},
-    )
-
-    x_weights = get1dGridWeights(x_values)
-    y_weights = get1dGridWeights(y_values)
-
-    return x_weights .* transpose(y_weights)
-end
-
-"""
 Determine one or several quantiles from a one-dimensional posterior known on a
 grid (OGD = OnGridDist).
 
