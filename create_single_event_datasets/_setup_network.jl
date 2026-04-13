@@ -53,11 +53,11 @@ function setupET15km45(psd_dir)
     ETLS_15km.fNoise = f_ET_15
     ETLS_15km.psd = PSD_ET_15
 
-    ETLMR_0_15km = deepcopy(ETLMR)
-    ETLMR_0_15km.label = "ETLMR_0_15km"
-    ETLMR_0_15km.fNoise = f_ET_15
-    ETLMR_0_15km.psd = PSD_ET_15
-    ETLMR_0_15km.orientation_rad = orientation_CBC
+    ETLMR_45_15km = deepcopy(ETLMR)
+    ETLMR_45_15km.label = "ETLMR_0_15km"
+    ETLMR_45_15km.fNoise = f_ET_15
+    ETLMR_45_15km.psd = PSD_ET_15
+    ETLMR_45_15km.orientation_rad = orientation_CBC
 
     return [ETLS_15km, ETLMR_45_15km]
 end
