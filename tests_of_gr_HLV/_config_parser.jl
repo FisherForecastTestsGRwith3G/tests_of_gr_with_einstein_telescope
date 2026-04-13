@@ -47,6 +47,8 @@ function read_config(config_file::AbstractString)
     config["fmin"] = Float64(raw_config["fisher"]["fmin"])
     config["snr_threshold"] = Float64(raw_config["population"]["snr_threshold"])
     config["snr_inspiral_threshold"] = Float64(raw_config["population"]["snr_inspiral_threshold"])
+    config["select_before_bootstrap"] = haskey(raw_config["population"], "select_before_bootstrap") ?
+        Bool(raw_config["population"]["select_before_bootstrap"]) : true
 
     config["bootstrap_outdir"] = haskey(raw_config["bootstrap"], "outdir") ? String(raw_config["bootstrap"]["outdir"]) : config["outdir"]
     config["bootstrap_tag"] = haskey(raw_config["bootstrap"], "bootstrap_tag") ? String(raw_config["bootstrap"]["bootstrap_tag"]) : config["catalog_tag"]

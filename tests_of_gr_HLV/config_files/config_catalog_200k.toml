@@ -20,8 +20,9 @@ waveform               = ["PhenomD","PhenomHM"]
 fmin                   = 20.0
 
 [population]
-snr_threshold          = 12.0
-snr_inspiral_threshold = 6.0
+snr_threshold           = 12.0
+snr_inspiral_threshold  = 6.0
+select_before_bootstrap = true
 
 [bootstrap]
 outdir        = "./results/data/"
