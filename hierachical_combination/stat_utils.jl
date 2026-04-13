@@ -145,25 +145,32 @@ function getContourLevelOGD(
 
     0.0 < CI < 1.0 || throw(ArgumentError("`CI` must be strictly between 0 and 1."))
 
-    bin_values = if isnothing(weights)
-        vec(Float64.(p_values))
+    density_values = vec(Float64.(p_values))
+    any(density_values .< 0.0) &&
+        throw(ArgumentError("`p_values` must be non-negative."))
+
+    probability_masses = if isnothing(weights)
+        density_values
     else
         size(weights) == size(p_values) ||
             throw(ArgumentError("`weights` must have the same size as `p_values`."))
-        vec(Float64.(p_values) .* Float64.(weights))
+        weight_values = vec(Float64.(weights))
+        any(weight_values .< 0.0) &&
+            throw(ArgumentError("`weights` must be non-negative."))
+        density_values .* weight_values
     end
 
-    total_probability = sum(bin_values)
+    total_probability = sum(probability_masses)
     total_probability > 0.0 || throw(ArgumentError("`p_values` must contain positive probability mass."))
 
-    sorted_indices = sortperm(bin_values; rev=true)
-    cumulative_probability = cumsum(bin_values[sorted_indices]) ./ total_probability
+    sorted_indices = sortperm(density_values; rev=true)
+    cumulative_probability = cumsum(probability_masses[sorted_indices]) ./ total_probability
     level_idx = findfirst(cumulative_probability .>= CI)
 
     isnothing(level_idx) &&
         throw(ArgumentError("Could not determine the contour level for the requested `CI`."))
 
-    return bin_values[sorted_indices[level_idx]]
+    return density_values[sorted_indices[level_idx]]
 end
 
 """
@@ -181,8 +188,8 @@ all cells whose value is at least `p_ref`.
 function getEnclosedIsoVolProbOGD(
     p_values::AbstractArray{<:Real},
     p_ref::Float64,
-    weights=nothing,
-    )
+    ; weights=nothing,
+)
 
     bin_values = if isnothing(weights)
         vec(Float64.(p_values))
