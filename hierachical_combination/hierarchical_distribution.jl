@@ -1,3 +1,14 @@
+mutable struct hyperparamDistTIGER
+    dphi0_k::Vector{Float64}
+    delta_k::Vector{Float64}
+
+    function hyperparamDistTIGER(dphi0_k::Vector{Float64}, delta_k::Vector{Float64})
+        length(dphi0_k) == length(delta_k) || throw(ArgumentError("`dphi0_k` and `delta_k` must have the same length."))
+        return new(copy(dphi0_k), copy(delta_k))
+    end
+end
+
+
 """
 Function that calculates the values of the LSA hyperparameter distribution p(μ, σ | φ_k , Δ_k)
 given the k in (1,...,N) measurements of individual GW events. 
@@ -11,15 +22,16 @@ For an event with index k we have
 INPUT:
     mu         μ-values
     sigma      σ-values 
-    dphi0_k    φ_k-values
-    delta_k    Δ_k-values
+    hyper      Struct containing the φ_k-values and Δ_k-values
 """
-function hyperparamDistTIGER(
+function getDistributionOnGrid(
     mu::Vector{Float64}, 
     sigma::Vector{Float64}, 
-    dphi0_k::Vector{Float64},  
-    delta_k::Vector{Float64} 
+    hyper::hyperparamDistTIGER,
     )
+
+    dphi0_k = hyper.dphi0_k
+    delta_k = hyper.delta_k
 
     n_mu = length(mu)
     n_sigma = length(sigma)
@@ -76,6 +88,15 @@ function hyperparamDistTIGER(
     return p_mu_sigma, p_sigma, p_mu, n, nn
 end
 
+function getDistributionOnGrid(
+    mu::Vector{Float64},
+    sigma::Vector{Float64},
+    dphi0_k::Vector{Float64},
+    delta_k::Vector{Float64},
+    )
+    return getDistributionOnGrid(mu, sigma, hyperparamDistTIGER(dphi0_k, delta_k))
+end
+
 """
 Function that calculates the values of the LSA hyperparameter distribution p(μ | σ=0, φ_k , Δ_k)
 given the k in (1,...,N) measurements of individual GW events. 
@@ -91,19 +112,20 @@ obtains a different distribution, then when relaxing the assumption of having σ
 
 INPUT:
     mu         μ-values
-    dphi0_k    φ_k-values
-    delta_k    Δ_k-values
+    hyper      Struct containing the φ_k-values and Δ_k-values
 
     Optional
     norm_max   Value of the maximum of the distribution. The distribution is normalized such that the maximum 
                value 1 by default. 
 """
-function naiveMuDistTIGER(
+function getNaiveDistributionOnGrid(
     mu::Vector{Float64}, 
-    dphi0_k::Vector{Float64}, 
-    delta_k::Vector{Float64}, 
+    hyper::hyperparamDistTIGER,
     norm_max::Float64=1.
     )
+
+    dphi0_k = hyper.dphi0_k
+    delta_k = hyper.delta_k
     
     deltak2 = delta_k.^2
     a0 = sum(1.0 ./ deltak2)
@@ -114,4 +136,13 @@ function naiveMuDistTIGER(
     max_log_p_mu = maximum(log_p_mu)
 
     return exp.(log_p_mu .- max_log_p_mu)*norm_max
+end
+
+function getNaiveDistributionOnGrid(
+    mu::Vector{Float64},
+    dphi0_k::Vector{Float64},
+    delta_k::Vector{Float64},
+    norm_max::Float64=1.,
+    )
+    return getNaiveDistributionOnGrid(mu, hyperparamDistTIGER(dphi0_k, delta_k), norm_max)
 end

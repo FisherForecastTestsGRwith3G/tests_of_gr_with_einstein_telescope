@@ -305,7 +305,10 @@ function createSEDfromCatalog(
     # --------------------------------------------------#
     # Estimate dphi_k                                   #
     # --------------------------------------------------#
-    dphi_k = pn_deviation .+ delta_k .* randn(n_events)
+    rng = Random.MersenneTwister(seed)
+    dphi_noise = Vector{Float64}(undef, n_events)
+    Random.randn!(rng, dphi_noise)
+    dphi_k = pn_deviation .+ delta_k .* dphi_noise
 
     return fisher, snr, isnr, invc, delta_k, dphi_k
 end

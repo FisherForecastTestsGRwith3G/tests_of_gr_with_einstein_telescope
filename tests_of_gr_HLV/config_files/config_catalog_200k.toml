@@ -5,7 +5,7 @@ seed         = 1234
 outdir       = "./results/data/"
 catalog_tag  = "bbh_200k"
 n_events     = 200000
-z_cut        = 1.5
+z_cut        = 1000
 
 [deviations]
 pn_orders    = ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]
@@ -20,8 +20,9 @@ waveform               = ["PhenomD","PhenomHM"]
 fmin                   = 20.0
 
 [population]
-snr_threshold          = 12.0
-snr_inspiral_threshold = 6.0
+snr_threshold           = 12.0
+snr_inspiral_threshold  = 6.0
+select_before_bootstrap = true
 
 [bootstrap]
 outdir        = "./results/data/"
