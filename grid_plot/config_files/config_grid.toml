@@ -31,8 +31,7 @@ n_sample      = 1000
 
 [grid]
 grid_tag      = "void"
-n_median      = 3
-n_events_grid = 10
+n_median      = 150
 
 [plots]
 plot_tag      = "bbh_1k_grid"

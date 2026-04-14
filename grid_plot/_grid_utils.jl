@@ -57,6 +57,7 @@ function bisection_method(f, a, b; tol=1e-6, max_iter=100, debug=true, args_f=()
         if  fa * fb > 0
             if debug
                 println("The function must have opposite signs at the endpoints a and b.")
+                println("This is handled correctly, but you may want to check your function and interval.")
             end
             if fa > 0.
             

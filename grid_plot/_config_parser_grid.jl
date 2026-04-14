@@ -38,7 +38,7 @@ function read_config_grid(config_file::AbstractString)
     raw_config_grid = raw_config["grid"]
     config["grid_tag"] = String.(raw_config_grid["grid_tag"])
     config["n_median"] = Int(raw_config_grid["n_median"])
-    config["n_events_grid"] = Int(raw_config_grid["n_events_grid"])
+    #config["n_events_grid"] = Int(raw_config_grid["n_events_grid"])
 
     network_config = raw_config["detectors"]["network"]
     network_config isa AbstractString ||

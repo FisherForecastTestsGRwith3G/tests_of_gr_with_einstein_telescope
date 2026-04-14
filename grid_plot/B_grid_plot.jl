@@ -60,6 +60,12 @@ function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center
     n_events_used = Int(round(n_events_used))
     dphi0_k = dphi0_k[1:n_events_used]
     delta_k = delta_k[1:n_events_used]
+    
+    number_of_zeros = count(x -> x == 0.0, delta_k)
+    if number_of_zeros > 0
+        @warn "There are $(number_of_zeros) zero values in delta_k. This may lead to issues in the hyperparameter distribution calculation."
+    end
+
 
     spread = sqrt(1.0 / sum(1.0 ./ delta_k.^2))
 
@@ -179,6 +185,7 @@ for i in eachindex(mu_vec)
             configs["snr_threshold"],
             configs["snr_inspiral_threshold"],
         )
+        println("Number of valid events for this grid point: ", length(dphi0_k))
 
         res[i, j] = reshuffling_bisection(n_median, wrapper_3sigma_local, dphi0_k, delta_k, mu, sigma)[1]
     end
