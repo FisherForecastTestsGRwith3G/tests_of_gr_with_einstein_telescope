@@ -79,10 +79,9 @@ function BBHCatalog(n_events, seed)
         SFR = "Madau&Dickinson", 
         name_catalog = nothing, 
         local_rate = nothing, 
-        auto_save=false # not available in the current version of GWInference
+        auto_save=false 
         )
 
-    # z_catalog = get_z.(gr_catalog[5])
     return BBHCatalog(
         gr_catalog[1],
         gr_catalog[2],
@@ -98,32 +97,6 @@ function BBHCatalog(n_events, seed)
         gr_catalog[14]
     )
 end 
-
-"""
-Obtain z of the catalog from dL and cosmology
-"""
-function get_z(dL)
-    # use bisection method to find z
-    z=1
-    zmin = 0.
-    zmax = 30.
-    dL = dL*1e3 # convert to Mpc
-    iteration = 0
-    while abs.(dL - get_dL(z)[1]) .> 1e-3
-        iteration += 1
-        if iteration > 100
-            println("Could not find z")
-            break
-        end
-        z = 0.5*(zmin + zmax)
-        if dL .> get_dL(z)[1]
-            zmin = z
-        else
-            zmax = z
-        end
-    end
-    return z
-end
 
 """
 Merge catalogs

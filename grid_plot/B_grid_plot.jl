@@ -1,29 +1,16 @@
 using HDF5
 using Trapz
-using LaTeXStrings
 using KernelDensity, Statistics
 using Serialization
 using Base.Threads
-using CairoMakie
 using Interpolations
 
 # include required scripts
 include("../hierachical_combination/hierarchical_distribution.jl")
 include("_config_parser_grid.jl")
 include("_grid_utils.jl")
-
-const PNO_STRING_MAP = Dict(
-    "-1" => "minus_one",
-    "0" => "zero",
-    "0.5" => "zero_half",
-    "1" => "one",
-    "1.5" => "one_half",
-    "2" => "two",
-    "log(2.5)" => "log_two_half",
-    "3" => "three",
-    "log(3.)" => "log_three",
-    "3.5" => "three_half",
-)
+include("../create_single_event_datasets/createSED.jl")
+using .createSED: pnoString
 
 const N_POINTS_HYPER = 2000
 const K_SPREAD_HYPER = 30.0
@@ -92,11 +79,6 @@ function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center
     return level[1] - p_GR
 end
 
-function get_pn_tag(pn_string::String)
-    haskey(PNO_STRING_MAP, pn_string) || throw(ArgumentError("Unsupported PN order: $(pn_string)"))
-    return PNO_STRING_MAP[pn_string]
-end
-
 function resolve_grid_result_file(base_data_dir::String, header::String, catalog_tag::String)
     candidates = [
         joinpath(base_data_dir, header, "fisher_results_$(catalog_tag).h5"),
@@ -142,7 +124,7 @@ configs = read_config_grid(config_file_name)
 mu_vec = configs["mu_vec"]
 sigma_vec = configs["sigma_vec"]
 pn_string = configs["pn_orders"][1]
-pn_tag = get_pn_tag(pn_string)
+pn_tag = pnoString(pn_string)
 network = configs["network"]
 waveform = configs["waveform_families"][1]
 n_median = configs["n_median"]
@@ -154,7 +136,6 @@ output_folder_name = abspath(joinpath(@__DIR__, configs["outdir"], "grid", netwo
 plot_folder_name = abspath(joinpath(@__DIR__, configs["plot_outdir"], "grid", network, pn_tag))
 
 mkpath(output_folder_name)
-mkpath(plot_folder_name)
 
 println("\nAnalyzing grid composed of $(grid_size) grid points\n")
 println("\nCalculating $(n_median) median values for each grid point\n")
@@ -193,57 +174,9 @@ end
 
 h5open(joinpath(output_folder_name, "results.h5"), "w") do file
     write(file, "results", res)
+    write(file, "mu_vec", mu_vec)
+    write(file, "sigma_vec", sigma_vec)
+    write(file, "pn_string", pn_string)
 end
-
-fig_file_name = joinpath(plot_folder_name, "grid_plot.pdf")
-println("\nSaving grid plot in: $(fig_file_name)")
-
-
-### leave unchanged
-fontsize_theme = Theme(fontsize = 24)
-set_theme!(fontsize_theme)
-
-MT = Makie.MathTeXEngine
-mt_fonts_dir = joinpath(dirname(pathof(MT)), "..", "assets", "fonts", "NewComputerModern")
-
-set_theme!(fonts = (
-    regular = joinpath(mt_fonts_dir, "NewCM10-Regular.otf"),
-    bold = joinpath(mt_fonts_dir, "NewCM10-Bold.otf")
-))
-####
-
-tickfontsize = 24
-titlefontsize = 26
-labelfontsize = 30
-lim = collect(0:0.4:3)
-lim_label = []
-for (i, lim_i) in enumerate(lim)
-    if lim_i < 10.
-
-        push!(lim_label, string.(Int.(round.(10 .^lim_i, sigdigits =1))))
-    else
-        push!(lim_label, string.(Int.(round.(10 .^lim_i, sigdigits =1))))
-    end
-
-end
-
-fig = Figure(size = (800, 600))
-ax = Axis(fig[1, 1], xlabel = L"\mu", ylabel = L"\sigma", title = "PN: " * pn_string)
-
-# Create a heatmap with the results
-hm = Makie.heatmap!(ax, mu_vec, sigma_vec , log10.(res), colormap = :viridis)
-Makie.Colorbar(fig[1, 2], hm,  size = 20,
-                     ticklabelsize = 20, ticks = (lim, lim_label))
-
-Makie.Label(fig[1, 2, Top()], L"n_{\text{events}}", fontsize = labelfontsize)
-
-ax.titlesize = titlefontsize
-ax.xlabelsize = labelfontsize
-ax.ylabelsize = labelfontsize
-
-ax.xticklabelsize = tickfontsize
-ax.yticklabelsize = tickfontsize
-ax.yticklabelspace = 50.
-
-
-Makie.save(fig_file_name, fig)
+println("\nSaved intermediate grid data in: $(joinpath(output_folder_name, "results.h5"))")
+println("Run C_grid_plot.jl with the same config to generate the figure.")
