@@ -1,7 +1,9 @@
 using TOML
 using HDF5
+using Dates
 
 include("_config_parser.jl")
+include("_hdf5_metadata.jl")
 include("../create_single_event_datasets/createSED.jl")
 
 #----------------------------------------------------------------------------#
@@ -167,6 +169,7 @@ function run_fisher_analysis(config::Dict)
     #--------------------------------------------------------------------------#
     println("Writing results to $(output_file)")
     h5open(output_file, "w") do file
+        write_top_level_output_metadata!(file)
         write_catalog_to_hdf5(file, catalog, config, initial_seed, next_seed)
 
         reference_pno = first(config["pn_orders"])

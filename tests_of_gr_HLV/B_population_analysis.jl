@@ -1,8 +1,10 @@
 using TOML
 using HDF5
 using Random
+using Dates
 
 include("_config_parser.jl")
+include("_hdf5_metadata.jl")
 include("../create_single_event_datasets/createSED.jl")
 include("../hierachical_combination/hierDist.jl")
 
@@ -97,6 +99,7 @@ function write_population_results_hdf5(
     mkpath(dirname(population_results_file))
 
     h5open(population_results_file, "w") do file
+        write_top_level_output_metadata!(file)
         attrs(file)["select_before_bootstrap"] = config["select_before_bootstrap"]
         attrs(file)["bootstrap_selection_mode"] = config["select_before_bootstrap"] ? "select_before_bootstrap" : "bootstrap_before_select"
         network_group = create_group(file, config["network"])
