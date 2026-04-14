@@ -7,6 +7,7 @@ using Interpolations
 
 # include required scripts
 include("../hierachical_combination/hierarchical_distribution.jl")
+include("../hierachical_combination/stat_utils.jl")
 include("_config_parser_grid.jl")
 include("_grid_utils.jl")
 include("../create_single_event_datasets/createSED.jl")
@@ -14,34 +15,6 @@ using .createSED: pnoString
 
 const N_POINTS_HYPER = 2000
 const K_SPREAD_HYPER = 30.0
-
-function calcPercentileLvl(
-    p_values::Array{Float64},
-    percentiles=[0.3935, 0.8647, 0.9889],
-    weights=nothing,
-)
-    if weights === nothing
-        weights = ones(size(p_values))
-    end
-
-    if any(percentiles .>= 1) || any(percentiles .<= 0)
-        throw(ArgumentError("Percentiles must be values between 0 and 1."))
-    end
-
-    bin_values = p_values[:] .* weights[:]
-    sort!(bin_values)
-    z = cumsum(bin_values)
-    z ./= z[end]
-
-    percentile_level = Float64[]
-    for perc in sort(percentiles, rev=true)
-        idx = findfirst(z .>= (1.0 - perc))
-        isnothing(idx) && throw(ErrorException("Contour level could not be found."))
-        push!(percentile_level, bin_values[idx])
-    end
-
-    return percentile_level
-end
 
 function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center_sig)
     n_events_used = Int(round(n_events_used))
@@ -69,14 +42,14 @@ function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center
 
     local level, p_GR
     try
-        level = calcPercentileLvl(p_mu_sig, [0.9889])
+        level = getContourLevelOGD(p_mu_sig, 0.9889)
         p_GR = p_mu_sig_interp(0.0, 0.0)
     catch
         return 1.0
     end
 
     # Positive means the GR point lies outside the 3-sigma contour.
-    return level[1] - p_GR
+    return level - p_GR
 end
 
 function resolve_grid_result_file(base_data_dir::String, header::String, catalog_tag::String)
