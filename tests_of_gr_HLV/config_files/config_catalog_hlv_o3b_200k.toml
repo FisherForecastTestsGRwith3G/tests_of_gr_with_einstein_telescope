@@ -3,9 +3,9 @@ seed         = 1234
 
 [catalog]
 outdir       = "./results/data/"
-catalog_tag  = "bbh_200k"
+catalog_tag  = "lvh_o3b_bbh_200k"
 n_events     = 200000
-z_cut        = 1000
+z_cut        = 10000000
 
 [deviations]
 pn_orders    = ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]
@@ -26,10 +26,10 @@ select_before_bootstrap = true
 
 [bootstrap]
 outdir        = "./results/data/"
-bootstrap_tag = "bbh_200k"
+bootstrap_tag = "lvh_o3b_bbh_200k"
 n_catalog     = 9
 n_sample      = 1000
 
 [plots]
-plot_tag      = "bbh_200k"
+plot_tag      = "lvh_o3b_bbh_200k"
 outdir        = "./results/plots/"
