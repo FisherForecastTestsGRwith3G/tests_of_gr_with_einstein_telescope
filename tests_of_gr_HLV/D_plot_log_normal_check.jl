@@ -23,15 +23,21 @@
 
 using TOML
 using HDF5
-using Plots
+using CairoMakie
 using Statistics
 using Distributions
+using LaTeXStrings
 
 include("_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
 
+const LOG_NORMAL_CHECK_SIZE_PER_PANEL = (320, 420)
+const LOG_NORMAL_CHECK_BINS = 30
+const LOG_NORMAL_CHECK_HIST_COLOR = :darkorange
+const LOG_NORMAL_CHECK_CURVE_COLOR = :black
+
 function get_population_results_file(config::Dict)
-    return joinpath(@__DIR__, config["bootstrap_outdir"], "population_results_$(config["catalog_tag"]).h5")
+    return joinpath(@__DIR__, config["bootstrap_outdir"], "population_results_$(config["bootstrap_tag"]).h5")
 end
 
 function get_check_plot_output_file(config::Dict, waveform_family::AbstractString)
@@ -82,33 +88,39 @@ normal density.
 """
 function plot_bootstrap_checks_for_waveform(config::Dict, waveform_family::String, bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}})
     n_pno = length(config["pn_orders"])
-    plots_log = Any[]
-    n_bins = 30
+    fig = Figure(
+        size=(LOG_NORMAL_CHECK_SIZE_PER_PANEL[1] * n_pno, LOG_NORMAL_CHECK_SIZE_PER_PANEL[2]),
+        backgroundcolor=:white,
+    )
 
-    for pno in config["pn_orders"]
+    for (idx, pno) in enumerate(config["pn_orders"])
         values = bootstrap_constraints[waveform_family][pno]
 
         positive_values = values[values .> 0.0]
+        isempty(positive_values) && throw(ArgumentError("No positive bootstrap constraints found for waveform `$(waveform_family)` and PN order `$(pno)`."))
         log_values = log10.(positive_values)
 
         # find gaussian approximation
         mu_log = mean(log_values)
-        sigma_log = std(log_values)
+        sigma_log = max(std(log_values), sqrt(eps(Float64)))
         x_grid = range(minimum(log_values), maximum(log_values), length=400)
-        bin_edges = collect(range(first(x_grid), last(x_grid), length=n_bins + 1))
+        bin_edges = collect(range(first(x_grid), last(x_grid), length=LOG_NORMAL_CHECK_BINS + 1))
 
         # calculate JS divergence between distribution and gaussian approximation
-        empirical_counts = zeros(Float64, n_bins)
+        empirical_counts = zeros(Float64, LOG_NORMAL_CHECK_BINS)
         @inbounds for value in log_values
             bin_idx = searchsortedlast(bin_edges, value)
-            bin_idx = clamp(bin_idx, 1, n_bins)
+            bin_idx = clamp(bin_idx, 1, LOG_NORMAL_CHECK_BINS)
+            if value == bin_edges[end]
+                bin_idx = LOG_NORMAL_CHECK_BINS
+            end
             empirical_counts[bin_idx] += 1.0
         end
         empirical_probs = empirical_counts ./ length(log_values)
 
         normal_dist = Normal(mu_log, sigma_log)
-        gaussian_probs = zeros(Float64, n_bins)
-        @inbounds for i in 1:n_bins
+        gaussian_probs = zeros(Float64, LOG_NORMAL_CHECK_BINS)
+        @inbounds for i in 1:LOG_NORMAL_CHECK_BINS
             gaussian_probs[i] = cdf(normal_dist, bin_edges[i + 1]) - cdf(normal_dist, bin_edges[i])
         end
         gaussian_probs ./= sum(gaussian_probs)
@@ -119,49 +131,52 @@ function plot_bootstrap_checks_for_waveform(config::Dict, waveform_family::Strin
             sum(ifelse(gaussian_probs[i] > 0.0, gaussian_probs[i] * log(gaussian_probs[i] / mixture_probs[i]), 0.0) for i in eachindex(gaussian_probs))
         )
 
-        # plot histograms
-        log_hist = histogram(
+        ax = Axis(
+            fig[1, idx],
+            backgroundcolor=:white,
+            xlabel=L"\log_{10}(%$(createSED.pnoLatex(pno)))",
+            ylabel=idx == 1 ? "density" : "",
+            title="log10(x)",
+        )
+
+        hist!(
+            ax,
             log_values;
             bins=bin_edges,
-            normalize=:pdf,
-            xlabel="log10(" * string(createSED.pnoLatex(pno)) * ")",
-            ylabel="density",
-            title="log10(x)",
-            color=:darkorange,
-            alpha=0.75,
-            legend=false,
-            framestyle=:box,
+            normalization=:pdf,
+            color=(LOG_NORMAL_CHECK_HIST_COLOR, 0.75),
+            strokecolor=:black,
+            strokewidth=1.0,
         )
-        plot!(
-            log_hist,
+
+        lines!(
+            ax,
             x_grid,
-            pdf.(Normal(mu_log, sigma_log), x_grid);
-            color=:black,
-            lw=2.5,
-            label=false,
+            pdf.(normal_dist, x_grid);
+            color=LOG_NORMAL_CHECK_CURVE_COLOR,
+            linewidth=2.5,
         )
-        annotate!(
-            log_hist,
+
+        text!(
+            ax,
             minimum(log_values) + 0.05 * (maximum(log_values) - minimum(log_values)),
             maximum(pdf.(normal_dist, x_grid)) * 0.92,
-            text("JS = $(round(js_divergence; digits=4))", 10, :black, :left),
+            text="JS = $(round(js_divergence; digits=4))",
+            align=(:left, :top),
+            color=:black,
+            fontsize=10,
         )
-        push!(
-            plots_log,
-            log_hist
-        )
+
+        if idx != 1
+            hideydecorations!(ax; grid=false)
+        end
     end
 
-    combined_plot = plot(
-        plots_log...;
-        layout=(1, n_pno),
-        size=(320 * n_pno, 420),
-        dpi=200,
-    )
+    colgap!(fig.layout, 12)
 
     output_file = get_check_plot_output_file(config, waveform_family)
     mkpath(dirname(output_file))
-    savefig(combined_plot, output_file)
+    save(output_file, fig)
     println("Saved bootstrap check plot for $(waveform_family) to $(output_file)")
 end
 
@@ -194,5 +209,6 @@ function main(args=ARGS)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
+    CairoMakie.activate!()
     main()
 end
