@@ -133,10 +133,6 @@ function getNetwork(network_name)
         return setupET15km0(psd_data_dir_et)
     elseif network_name == "network_45_15km"
         return setupET15km45(psd_data_dir_et)
-    elseif network_name == "LHV"
-        return setupLHVO3b(asd_data_dir_lvk)
-    elseif network_name == "LHV_O3"
-        return setupLHVO3a(asd_data_dir_lvk)
     elseif network_name == "LHV_O3a"
         return setupLHVO3a(asd_data_dir_lvk)
     elseif network_name == "LHV_O3b"
