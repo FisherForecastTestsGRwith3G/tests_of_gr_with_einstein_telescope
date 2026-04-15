@@ -66,22 +66,52 @@ end
 # LIGO-Virgo detector networks                                                #
 #-----------------------------------------------------------------------------#
 
+function _setupLHVNetwork(l_asd_path, h_asd_path, v_asd_path, label_suffix)
+
+    ligo_l = Detector(getCoords(LIGO_L)..., 'L', _readASD(l_asd_path)..., "LIGO_L_$(label_suffix)")
+    ligo_h = Detector(getCoords(LIGO_H)..., 'L', _readASD(h_asd_path)..., "LIGO_H_$(label_suffix)")
+    virgo  = Detector(getCoords(VIRGO)...,  'L', _readASD(v_asd_path)..., "VIRGO_$(label_suffix)")
+
+    return [ligo_l, ligo_h, virgo]
+end
+
 """
-Set up the O3 LIGO-Virgo-KAGRA network. (No KAGRA detector online at O3)
+Set up the O3a HLV network.
 """
-function setupLHV(asd_dir)
+function setupLHVO3a(asd_dir)
 
-    l_asd_path = joinpath(asd_dir, "O3-L1-C01_CLEAN_SUB60HZ-1240573680.0_sensitivity_strain_asd.txt")
-    LIGO_L_O3  = Detector(getCoords(LIGO_L)..., 'L', _readASD(l_asd_path)...,  "LIGO_L_O3")
-    
-    h_asd_path = joinpath(asd_dir, "O3-H1-C01_CLEAN_SUB60HZ-1251752040.0_sensitivity_strain_asd.txt")
-    LIGO_H_O3  = Detector(getCoords(LIGO_H)..., 'L', _readASD(h_asd_path)...,  "LIGO_H_O3")
+    l_asd_path = joinpath(asd_dir, "O3a", "O3-L1-C01_CLEAN_SUB60HZ-1240573680.0_sensitivity_strain_asd.txt")
+    h_asd_path = joinpath(asd_dir, "O3a", "O3-H1-C01_CLEAN_SUB60HZ-1251752040.0_sensitivity_strain_asd.txt")
+    v_asd_path = joinpath(asd_dir, "O3a", "O3-V1_sensitivity_strain_asd.txt")
 
-    v_asd_path = joinpath(asd_dir, "O3-V1_sensitivity_strain_asd.txt") 
-    VIRGO_O3   = Detector(getCoords(VIRGO)..., 'L', _readASD(v_asd_path)...,  "VIRGO_O3")
+    return _setupLHVNetwork(l_asd_path, h_asd_path, v_asd_path, "O3a")
+end
 
-    return [LIGO_L_O3, LIGO_H_O3, VIRGO_O3]
-end 
+"""
+Set up the O3b HLV network.
+"""
+function setupLHVO3b(asd_dir)
+
+    l_asd_path = joinpath(asd_dir, "O3b", "O3-L1-C01_CLEAN_SUB60HZ-1262141640.0_sensitivity_strain_asd.txt")
+    h_asd_path = joinpath(asd_dir, "O3b", "O3-H1-C01_CLEAN_SUB60HZ-1262197260.0_sensitivity_strain_asd.txt")
+    v_asd_path = joinpath(asd_dir, "O3b", "O3-V1-1265246178_sensitivity_strain_asd.txt")
+
+    return _setupLHVNetwork(l_asd_path, h_asd_path, v_asd_path, "O3b")
+end
+
+"""
+Set up the pre-O4 estimate HLV network used as pO4/O4a sensitivity estimate.
+"""
+function setupLHVpO4(asd_dir)
+
+    l_asd_path = joinpath(asd_dir, "O4_preO4estimates", "aligo_O4high.txt")
+    h_asd_path = joinpath(asd_dir, "O4_preO4estimates", "aligo_O4high.txt")
+    v_asd_path = joinpath(asd_dir, "O4_preO4estimates", "avirgo_O4high_NEW.txt")
+
+    return _setupLHVNetwork(l_asd_path, h_asd_path, v_asd_path, "pO4")
+end
+
+setupLHVO3(asd_dir) = setupLHVO3a(asd_dir)
 
 #-----------------------------------------------------------------------------# 
 # Select detector network                                                     #
@@ -95,7 +125,7 @@ function getNetwork(network_name)
     psd_data_dir_et  = joinpath(@__DIR__, "psd_data", "et_curves")
     asd_data_dir_lvk = joinpath(@__DIR__, "psd_data", "hlv_curves")
 
-    available_networks = ["ETS", "network_0_15km", "network_45_15km", "LHV_O3"]
+    available_networks = ["ETS", "network_0_15km", "network_45_15km", "LHV", "LHV_O3", "LHV_O3a", "LHV_O3b", "LHV_pO4"]
 
     if network_name == "ETS"
         return setupET10kmT(psd_data_dir_et)
@@ -104,7 +134,15 @@ function getNetwork(network_name)
     elseif network_name == "network_45_15km"
         return setupET15km45(psd_data_dir_et)
     elseif network_name == "LHV"
-        return setupLHV(asd_data_dir_lvk)
+        return setupLHVO3b(asd_data_dir_lvk)
+    elseif network_name == "LHV_O3"
+        return setupLHVO3a(asd_data_dir_lvk)
+    elseif network_name == "LHV_O3a"
+        return setupLHVO3a(asd_data_dir_lvk)
+    elseif network_name == "LHV_O3b"
+        return setupLHVO3b(asd_data_dir_lvk)
+    elseif network_name == "LHV_pO4"
+        return setupLHVpO4(asd_data_dir_lvk)
     else 
         throw(ArgumentError("$(network_name) network not available. Use one of these: $(available_networks)"))
     end 

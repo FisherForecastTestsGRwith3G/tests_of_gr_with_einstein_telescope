@@ -13,7 +13,7 @@ mu           = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,  
 sigma        = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
 
 [detectors]
-network      = "LHV"
+network      = "LHV_O3b"
 
 [fisher]
 waveform               = ["PhenomD","PhenomHM"]
