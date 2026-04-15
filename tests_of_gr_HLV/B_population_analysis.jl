@@ -1,7 +1,9 @@
 using TOML
 using HDF5
+using Printf
 using Random
 using Dates
+using Statistics
 
 include("_config_parser.jl")
 include("_hdf5_metadata.jl")
@@ -126,58 +128,71 @@ function write_population_results_hdf5(
 end
 
 """
-    print_selection_summary(config, pn_indices, summary_indices, noninvertible_after_snr)
+    print_population_workflow_header(mode_label, config)
 
-Print a summary of event selection counts for each waveform family and PN order.
-
-The summary includes the number of selected events after PN-order-specific cuts,
-the number of events that pass the SNR cuts but become non-invertible, and the
-final number of events retained per waveform family. The function also computes
-and returns the event-selection mask shared across all waveform families.
-
-Arguments
----------
-- `config`                 : Analysis configuration containing waveform families, 
-                             PN orders, and SNR thresholds.
-- `pn_indices`             : Per-waveform-family and per-PN-order selection masks.
-- `summary_indices`        : Final per-waveform-family selection masks.
-- `noninvertible_after_snr`: Per-waveform-family and per-PN-order masks for
-                             events that pass SNR cuts but are non-invertible.
-
-Returns
--------
-- `shared_index`           : Bit vector containing the events selected in every 
-                             waveform family.
+Print the analysis mode and the common selection/bootstrap settings.
 """
-function print_selection_summary(config::Dict, pn_indices::Dict{String, Dict{String, BitVector}}, summary_indices::Dict{String, BitVector}, noninvertible_after_snr::Dict{String, Dict{String, BitVector}})
-    println("\nSelection summary")
+function print_population_workflow_header(mode_label::AbstractString, config::Dict)
+    println("\nPopulation analysis workflow: $(mode_label)")
     println("Applied SNR cuts: snr > $(config["snr_threshold"]), isnr > $(config["snr_inspiral_threshold"])")
-    total_snr_not_invc = 0
-    for wf_fam in config["waveform_families"]
-        println("Waveform family: $(wf_fam)")
-        for pno in config["pn_orders"]
-            println("  PN order $(pno):")
-            println("      Selected events = $(sum(pn_indices[wf_fam][pno]))")
-            count_not_invc = sum(noninvertible_after_snr[wf_fam][pno])
-            total_snr_not_invc += count_not_invc
-            println("      SNR-selected but non-invertible = $(count_not_invc)")
-        end
+    println("Bootstrap settings: n_catalog = $(config["n_catalog"]), n_sample = $(config["n_sample"])")
+end
 
-        println("  Final events used across all PN orders: $(sum(summary_indices[wf_fam]))")
-        println("  Total SNR-selected but non-invertible across PN orders: $(total_snr_not_invc)")
-    end
+"""
+    print_select_before_bootstrap_summary(...)
 
-    shared_index = nothing
-    for wf_fam in config["waveform_families"]
-        if isnothing(shared_index)
-            shared_index = copy(summary_indices[wf_fam])
-        else
-            shared_index .&= summary_indices[wf_fam]
-        end
-    end
-    println("Events used in all waveform families: $(sum(shared_index))")
+Print a per-waveform, per-PN-order summary for the workflow that applies the
+selection before the bootstrap stage.
+"""
+function print_select_before_bootstrap_summary(
+    wf_fam::AbstractString,
+    pno::AbstractString,
+    total_events::Integer,
+    pn_selected::Integer,
+    shared_selected::Integer,
+    noninvertible_count::Integer,
+    n_constraints::Integer,
+)
+    println("\nWaveform family: $(wf_fam), PN order: $(pno)")
+    println("  Total events loaded: $(total_events)")
+    println("  Events passing SNR and invertibility cuts for this PN order: $(pn_selected)")
+    println("  SNR-selected but non-invertible events: $(noninvertible_count)")
+    println("  Events retained after cross-PN selection: $(shared_selected)")
+    println(" *Running phi90 and bootstrap on the shared selected sample.")
+    println("  Bootstrap constraints generated: $(n_constraints)")
+end
 
-    return shared_index
+"""
+    print_bootstrap_before_select_summary(...)
+
+Print a per-waveform, per-PN-order summary for the workflow that bootstraps the
+catalog before applying the observation selection.
+"""
+function print_bootstrap_before_select_summary(
+    wf_fam::AbstractString,
+    pno::AbstractString,
+    total_events::Integer,
+    pn_selected::Integer,
+    shared_selected::Integer,
+    noninvertible_count::Integer,
+    observed_fractions::Vector{Float64},
+)
+    empty_draws = count(iszero, observed_fractions)
+    observed_fraction_ci90 = quantile(observed_fractions, [0.05, 0.95])
+    observed_fraction_median = median(observed_fractions)
+    observed_fraction_mean = mean(observed_fractions)
+    observed_fraction_std = std(observed_fractions)
+    format_percent(value) = @sprintf("%.2f%%", 100 * value)
+    println("\nWaveform family: $(wf_fam), PN order: $(pno)")
+    println("  Total events loaded: $(total_events)")
+    println("  Events passing SNR and invertibility cuts for this PN order: $(pn_selected)")
+    println("  SNR-selected but non-invertible events: $(noninvertible_count)")
+    println("  Events retained after cross-PN selection for phi90: $(shared_selected)")
+    println(" *Bootstrap draws were taken from the full catalog and filtered afterwards.")
+    println("  Observed fraction per draw (median -/+ lower/upper 90% CI errr): $(format_percent(observed_fraction_median)) - $(format_percent(observed_fraction_median - observed_fraction_ci90[1])) + $(format_percent(observed_fraction_ci90[2] - observed_fraction_median))")
+    println("  Observed fraction per draw (mean +- std): $(format_percent(observed_fraction_mean)) +- $(format_percent(observed_fraction_std))")
+    println("  Observed fraction per draw ([0.05,0.5,0.95]-quantile): [$(format_percent(observed_fraction_ci90[1])), $(format_percent(observed_fraction_median)), $(format_percent(observed_fraction_ci90[2]))]")
+    println("  Empty observed draws: $(empty_draws) / $(length(observed_fractions))")
 end
 
 """
@@ -461,7 +476,7 @@ Returns
   `delta_k` and `dphi_k` samples, per-configuration `phi90` estimates,
   bootstrap constraints, and the bootstrap observed fractions.
 """
-function run_population_analysis_select_before_bootstrap(file, config::Dict)
+function run_population_analysis_select_before_bootstrap(file, config::Dict; verbose::Bool=true)
     pn_indices, summary_indices, noninvertible_after_snr, delta_k_data, dphi_k_data =
         collect_population_inputs(file, config)
 
@@ -470,6 +485,8 @@ function run_population_analysis_select_before_bootstrap(file, config::Dict)
     phi90 = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_constraints = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_observed_fractions = Dict{String, Dict{String, Vector{Float64}}}()
+
+    verbose && print_population_workflow_header("select_before_bootstrap", config)
 
     for (idx_wf, wf_fam) in enumerate(config["waveform_families"])
         selected_delta_k[wf_fam] = Dict{String, Vector{Float64}}()
@@ -497,6 +514,18 @@ function run_population_analysis_select_before_bootstrap(file, config::Dict)
                 seed=derive_population_seed(config["seed"], idx_wf, idx_pno, 1),
             )
             bootstrap_observed_fractions[wf_fam][pno] = ones(Float64, config["n_sample"])
+
+            if verbose
+                print_select_before_bootstrap_summary(
+                    wf_fam,
+                    pno,
+                    length(delta_k_data[wf_fam][pno]),
+                    sum(pn_indices[wf_fam][pno]),
+                    length(selected_delta_k[wf_fam][pno]),
+                    sum(noninvertible_after_snr[wf_fam][pno]),
+                    length(bootstrap_constraints[wf_fam][pno]),
+                )
+            end
         end
     end
 
@@ -536,7 +565,7 @@ Returns
   `delta_k` and `dphi_k` samples, per-configuration `phi90` estimates,
   bootstrap constraints, and the bootstrap observed fractions.
 """
-function run_population_analysis_bootstrap_before_select(file, config::Dict)
+function run_population_analysis_bootstrap_before_select(file, config::Dict; verbose::Bool=true)
     pn_indices, summary_indices, noninvertible_after_snr, delta_k_data, dphi_k_data =
         collect_population_inputs(file, config)
 
@@ -545,6 +574,8 @@ function run_population_analysis_bootstrap_before_select(file, config::Dict)
     phi90 = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_constraints = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_observed_fractions = Dict{String, Dict{String, Vector{Float64}}}()
+
+    verbose && print_population_workflow_header("bootstrap_before_select", config)
 
     for (idx_wf, wf_fam) in enumerate(config["waveform_families"])
         selected_delta_k[wf_fam] = Dict{String, Vector{Float64}}()
@@ -578,6 +609,18 @@ function run_population_analysis_bootstrap_before_select(file, config::Dict)
             )
             bootstrap_constraints[wf_fam][pno] = constraints
             bootstrap_observed_fractions[wf_fam][pno] = observed_fractions
+
+            if verbose
+                print_bootstrap_before_select_summary(
+                    wf_fam,
+                    pno,
+                    length(delta_k),
+                    sum(selection_index),
+                    length(selected_delta_k[wf_fam][pno]),
+                    sum(noninvertible_after_snr[wf_fam][pno]),
+                    observed_fractions,
+                )
+            end
         end
     end
 
@@ -596,7 +639,7 @@ end
 #----------------------------------------------------------------------------#
 # MAIN FUNCTION
 #----------------------------------------------------------------------------#
-function run_population_analysis(config::Dict)
+function run_population_analysis(config::Dict; verbose::Bool=true)
     fisher_results_file = get_fisher_results_file(config)
     population_results_file = get_population_results_file(config)
     isfile(fisher_results_file) || throw(ArgumentError("Fisher results file does not exist: $(fisher_results_file)"))
@@ -611,7 +654,7 @@ function run_population_analysis(config::Dict)
         end
         
         write_population_results_hdf5(
-            population_results_file,
+            population_results_file,    
             config,
             results.summary_indices,
             results.pn_indices,
@@ -622,16 +665,6 @@ function run_population_analysis(config::Dict)
             results.noninvertible_after_snr,
             results.bootstrap_observed_fractions,
         )
-
-        print_selection_summary(
-            config,
-            results.pn_indices,
-            results.summary_indices,
-            results.noninvertible_after_snr,
-        )
-        if !config["select_before_bootstrap"]
-            println("Bootstrap mode: draw $(config["n_catalog"]) catalog events first, then apply the observation cuts.")
-        end
     end
 
     println("Population results written to $(population_results_file)")
