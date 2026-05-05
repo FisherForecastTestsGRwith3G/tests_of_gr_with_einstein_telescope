@@ -79,7 +79,7 @@ function BBHCatalog(n_events, seed)
         SFR = "Madau&Dickinson", 
         name_catalog = nothing, 
         local_rate = nothing, 
-        auto_save=false
+        auto_save=false 
         )
 
     return BBHCatalog(
