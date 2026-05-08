@@ -3,7 +3,7 @@ seed         = 1234
 
 [catalog]
 outdir       = "./results/data/"
-catalog_tag  = "ETS_bbh_200k"
+catalog_tag  = "ET15km0_bbh_200k"
 n_events     = 200000
 z_cut        = inf
 
@@ -13,7 +13,7 @@ mu           = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,  
 sigma        = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
 
 [detectors]
-network      = "ETS"
+network      = "network_0_15km"
 
 [fisher]
 waveform               = ["PhenomD", "PhenomHM"]
@@ -26,10 +26,10 @@ select_before_bootstrap = false
 
 [bootstrap]
 outdir        = "./results/data/"
-bootstrap_tag = "ETS_bbh_200k_bts_10k"
+bootstrap_tag = "ET15km0_bbh_200k_bts_10k"
 n_catalog     = 10000
 n_sample      = 1000
 
 [plots]
-plot_tag      = "ETS_bbh_200k_bts_10k"
+plot_tag      = "ET15km0_bbh_200k_bts_10k"
 outdir        = "./results/plots/"

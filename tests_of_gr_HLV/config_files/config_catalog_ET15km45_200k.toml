@@ -3,9 +3,9 @@ seed         = 1234
 
 [catalog]
 outdir       = "./results/data/"
-catalog_tag  = "lvh_po4_bbh_200k"
+catalog_tag  = "ET15km45_bbh_200k"
 n_events     = 200000
-z_cut        = 10000000
+z_cut        = inf
 
 [deviations]
 pn_orders    = ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]
@@ -13,23 +13,23 @@ mu           = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,  
 sigma        = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
 
 [detectors]
-network      = "LHV_pO4"
+network      = "network_45_15km"
 
 [fisher]
-waveform               = ["PhenomD","PhenomHM"]
-fmin                   = 20.0
+waveform               = ["PhenomD", "PhenomHM"]
+fmin                   = 2.0
 
 [population]
 snr_threshold           = 12.0
 snr_inspiral_threshold  = 6.0
-select_before_bootstrap = true
+select_before_bootstrap = false
 
 [bootstrap]
 outdir        = "./results/data/"
-bootstrap_tag = "lvh_po4_bbh_200k"
-n_catalog     = 9
+bootstrap_tag = "ET15km45_bbh_200k_bts_10k"
+n_catalog     = 10000
 n_sample      = 1000
 
 [plots]
-plot_tag      = "lvh_po4_bbh_200k"
+plot_tag      = "ET15km45_bbh_200k_bts_10k"
 outdir        = "./results/plots/"
