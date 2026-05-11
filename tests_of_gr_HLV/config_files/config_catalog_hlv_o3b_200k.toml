@@ -3,7 +3,7 @@ seed         = 1234
 
 [catalog]
 outdir       = "./results/data/"
-catalog_tag  = "lvh_o3b_bbh_200k"
+catalog_tag  = "hlv_o3b_bbh_200k"
 n_events     = 200000
 z_cut        = inf
 
@@ -13,7 +13,7 @@ mu           = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,  
 sigma        = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
 
 [detectors]
-network      = "LHV_O3b"
+network      = "HLV_O3b"
 
 [fisher]
 waveform               = ["PhenomD","PhenomHM"]
@@ -26,10 +26,10 @@ select_before_bootstrap = true
 
 [bootstrap]
 outdir        = "./results/data/"
-bootstrap_tag = "lvh_o3b_bbh_200k"
+bootstrap_tag = "hlv_o3b_bbh_200k_stb_9"
 n_catalog     = 9
 n_sample      = 1000
 
 [plots]
-plot_tag      = "lvh_o3b_bbh_200k"
 outdir        = "./results/plots/"
+plot_tag      = "hlv_o3b_bbh_200k_stb_9"
