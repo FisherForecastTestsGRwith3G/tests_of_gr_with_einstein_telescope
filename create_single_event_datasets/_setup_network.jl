@@ -125,13 +125,13 @@ function getNetwork(network_name)
     psd_data_dir_et  = joinpath(@__DIR__, "psd_data", "et_curves")
     asd_data_dir_lvk = joinpath(@__DIR__, "psd_data", "hlv_curves")
 
-    available_networks = ["ETS", "network_0_15km", "network_45_15km", "HLV", "HLV_O3", "HLV_O3a", "HLV_O3b", "HLV_pO4"]
+    available_networks = ["ETS", "ET_0_15km", "ET_45_15km", "HLV", "HLV_O3", "HLV_O3a", "HLV_O3b", "HLV_pO4"]
 
     if network_name == "ETS"
         return setupET10kmT(psd_data_dir_et)
-    elseif network_name == "network_0_15km"
+    elseif network_name == "ET_0_15km"
         return setupET15km0(psd_data_dir_et)
-    elseif network_name == "network_45_15km"
+    elseif network_name == "ET_45_15km"
         return setupET15km45(psd_data_dir_et)
     elseif network_name == "HLV_O3a"
         return setupHLVO3a(asd_data_dir_lvk)
