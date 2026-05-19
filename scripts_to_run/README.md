@@ -11,9 +11,9 @@ Below, we provide instruction on how to rerun scripts in order to produce the pl
 ### Figure 1
 
 ```
-julia --project=. A_fisher_analysis config_files/config_catalog_200k.toml   
-julia --project=. B_population_analysis config_files/config_catalog_200k.toml   
-julia --project=. C_fig1 config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/A_fisher_analysis tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/B_population_analysis tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/C_fig1 tests_of_gr_HLV/config_files/config_catalog_200k.toml   
 ```
 
 ### Figure 9
