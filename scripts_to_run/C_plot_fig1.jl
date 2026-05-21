@@ -522,6 +522,19 @@ function main(args=ARGS)
     return run_plot_fig1(config)
 end
 
+### leave unchanged
+fontsize_theme = Theme(fontsize = 24)
+set_theme!(fontsize_theme)
+
+MT = Makie.MathTeXEngine
+mt_fonts_dir = joinpath(dirname(pathof(MT)), "..", "assets", "fonts", "NewComputerModern")
+
+set_theme!(fonts = (
+    regular = joinpath(mt_fonts_dir, "NewCM10-Regular.otf"),
+    bold = joinpath(mt_fonts_dir, "NewCM10-Bold.otf")
+))
+####
+
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end

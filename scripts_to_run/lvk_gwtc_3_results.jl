@@ -57,7 +57,7 @@ function make_comparison_plot(result_key::AbstractString)
         markersize=7,
         color="#1f77b4",
         xlabel="PN order",
-        ylabel=L"\delta \phi_k",
+        ylabel=L"\delta \varphi_k",
         yscale=:log10,
         xticks=(xticks, labels),
         title=result_key,

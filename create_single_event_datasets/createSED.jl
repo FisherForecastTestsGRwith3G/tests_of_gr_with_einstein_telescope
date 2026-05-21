@@ -27,16 +27,16 @@ export computeSNRsFromCatalog
 export pnoString, pnoNum, pnoLatex, pno_list 
 
 const pno_dict = Dict(
-    "-1"       => (-1.0    ,"minus_one"    , L"\delta \phi_{-2}"  )     ,
-    "0"        => (0.0     ,"zero"         , L"\delta \phi_{0}"   )     , 
-    "0.5"      => (0.5     ,"half"         , L"\delta \phi_{1}" )     ,
-    "1"        => (1.0     ,"one"          , L"\delta \phi_{2}"   )     ,   
-    "1.5"      => (1.5     ,"one_half"     , L"\delta \phi_{3}" )     , 
-    "2"        => (2.0     ,"two"          , L"\delta \phi_{4}"   )     ,
-    "log(2.5)" => (log(2.5),"log_two_half" , L"\delta \phi_{5\ell}" ),
-    "3"        => (3.0     ,"three"        , L"\delta \phi_{6}"   )     ,
-    "log(3.)"  => (log(3.) ,"log_three"    , L"\delta \phi_{6\ell}")  ,
-    "3.5"      => (3.5     ,"three_half"   , L"\delta \phi_{7}" )     ,
+    "-1"       => (-1.0    ,"minus_one"    , L"\delta \varphi_{-2}"  )     ,
+    "0"        => (0.0     ,"zero"         , L"\delta \varphi_{0}"   )     , 
+    "0.5"      => (0.5     ,"half"         , L"\delta \varphi_{1}" )     ,
+    "1"        => (1.0     ,"one"          , L"\delta \varphi_{2}"   )     ,   
+    "1.5"      => (1.5     ,"one_half"     , L"\delta \varphi_{3}" )     , 
+    "2"        => (2.0     ,"two"          , L"\delta \varphi_{4}"   )     ,
+    "log(2.5)" => (log(2.5),"log_two_half" , L"\delta \varphi_{5\ell}" ),
+    "3"        => (3.0     ,"three"        , L"\delta \varphi_{6}"   )     ,
+    "log(3.)"  => (log(3.) ,"log_three"    , L"\delta \varphi_{6\ell}")  ,
+    "3.5"      => (3.5     ,"three_half"   , L"\delta \varphi_{7}" )     ,
 )
 const pno_list = [ "-1","0","0.5","1","1.5","2","log(2.5)","3","log(3.)","3.5"]
 
