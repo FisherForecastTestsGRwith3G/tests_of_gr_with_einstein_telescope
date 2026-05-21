@@ -19,6 +19,43 @@ julia --project=. tests_of_gr_HLV/C_fig1 tests_of_gr_HLV/config_files/config_cat
 ### Figure 9
 WIP
 
+### Figure 7
+
+Figure 7 is the CairoMakie rewrite of the old
+`old /D_delta_phi_dist_plot.jl` workflow. The old script produced grouped violin
+plots for the hierarchical posterior distribution of the PN deformation
+coefficients, with an optional outline for the `sigma = 0` conditioned
+distribution.
+
+The rewritten script uses the population-analysis HDF5 output written by
+[`B_population_analysis.jl`](./B_population_analysis.jl). For each configured
+waveform family and PN order it reads `selected_dphi_k` and `selected_delta_k`,
+builds the hierarchical distribution with `HierDist.hyperparamDistTIGER`,
+marginalizes over `sigma` with `HierDist.getDistributionOnGrid`, and draws the
+posterior profiles directly in CairoMakie. The conditioned outline is evaluated
+with `HierDist.getNaiveDistributionOnGrid`.
+
+```
+julia --project=. A_fisher_analysis.jl config_files/config_catalog_ET15km45_200k.toml
+julia --project=. B_population_analysis.jl config_files/config_catalog_ET15km45_200k.toml
+julia --project=. C_plot_fig7.jl config_files/config_catalog_ET15km45_200k.toml
+```
+
+Outputs are written to `results/plots/fig_7/` unless the config overrides
+`[plots].outdir`.
+
+Optional Figure 7 controls can be added under `[plots.fig7]` in the TOML config:
+
+```
+[plots.fig7]
+grid_points = 700
+plot_conditioned_distribution = true
+subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
+offset_x_axis = 0.16
+violin_width = 0.34
+# y_axis_limits = [[-1e-5, 1e-5], [-0.05, 0.05], [-1.0, 1.0]]
+```
+
 ## Performin additional checks
 
 ### Gaussianity of bootstrap samples in log-space
