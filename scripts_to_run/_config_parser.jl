@@ -55,6 +55,23 @@ function read_config(config_file::AbstractString)
     config["n_catalog"] = Int(raw_config["bootstrap"]["n_catalog"])
     config["n_sample"] = Int(raw_config["bootstrap"]["n_sample"])
 
+    if haskey(raw_config, "scaling")
+        scaling = raw_config["scaling"]
+        config["scaling_outdir"] = haskey(scaling, "outdir") ? String(scaling["outdir"]) : config["outdir"]
+        config["scaling_tag"] = haskey(scaling, "scaling_tag") ? String(scaling["scaling_tag"]) : config["bootstrap_tag"]
+        config["scaling_n_max"] = haskey(scaling, "n_max") ? Int(scaling["n_max"]) : config["n_catalog"]
+        config["scaling_n_steps"] = haskey(scaling, "n_steps") ? Int(scaling["n_steps"]) : 10
+        config["scaling_n_sample"] = haskey(scaling, "n_sample") ? Int(scaling["n_sample"]) : config["n_sample"]
+        config["scaling_method"] = haskey(scaling, "method") ? String(scaling["method"]) : "prodL"
+    else
+        config["scaling_outdir"] = config["outdir"]
+        config["scaling_tag"] = config["bootstrap_tag"]
+        config["scaling_n_max"] = config["n_catalog"]
+        config["scaling_n_steps"] = 10
+        config["scaling_n_sample"] = config["n_sample"]
+        config["scaling_method"] = "prodL"
+    end
+
     if haskey(raw_config, "plots")
         config["plot_outdir"] = haskey(raw_config["plots"], "outdir") ? String(raw_config["plots"]["outdir"]) : config["outdir"]
         config["plot_tag"] = haskey(raw_config["plots"], "plot_tag") ? String(raw_config["plots"]["plot_tag"]) : config["catalog_tag"]

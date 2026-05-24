@@ -30,6 +30,14 @@ bootstrap_tag = "ET15km0_bbh_200k_bts_10k"
 n_catalog     = 10000
 n_sample      = 1000
 
+[scaling]
+outdir        = "./results/data/"
+scaling_tag   = "ET15km0_bbh_200k_30_10k"
+n_max         = 10000
+n_steps       = 30
+n_sample      = 1000
+method        = "prodL"
+
 [plots]
 plot_tag      = "ET15km0_bbh_200k_bts_10k"
 outdir        = "./results/plots/"
