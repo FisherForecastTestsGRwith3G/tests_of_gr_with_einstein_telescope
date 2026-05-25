@@ -290,8 +290,8 @@ function add_fig9_legend!(target_slot, color_lims)
         fig9_grouped_marker_element(:circle, improvement_colors; strokecolor=:black, strokewidth=FIG9_MARKER_STROKE_WIDTH),
     ]
     labels = [
-        "BBH Population",
-        "Observed Events",
+        "BBH population",
+        "Observed events",
         "Inspiral SNR too low",
     ]
 

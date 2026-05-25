@@ -4,6 +4,7 @@ using CairoMakie
 using LaTeXStrings
 
 include("_config_parser.jl")
+include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 
 ## WARNING: NOT HUMAN CONTROLLED YET! 
@@ -11,9 +12,9 @@ include("../create_single_event_datasets/createSED.jl")
 const TARGET_PN_ORDERS = ["-1", "1", "log(3.)"]
 const TARGET_WAVEFORM_FAMILY = "PhenomHM"
 const PN_COLORS = Dict(
-    "-1" => "#0072B2",
-    "1" => "#D55E00",
-    "log(3.)" => "#009E73",
+    "-1" => FIG9_IMPROVEMENT_HIGH_COLOR,
+    "1" => FIG9_IMPROVEMENT_MIDDLE_COLOR,
+    "log(3.)" => FIG9_IMPROVEMENT_LOW_COLOR,
 )
 const WAVEFORM_LINESTYLES = Dict(
     "PhenomD" => nothing,
@@ -57,21 +58,14 @@ function pno_plot_label(pno::AbstractString)
     return latexstring(raw"\varphi_{", pno, "}")
 end
 
-function decade_log_ticks(x_min::Real, x_max::Real)
-    decade_min = floor(Int, log10(x_min))
-    decade_max = ceil(Int, log10(x_max))
-    ticks = Float64[]
-    labels = Any[]
-
-    for exponent in decade_min:decade_max
-        value = exp10(exponent)
-        if x_min <= value <= x_max
-            push!(ticks, value)
-            push!(labels, latexstring("10^{", exponent, "}"))
-        end
-    end
-
-    return ticks, labels
+function decade_ticks(limits::Tuple{<:Real, <:Real})
+    min_value, max_value = limits
+    decade_min = floor(Int, log10(min_value))
+    decade_max = ceil(Int, log10(max_value))
+    exponents = collect(decade_min:decade_max)
+    values = exp10.(exponents)
+    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
+    return values, labels
 end
 
 function read_scaling_results(scaling_results_file::AbstractString, config::Dict)
@@ -166,25 +160,26 @@ function add_fig3_legend!(fig::Figure, target_slot)
     push!(pn_labels, "")
 
     summary_elements = [
-        LineElement(color=:black, linestyle=nothing, linewidth=LEGEND_POPULATION_LINE_WIDTH),
-        PolyElement(color=(:gray70, 0.28), strokecolor=:transparent),
+        [
+            PolyElement(color=(:gray70, 0.28), strokecolor=:transparent),
+            LineElement(color=:black, linestyle=nothing, linewidth=LEGEND_POPULATION_LINE_WIDTH),
+        ],
         LineElement(color=:black, linestyle=:dash, linewidth=LEGEND_BEST_EVENT_LINE_WIDTH),
         LineElement(color=SQRT_N_GUIDE_COLOR, linestyle=:dashdot, linewidth=LEGEND_GUIDE_LINE_WIDTH),
         LineElement(color=CBRT_N_GUIDE_COLOR, linestyle=:dot, linewidth=LEGEND_GUIDE_LINE_WIDTH),
     ]
     summary_labels = [
-        L"\text{Population median}",
-        L"\text{Population 90\% CI}",
-        L"\text{Best event median}",
-        L"\propto N^{-1/2}",
-        L"\propto N^{-1/3}",
+        L"\text{Population constraint}",
+        L"\text{Best single event constraint}",
+        L"N_{\mathrm{obs}}^{-1/2}",
+        L"N_{\mathrm{obs}}^{-1/3}",
     ]
 
     Legend(
         target_slot,
         [pn_elements, summary_elements],
         [pn_labels, summary_labels],
-        [L"\text{PN order}", L"\text{Summary}"];
+        [L"\text{PN order}", L"\text{Constraint type}"];
         tellwidth=true,
         tellheight=false,
         halign=:center,
@@ -211,7 +206,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
         backgroundcolor=:white,
         xscale=log10,
         yscale=log10,
-        xlabel=L"N_\mathrm{obs.}",
+        xlabel=L"N_\mathrm{obs}",
         ylabel=L"|\delta\varphi_p|",
         xlabelsize=GUIDE_FONT_SIZE,
         ylabelsize=GUIDE_FONT_SIZE,
@@ -290,7 +285,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
                         ax,
                         guide_x[end],
                         guide_y[end];
-                        text=L"N^{-1/2}",
+                        text=L"N_{\mathrm{obs}}^{-1/2}",
                         fontsize=LEGEND_FONT_SIZE,
                         color=SQRT_N_GUIDE_COLOR,
                         align=(:right, :bottom),
@@ -315,7 +310,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
                         ax,
                         guide_x[end],
                         guide_y[end];
-                        text=L"N^{-1/3}",
+                        text=L"N_{\mathrm{obs}}^{-1/3}",
                         fontsize=LEGEND_FONT_SIZE,
                         color=CBRT_N_GUIDE_COLOR,
                         align=(:right, :bottom),
@@ -338,7 +333,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
 
     if isfinite(x_min) && isfinite(x_max)
         xlims!(ax, x_min, x_max)
-        ax.xticks = decade_log_ticks(x_min, x_max)
+        ax.xticks = decade_ticks((x_min, x_max))
     end
 
     if !isempty(y_values)
@@ -380,6 +375,17 @@ function main(args=ARGS)
 
     return run_plot_scaling_analysis(config)
 end
+
+fontsize_theme = Theme(fontsize = 24)
+set_theme!(fontsize_theme)
+
+MT = Makie.MathTeXEngine
+mt_fonts_dir = joinpath(dirname(pathof(MT)), "..", "assets", "fonts", "NewComputerModern")
+
+set_theme!(fonts = (
+    regular = joinpath(mt_fonts_dir, "NewCM10-Regular.otf"),
+    bold = joinpath(mt_fonts_dir, "NewCM10-Bold.otf")
+))
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()

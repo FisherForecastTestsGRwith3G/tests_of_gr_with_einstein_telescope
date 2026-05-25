@@ -8,24 +8,25 @@ import JSON
 ## WARNING: NOT HUMAN CONTROLLED YET! 
 
 include("_config_parser.jl")
+include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 
 const PHENOM_HM = "PhenomHM"
 const DETECTOR_ORDER = ["ET_0_15km", "ET_45_15km", "ETS"]
 const DETECTOR_LABELS = Dict(
-    "ET_0_15km" => L"\mathrm{ET}\ 0^\circ",
-    "ET_45_15km" => L"\mathrm{ET}\ 45^\circ",
+    "ET_0_15km" => L"\mathrm{ET}\ \mathrm{2L\_0}",
+    "ET_45_15km" => L"\mathrm{ET}\ \mathrm{2L\_45}",
     "ETS" => L"\mathrm{ET}\ \Delta",
 )
 const DETECTOR_COLORS = Dict(
-    "ET_0_15km" => "#0072B2",
-    "ET_45_15km" => "#D55E00",
-    "ETS" => "#009E73",
+    "ET_0_15km" => FIG9_IMPROVEMENT_HIGH_COLOR,
+    "ET_45_15km" => FIG9_IMPROVEMENT_MIDDLE_COLOR,
+    "ETS" => FIG9_IMPROVEMENT_LOW_COLOR,
 )
 const DETECTOR_FILL_COLORS = Dict(
-    "ET_0_15km" => "#A8CFE5",
-    "ET_45_15km" => "#F1C8A8",
-    "ETS" => "#A8DCCF",
+    "ET_0_15km" => FIG9_LIGHT_IMPROVEMENT_HIGH_COLOR,
+    "ET_45_15km" => FIG9_LIGHT_IMPROVEMENT_MIDDLE_COLOR,
+    "ETS" => FIG9_LIGHT_IMPROVEMENT_LOW_COLOR,
 )
 const GWTC3_COLOR = :black
 const GUIDE_FONT_SIZE = 32
@@ -343,8 +344,8 @@ function add_fig2_legend!(fig::Figure, target_slot)
         MarkerElement(color=GWTC3_COLOR, marker=:diamond, markersize=18, strokecolor=:white, strokewidth=1.0),
     ]
     summary_labels = [
-        L"\text{Bootstrap median}",
-        L"\text{Bootstrap 90\% CI}",
+        L"\text{Population constraint}",
+        L"\text{Population constraint 90\% CI}",
         L"\text{GWTC-3 TGR (SEOBNRv4\_ROM)}",
     ]
 

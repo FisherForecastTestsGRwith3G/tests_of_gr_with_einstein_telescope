@@ -6,12 +6,13 @@ using Statistics
 import JSON
 
 include("_config_parser.jl")
+include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 
-const PHENOM_D_COLOR  = "#ff7f0e"
-const PHENOM_HM_COLOR = "#1f77b4"
-const PHENOM_D_FILL_COLOR  = "#ffcc9f"
-const PHENOM_HM_FILL_COLOR = "#a6c9e1"
+const PHENOM_D_COLOR  = FIG9_IMPROVEMENT_LOW_COLOR
+const PHENOM_HM_COLOR = FIG9_IMPROVEMENT_HIGH_COLOR
+const PHENOM_D_FILL_COLOR  = FIG9_LIGHT_IMPROVEMENT_LOW_COLOR
+const PHENOM_HM_FILL_COLOR = FIG9_LIGHT_IMPROVEMENT_HIGH_COLOR
 const GWTC3_COLOR     = :black
 const TITLE_FONT_SIZE = 28
 const GUIDE_FONT_SIZE = 32
@@ -362,8 +363,8 @@ function add_fig1_legend!(fig::Figure, target_slot)
     labels = [
         L"\text{IMRPhenomD}",
         L"\text{IMRPhenomHM}", 
-        L"\text{Bootstrap median}", 
-        L"\text{Bootstrap 90\% CI}", 
+        L"\text{Population constraint median}", 
+        L"\text{Population constraint 90\% CI}", 
         L"\text{GWTC-3 TGR (SEOBNRv4\_ROM)}"
     ]
     Legend(target_slot, elements, labels;
