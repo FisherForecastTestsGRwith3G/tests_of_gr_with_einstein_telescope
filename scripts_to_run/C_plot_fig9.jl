@@ -8,9 +8,27 @@ using Colors
 include("_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
 
-const CONTOUR_FILL_COLORS = [:aliceblue, :lightblue, :cornflowerblue]
-const CONTOUR_LINE_COLOR = :royalblue4
-const OBSERVABLE_COLORMAP = :viridis
+const FIG9_BLUE = "#0072B2"
+const FIG9_BLUE_FILL = "#A8CFE5"
+const FIG9_ORANGE = "#D55E00"
+const FIG9_ORANGE_FILL = "#F1C8A8"
+const FIG9_GREEN = "#009E73"
+const FIG9_GREEN_FILL = "#A8DCCF"
+const FIG9_PURPLE = "#CC79A7"
+const CONTOUR_FILL_COLORS = ["#F7F7F7", "#E0E0E0", "#BDBDBD"]
+const CONTOUR_LINE_COLOR = "#8F8F8F"
+const IMPROVEMENT_COLORMAP = [
+    "#E86A17",
+    "#D46B24",
+    "#BF6B32",
+    "#A76943",
+    "#8F6556",
+    "#75637A",
+    "#5F6B98",
+    "#4973B6",
+    "#347BC7",
+    "#1E6CCB",
+]
 const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \Delta k_{\mathrm{D}}\right)"
 const FIG9_Z_THRESHOLD = 0.5
 const FIG9_MC_LIMITS = (5.0, 80.0)
@@ -19,11 +37,12 @@ const FIG9_HIST_FRACTION = 0.32
 const FIG9_COL_GAP = 6*5
 const FIG9_ROW_GAP = 4*5
 const FIG9_LABELSIZE =28
-const FIG9_MARKER_SIZE = 12
-const FIG9_PROBLEM_BOX_HALFHEIGHT = 0.9
-const HIST_BASE_COLOR = :lightblue
-const HIST_FISHER_COLOR = :crimson
-const HIST_OBSERVABLE_COLOR = :darkorange
+const FIG9_MARKER_SIZE = 18
+const FIG9_MARKER_STROKE_WIDTH = 2.2
+const HIST_BASE_COLOR = "#D9D9D9"
+const HIST_LINE_WIDTH = 4
+const HIST_FISHER_COLOR = first(IMPROVEMENT_COLORMAP)
+const HIST_OBSERVABLE_COLOR = last(IMPROVEMENT_COLORMAP)
 
 function fig9_side_width_fraction()
     return FIG9_HIST_FRACTION * FIG9_SIZE[2] / FIG9_SIZE[1]
@@ -300,8 +319,8 @@ function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_valu
 
     fisher_x, fisher_y = step_xy(edges, fisher_counts)
     observable_x, observable_y = step_xy(edges, observable_counts)
-    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=2)
-    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=2)
+    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=HIST_LINE_WIDTH)
     lines!(ax, [Float64(xlim[1]), Float64(xlim[2])], [0.0, 0.0]; color=:black, linewidth=1)
     return ax
 end
@@ -329,31 +348,9 @@ function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_val
 
     fisher_x, fisher_y = side_step_xy(edges, fisher_counts)
     observable_x, observable_y = side_step_xy(edges, observable_counts)
-    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=2)
-    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=2)
+    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=HIST_LINE_WIDTH)
     lines!(ax, [0.0, 0.0], [FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2]]; color=:black, linewidth=1)
-    return ax
-end
-
-function problematic_box_halfwidth(xlim::Tuple{<:Real, <:Real}; halfheight::Float64=1.5)
-    chirp_mass_range = FIG9_MC_LIMITS[2] - FIG9_MC_LIMITS[1]
-    panel_height_over_width = 1.6
-    return halfheight * panel_height_over_width * (Float64(xlim[2]) - Float64(xlim[1])) / chirp_mass_range
-end
-
-function add_problematic_boxes!(ax::Axis, x::Vector{Float64}, y::Vector{Float64}, xlim::Tuple{<:Real, <:Real})
-    halfheight = FIG9_PROBLEM_BOX_HALFHEIGHT
-    halfwidth = problematic_box_halfwidth(xlim; halfheight=halfheight)
-
-    for idx in eachindex(x)
-        points = Point2f[
-            (x[idx] - halfwidth, y[idx] - halfheight),
-            (x[idx] + halfwidth, y[idx] - halfheight),
-            (x[idx] + halfwidth, y[idx] + halfheight),
-            (x[idx] - halfwidth, y[idx] + halfheight),
-        ]
-        poly!(ax, points; color=:transparent, strokecolor=:black, strokewidth=1.4)
-    end
     return ax
 end
 
@@ -372,8 +369,18 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
     xvals = catalog[x_key][selected]
     yvals = catalog["mc"][selected]
     cvals = ratio[selected]
-    scatterplot = scatter!(ax, xvals, yvals; color=cvals, colormap=OBSERVABLE_COLORMAP, colorrange=color_lims, markersize=FIG9_MARKER_SIZE)
-    add_problematic_boxes!(ax, catalog[x_key][problematic], catalog["mc"][problematic], xlim)
+    scatterplot = scatter!(ax, xvals, yvals; color=cvals, colormap=IMPROVEMENT_COLORMAP, colorrange=color_lims, markersize=FIG9_MARKER_SIZE)
+    scatter!(
+        ax,
+        catalog[x_key][problematic],
+        catalog["mc"][problematic];
+        color=ratio[problematic],
+        colormap=IMPROVEMENT_COLORMAP,
+        colorrange=color_lims,
+        markersize=FIG9_MARKER_SIZE,
+        strokecolor=:black,
+        strokewidth=FIG9_MARKER_STROKE_WIDTH,
+    )
 
     xlims!(ax, Float64(xlim[1]), Float64(xlim[2]))
     ylims!(ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
@@ -411,7 +418,8 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     observable_hist_selected = BitVector(kde_selected .& indices["both_observable"])
     scatter_selected = BitVector(kde_selected .& indices["both_fisher_selected"])
     valid_ratio = ratio[scatter_selected]
-    color_lims = isempty(valid_ratio) ? (-1.0, 1.0) : (minimum(valid_ratio), maximum(valid_ratio))
+    max_abs_ratio = isempty(valid_ratio) ? 1.0 : maximum(abs.(valid_ratio))
+    color_lims = (-max_abs_ratio, 0)
 
     fig = Figure(size=FIG9_SIZE, backgroundcolor=:white)
     main_width = (1.0 - fig9_side_width_fraction()) / 4.0
