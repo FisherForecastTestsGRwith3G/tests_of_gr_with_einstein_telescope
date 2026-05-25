@@ -29,6 +29,7 @@ const IMPROVEMENT_COLORMAP = [
     "#347BC7",
     "#1E6CCB",
 ]
+const IMPROVEMENT_COLORS = RGB{Float64}.(parse.(Ref(Colorant), IMPROVEMENT_COLORMAP))
 const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \Delta k_{\mathrm{D}}\right)"
 const FIG9_Z_THRESHOLD = 0.5
 const FIG9_MC_LIMITS = (5.0, 80.0)
@@ -40,9 +41,10 @@ const FIG9_LABELSIZE =28
 const FIG9_MARKER_SIZE = 18
 const FIG9_MARKER_STROKE_WIDTH = 2.2
 const HIST_BASE_COLOR = "#D9D9D9"
+const HIST_BASE_EDGE_COLOR = "#8F8F8F"
 const HIST_LINE_WIDTH = 4
-const HIST_FISHER_COLOR = first(IMPROVEMENT_COLORMAP)
-const HIST_OBSERVABLE_COLOR = last(IMPROVEMENT_COLORMAP)
+const HIST_OBSERVABLE_LINE_WIDTH = 2
+const HIST_OUTLINE_COLOR = :black
 
 function fig9_side_width_fraction()
     return FIG9_HIST_FRACTION * FIG9_SIZE[2] / FIG9_SIZE[1]
@@ -229,6 +231,48 @@ function histogram_bin_densities(values::Vector{Float64}, limits::Tuple{<:Real, 
     return edges, counts
 end
 
+function bin_index(value::Real, edges::Vector{Float64}, limits::Tuple{<:Real, <:Real})
+    xmin = Float64(limits[1])
+    xmax = Float64(limits[2])
+    if !isfinite(value) || value < xmin || value > xmax
+        return nothing
+    end
+    nbins = length(edges) - 1
+    idx = value == xmax ? nbins : searchsortedlast(edges, Float64(value))
+    return clamp(idx, 1, nbins)
+end
+
+function histogram_bin_ratios(values::Vector{Float64}, ratios::Vector{Float64}, edges::Vector{Float64},
+    limits::Tuple{<:Real, <:Real})
+
+    binned_ratios = [Float64[] for _ in 1:(length(edges) - 1)]
+    for (value, ratio) in zip(values, ratios)
+        !isfinite(ratio) && continue
+        idx = bin_index(value, edges, limits)
+        idx === nothing && continue
+        push!(binned_ratios[idx], Float64(ratio))
+    end
+    foreach(bin -> sort!(bin; by=abs), binned_ratios)
+    return binned_ratios
+end
+
+function ratio_color(value::Real, color_lims::Tuple{<:Real, <:Real})
+    lo = Float64(color_lims[1])
+    hi = Float64(color_lims[2])
+    t = hi == lo ? 0.5 : clamp((Float64(value) - lo) / (hi - lo), 0.0, 1.0)
+    scaled = 1.0 + t * (length(IMPROVEMENT_COLORS) - 1)
+    lower_idx = clamp(floor(Int, scaled), 1, length(IMPROVEMENT_COLORS))
+    upper_idx = clamp(lower_idx + 1, 1, length(IMPROVEMENT_COLORS))
+    frac = scaled - lower_idx
+    lo_color = IMPROVEMENT_COLORS[lower_idx]
+    hi_color = IMPROVEMENT_COLORS[upper_idx]
+    return RGB{Float64}(
+        (1.0 - frac) * red(lo_color) + frac * red(hi_color),
+        (1.0 - frac) * green(lo_color) + frac * green(hi_color),
+        (1.0 - frac) * blue(lo_color) + frac * blue(hi_color),
+    )
+end
+
 function scale_density_to_fisher_peak(density_values::Vector{Float64}, fisher_peak::Float64; factor::Float64=1.3)
     density_peak = maximum(density_values)
     target_peak = factor * fisher_peak
@@ -296,11 +340,48 @@ function side_step_xy(edges::Vector{Float64}, counts::Vector{Float64})
     return xcoords, ycoords
 end
 
+function draw_top_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_ratios::Vector{Vector{Float64}}, color_lims)
+    for (bin_idx, ratios) in enumerate(binned_ratios)
+        for (stack_idx, ratio) in enumerate(ratios)
+            y0 = Float64(stack_idx - 1)
+            y1 = Float64(stack_idx)
+            points = Point2f[
+                (edges[bin_idx], y0),
+                (edges[bin_idx + 1], y0),
+                (edges[bin_idx + 1], y1),
+                (edges[bin_idx], y1),
+            ]
+            poly!(ax, points; color=ratio_color(ratio, color_lims), strokecolor=:transparent)
+        end
+    end
+    return ax
+end
+
+function draw_side_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_ratios::Vector{Vector{Float64}}, color_lims)
+    for (bin_idx, ratios) in enumerate(binned_ratios)
+        for (stack_idx, ratio) in enumerate(ratios)
+            x0 = Float64(stack_idx - 1)
+            x1 = Float64(stack_idx)
+            points = Point2f[
+                (x0, edges[bin_idx]),
+                (x1, edges[bin_idx]),
+                (x1, edges[bin_idx + 1]),
+                (x0, edges[bin_idx + 1]),
+            ]
+            poly!(ax, points; color=ratio_color(ratio, color_lims), strokecolor=:transparent)
+        end
+    end
+    return ax
+end
+
 function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_values::Vector{Float64},
-    observable_values::Vector{Float64}, xlim::Tuple{<:Real, <:Real}; nbins::Int=20)
+    observable_values::Vector{Float64}, fisher_ratios::Vector{Float64}, observable_ratios::Vector{Float64},
+    xlim::Tuple{<:Real, <:Real}, color_lims; nbins::Int=20)
     edges, base_density = histogram_bin_densities(base_values, xlim; nbins=nbins)
     _, fisher_counts = histogram_bin_counts(fisher_values, xlim; nbins=nbins)
     _, observable_counts = histogram_bin_counts(observable_values, xlim; nbins=nbins)
+    fisher_binned_ratios = histogram_bin_ratios(fisher_values, fisher_ratios, edges, xlim)
+    observable_binned_ratios = histogram_bin_ratios(observable_values, observable_ratios, edges, xlim)
     base_counts = scale_density_to_fisher_peak(base_density, maximum(fisher_counts))
     ymax = maximum(vcat(base_counts, fisher_counts, observable_counts))
     ymax = ymax > 0 ? 1.05 * ymax : 1.0
@@ -317,19 +398,26 @@ function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_valu
         poly!(ax, points; color=HIST_BASE_COLOR, strokecolor=:transparent)
     end
 
+    base_x, base_y = step_xy(edges, base_counts)
+    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=1.4)
+    draw_top_colored_histogram!(ax, edges, fisher_binned_ratios, color_lims)
+    draw_top_colored_histogram!(ax, edges, observable_binned_ratios, color_lims)
     fisher_x, fisher_y = step_xy(edges, fisher_counts)
     observable_x, observable_y = step_xy(edges, observable_counts)
-    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=HIST_LINE_WIDTH)
-    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, fisher_x, fisher_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, observable_x, observable_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_OBSERVABLE_LINE_WIDTH)
     lines!(ax, [Float64(xlim[1]), Float64(xlim[2])], [0.0, 0.0]; color=:black, linewidth=1)
     return ax
 end
 
 function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_values::Vector{Float64},
-    observable_values::Vector{Float64}; nbins::Int=20)
+    observable_values::Vector{Float64}, fisher_ratios::Vector{Float64}, observable_ratios::Vector{Float64},
+    color_lims; nbins::Int=20)
     edges, base_density = histogram_bin_densities(base_values, FIG9_MC_LIMITS; nbins=nbins)
     _, fisher_counts = histogram_bin_counts(fisher_values, FIG9_MC_LIMITS; nbins=nbins)
     _, observable_counts = histogram_bin_counts(observable_values, FIG9_MC_LIMITS; nbins=nbins)
+    fisher_binned_ratios = histogram_bin_ratios(fisher_values, fisher_ratios, edges, FIG9_MC_LIMITS)
+    observable_binned_ratios = histogram_bin_ratios(observable_values, observable_ratios, edges, FIG9_MC_LIMITS)
     base_counts = scale_density_to_fisher_peak(base_density, maximum(fisher_counts))
     xmax = maximum(vcat(base_counts, fisher_counts, observable_counts))
     xmax = xmax > 0 ? 1.05 * xmax : 1.0
@@ -346,10 +434,14 @@ function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_val
         poly!(ax, points; color=HIST_BASE_COLOR, strokecolor=:transparent)
     end
 
+    base_x, base_y = side_step_xy(edges, base_counts)
+    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=1.4)
+    draw_side_colored_histogram!(ax, edges, fisher_binned_ratios, color_lims)
+    draw_side_colored_histogram!(ax, edges, observable_binned_ratios, color_lims)
     fisher_x, fisher_y = side_step_xy(edges, fisher_counts)
     observable_x, observable_y = side_step_xy(edges, observable_counts)
-    lines!(ax, fisher_x, fisher_y; color=HIST_FISHER_COLOR, linewidth=HIST_LINE_WIDTH)
-    lines!(ax, observable_x, observable_y; color=HIST_OBSERVABLE_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, fisher_x, fisher_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_LINE_WIDTH)
+    lines!(ax, observable_x, observable_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_OBSERVABLE_LINE_WIDTH)
     lines!(ax, [0.0, 0.0], [FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2]]; color=:black, linewidth=1)
     return ax
 end
@@ -438,10 +530,14 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     colgap!(fig.layout, FIG9_COL_GAP)
     rowgap!(fig.layout, FIG9_ROW_GAP)
 
-    draw_top_histogram!(top_axes[1], catalog["invq"][kde_selected], catalog["invq"][fisher_hist_selected], catalog["invq"][observable_hist_selected], (0.0, 1.0))
-    draw_top_histogram!(top_axes[2], catalog["iota"][kde_selected], catalog["iota"][fisher_hist_selected], catalog["iota"][observable_hist_selected], (0.0, π))
-    draw_top_histogram!(top_axes[3], catalog["chi_eff"][kde_selected], catalog["chi_eff"][fisher_hist_selected], catalog["chi_eff"][observable_hist_selected], (-1.0, 1.0))
-    draw_top_histogram!(top_axes[4], catalog["z"][kde_selected], catalog["z"][fisher_hist_selected], catalog["z"][observable_hist_selected], (0.0, FIG9_Z_THRESHOLD))
+    draw_top_histogram!(top_axes[1], catalog["invq"][kde_selected], catalog["invq"][fisher_hist_selected], catalog["invq"][observable_hist_selected],
+        ratio[fisher_hist_selected], ratio[observable_hist_selected], (0.0, 1.0), color_lims)
+    draw_top_histogram!(top_axes[2], catalog["iota"][kde_selected], catalog["iota"][fisher_hist_selected], catalog["iota"][observable_hist_selected],
+        ratio[fisher_hist_selected], ratio[observable_hist_selected], (0.0, π), color_lims)
+    draw_top_histogram!(top_axes[3], catalog["chi_eff"][kde_selected], catalog["chi_eff"][fisher_hist_selected], catalog["chi_eff"][observable_hist_selected],
+        ratio[fisher_hist_selected], ratio[observable_hist_selected], (-1.0, 1.0), color_lims)
+    draw_top_histogram!(top_axes[4], catalog["z"][kde_selected], catalog["z"][fisher_hist_selected], catalog["z"][observable_hist_selected],
+        ratio[fisher_hist_selected], ratio[observable_hist_selected], (0.0, FIG9_Z_THRESHOLD), color_lims)
     foreach(ax -> hide_hist_axis!(ax; bottom_spine=true), top_axes)
 
     scatter_ref = build_main_panel!(main_axes[1], catalog, results, indices, "invq", (0.0, 1.0), ratio, color_lims;
@@ -454,7 +550,8 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
         xlabel=labels["z"], show_yticks=true, show_yticklabels=false)
     linkyaxes!(main_axes...)
 
-    draw_side_histogram!(side_ax, catalog["mc"][kde_selected], catalog["mc"][fisher_hist_selected], catalog["mc"][observable_hist_selected])
+    draw_side_histogram!(side_ax, catalog["mc"][kde_selected], catalog["mc"][fisher_hist_selected], catalog["mc"][observable_hist_selected],
+        ratio[fisher_hist_selected], ratio[observable_hist_selected], color_lims)
     hide_hist_axis!(side_ax; left_spine=true, hide_x=true, hide_y=true)
     ylims!(side_ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
 
