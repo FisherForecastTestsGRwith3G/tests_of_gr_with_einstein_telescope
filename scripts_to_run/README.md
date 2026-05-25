@@ -11,9 +11,25 @@ Below, we provide instruction on how to rerun scripts in order to produce the pl
 ### Figure 1
 
 ```
-julia --project=. tests_of_gr_HLV/A_fisher_analysis tests_of_gr_HLV/config_files/config_catalog_200k.toml   
-julia --project=. tests_of_gr_HLV/B_population_analysis tests_of_gr_HLV/config_files/config_catalog_200k.toml   
-julia --project=. tests_of_gr_HLV/C_fig1 tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/B_population_analysis.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. tests_of_gr_HLV/C_fig1.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+```
+
+### Figure 2
+```
+julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
+julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.toml
+
+julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
+julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.
+
+julia --project=. scripts_to_run/C_plot_fig2.jl \
+  scripts_to_run/config_files/config_catalog_ET15km0_200k.toml \
+  scripts_to_run/config_files/config_catalog_ET15km45_200k.toml \
+  scripts_to_run/config_files/config_catalog_ETS_200k.toml
 ```
 
 ### Figure 9
@@ -76,7 +92,7 @@ violin_width = 0.34
 # y_axis_limits = [[-1e-5, 1e-5], [-0.05, 0.05], [-1.0, 1.0]]
 ```
 
-## Performin additional checks
+## Performing additional checks
 
 ### Gaussianity of bootstrap samples in log-space
 
