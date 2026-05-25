@@ -26,6 +26,10 @@ function get_population_results_file(config::Dict)
     )
 end
 
+function get_fisher_results_file(config::Dict)
+    return joinpath(@__DIR__, config["outdir"], "fisher_results_$(config["catalog_tag"]).h5")
+end
+
 function get_fig7_output_files(config::Dict)
     output_dir = joinpath(@__DIR__, config["plot_outdir"], "fig_7")
     stem = "fig7_$(config["plot_tag"])"
@@ -36,23 +40,89 @@ function get_fig7_output_files(config::Dict)
 end
 
 function read_fig7_config(config_file::AbstractString)
+    config_file = abspath(config_file)
     config = read_config(config_file)
-    raw_config = TOML.parsefile(abspath(config_file))
+    raw_config = TOML.parsefile(config_file)
     plot_config = get(raw_config, "plots", Dict{String, Any}())
     fig7_config = get(plot_config, "fig7", Dict{String, Any}())
 
+    config["fig7_config_file"] = config_file
     config["fig7_grid_points"] = Int(get(fig7_config, "grid_points", 700))
     config["fig7_plot_conditioned_distribution"] = Bool(get(fig7_config, "plot_conditioned_distribution", true))
     config["fig7_offset_x_axis"] = Float64(get(fig7_config, "offset_x_axis", 0.16))
     config["fig7_violin_width"] = Float64(get(fig7_config, "violin_width", 0.34))
+    config["fig7_waveform_family"] = String(get(fig7_config, "waveform_family", first(config["waveform_families"])))
+    config["fig7_n_events"] = haskey(fig7_config, "n_events") ? Int(fig7_config["n_events"]) : config["n_events"]
+    config["fig7_number_of_events_single_realization"] = haskey(fig7_config, "number_of_events_single_realization") ?
+        Int(fig7_config["number_of_events_single_realization"]) :
+        nothing
+    config["fig7_realization_index"] = Int(get(fig7_config, "realization_index", 1))
+    config["fig7_observed_events_direct"] = Bool(get(fig7_config, "n_events_and_number_of_events_single_realization_refer_directly_to_observed_events", false))
     config["fig7_grouping"] = haskey(fig7_config, "subplots_pn_order_grouping") ?
         [Int.(group) for group in fig7_config["subplots_pn_order_grouping"]] :
         default_fig7_grouping(length(config["pn_orders"]))
     config["fig7_y_limits"] = haskey(fig7_config, "y_axis_limits") ?
         [Tuple(Float64.(limits)) for limits in fig7_config["y_axis_limits"]] :
         nothing
+    config["fig7_comparison_config_files"] = haskey(fig7_config, "comparison_config_files") ?
+        String.(fig7_config["comparison_config_files"]) :
+        String[]
+    config["fig7_series_labels"] = haskey(fig7_config, "series_labels") ?
+        String.(fig7_config["series_labels"]) :
+        String[]
 
     return config
+end
+
+function resolve_config_path(path::AbstractString, base_config::Dict)
+    isabspath(path) && return path
+    return abspath(joinpath(dirname(base_config["fig7_config_file"]), path))
+end
+
+function network_series_label(config::Dict)
+    network_labels = Dict(
+        "ETS" => "ET 10 km",
+        "ET_45_15km" => "ET 15 km, 45 deg",
+        "ET_0_15km" => "ET 15 km, 0 deg",
+        "HLV_O3b" => "HLV O3b",
+    )
+    return get(network_labels, config["network"], config["network"])
+end
+
+function fig7_plot_sources(config::Dict)
+    comparison_files = config["fig7_comparison_config_files"]
+    labels = config["fig7_series_labels"]
+    isempty(comparison_files) && return [
+        (
+            config=config,
+            label=waveform_label(wf_fam),
+            waveform_family=wf_fam,
+        )
+        for wf_fam in config["waveform_families"]
+    ]
+
+    isempty(labels) || length(labels) == length(comparison_files) ||
+        throw(ArgumentError("`plots.fig7.series_labels` must have the same length as `comparison_config_files`."))
+
+    sources = Vector{NamedTuple}(undef, length(comparison_files))
+    for (idx, config_file) in enumerate(comparison_files)
+        source_config = read_config(resolve_config_path(config_file, config))
+        source_config["fig7_grid_points"] = config["fig7_grid_points"]
+        source_config["fig7_n_events"] = config["fig7_n_events"]
+        source_config["fig7_number_of_events_single_realization"] = config["fig7_number_of_events_single_realization"]
+        source_config["fig7_realization_index"] = config["fig7_realization_index"]
+        source_config["fig7_observed_events_direct"] = config["fig7_observed_events_direct"]
+        waveform_family = config["fig7_waveform_family"]
+        waveform_family in source_config["waveform_families"] ||
+            throw(ArgumentError("Waveform family `$(waveform_family)` is not listed in $(config_file)."))
+        source_label = isempty(labels) ? network_series_label(source_config) : labels[idx]
+        sources[idx] = (
+            config=source_config,
+            label=latexstring("\\text{$(source_label)}"),
+            waveform_family=waveform_family,
+        )
+    end
+    return sources
 end
 
 function default_fig7_grouping(n_pn_orders::Integer)
@@ -81,33 +151,117 @@ function top_pno_label(pno::AbstractString)
     return latexstring(pno, raw"\,\mathrm{PN}")
 end
 
+function waveform_summary_selection_from_fisher(file, config::Dict, waveform_family::AbstractString)
+    summary_selection = nothing
+    for pno in config["pn_orders"]
+        wf_group = file[createSED.pnoString(pno)][config["network"]][waveform_family]
+        snr = Float64.(read(wf_group, "snr"))
+        isnr = Float64.(read(wf_group, "isnr"))
+        invc = Bool.(read(wf_group, "invc"))
+
+        pno_selection = BitVector(
+            (snr .> config["snr_threshold"]) .&
+            (isnr .> config["snr_inspiral_threshold"]) .&
+            invc
+        )
+        summary_selection = isnothing(summary_selection) ? pno_selection : BitVector(summary_selection .& pno_selection)
+    end
+    return summary_selection
+end
+
+function realization_slice(
+    full_dphi_k::Vector{Float64},
+    full_delta_k::Vector{Float64},
+    summary_selection::BitVector,
+    config::Dict,
+)
+    events_per_realization = config["fig7_number_of_events_single_realization"]
+    events_per_realization === nothing && return clean_likelihood_data(
+        full_dphi_k[summary_selection],
+        full_delta_k[summary_selection],
+    )
+
+    n_events_requested = min(config["fig7_n_events"], length(full_dphi_k))
+    observed_direct = config["fig7_observed_events_direct"]
+
+    if observed_direct
+        observed_indices = findall(summary_selection)
+        n_events_used = min(n_events_requested, length(observed_indices))
+        n_realizations = fld(n_events_used, events_per_realization)
+        n_realizations > 0 ||
+            throw(ArgumentError("Not enough observed events to build one Figure 7 realization."))
+        realization_index = config["fig7_realization_index"]
+        1 <= realization_index <= n_realizations ||
+            throw(ArgumentError("Requested realization $(realization_index), but only $(n_realizations) are available."))
+        first_idx = (realization_index - 1) * events_per_realization + 1
+        last_idx = realization_index * events_per_realization
+        chosen = observed_indices[first_idx:last_idx]
+        println("Using observed-events realization $(realization_index)/$(n_realizations) with $(length(chosen)) observed events.")
+        return clean_likelihood_data(full_dphi_k[chosen], full_delta_k[chosen])
+    end
+
+    n_realizations = fld(n_events_requested, events_per_realization)
+    n_realizations > 0 ||
+        throw(ArgumentError("Not enough catalog events to build one Figure 7 realization."))
+    realization_index = config["fig7_realization_index"]
+    1 <= realization_index <= n_realizations ||
+        throw(ArgumentError("Requested realization $(realization_index), but only $(n_realizations) are available."))
+
+    first_idx = (realization_index - 1) * events_per_realization + 1
+    last_idx = realization_index * events_per_realization
+    chunk_indices = collect(first_idx:last_idx)
+    observed_chunk_indices = chunk_indices[summary_selection[chunk_indices]]
+    println("Using catalog realization $(realization_index)/$(n_realizations): $(length(observed_chunk_indices)) observed events out of $(events_per_realization) catalog events.")
+    return clean_likelihood_data(full_dphi_k[observed_chunk_indices], full_delta_k[observed_chunk_indices])
+end
+
+function read_realization_likelihood_data_from_fisher(fisher_results_file::AbstractString, config::Dict, waveform_family::AbstractString)
+    selected_dphi_k = Dict{String, Vector{Float64}}()
+    selected_delta_k = Dict{String, Vector{Float64}}()
+
+    h5open(fisher_results_file, "r") do file
+        summary_selection = waveform_summary_selection_from_fisher(file, config, waveform_family)
+        for pno in config["pn_orders"]
+            wf_group = file[createSED.pnoString(pno)][config["network"]][waveform_family]
+            dphi, delta = realization_slice(
+                Float64.(read(wf_group, "dphi_k")),
+                Float64.(read(wf_group, "delta_k")),
+                summary_selection,
+                config,
+            )
+            isempty(dphi) &&
+                throw(ArgumentError("Realization has no finite observed events for waveform $(waveform_family), PN order $(pno)."))
+            selected_dphi_k[pno] = dphi
+            selected_delta_k[pno] = delta
+        end
+    end
+
+    return selected_dphi_k, selected_delta_k
+end
+
 function clean_likelihood_data(dphi_k::Vector{Float64}, delta_k::Vector{Float64})
     valid = isfinite.(dphi_k) .& isfinite.(delta_k) .& (delta_k .> 0.0)
     return dphi_k[valid], delta_k[valid]
 end
 
-function read_selected_likelihood_data(population_results_file::AbstractString, config::Dict)
-    selected_dphi_k = Dict{String, Dict{String, Vector{Float64}}}()
-    selected_delta_k = Dict{String, Dict{String, Vector{Float64}}}()
+function read_selected_likelihood_data(population_results_file::AbstractString, config::Dict, waveform_family::AbstractString)
+    selected_dphi_k = Dict{String, Vector{Float64}}()
+    selected_delta_k = Dict{String, Vector{Float64}}()
 
     h5open(population_results_file, "r") do file
         network_group = file[config["network"]]
-        for wf_fam in config["waveform_families"]
-            selected_dphi_k[wf_fam] = Dict{String, Vector{Float64}}()
-            selected_delta_k[wf_fam] = Dict{String, Vector{Float64}}()
-            waveform_group = network_group[wf_fam]
+        waveform_group = network_group[waveform_family]
 
-            for pno in config["pn_orders"]
-                pno_group = waveform_group[createSED.pnoString(pno)]
-                dphi, delta = clean_likelihood_data(
-                    Float64.(read(pno_group, "selected_dphi_k")),
-                    Float64.(read(pno_group, "selected_delta_k")),
-                )
-                isempty(dphi) &&
-                    throw(ArgumentError("No finite selected likelihood data for waveform $(wf_fam), PN order $(pno)."))
-                selected_dphi_k[wf_fam][pno] = dphi
-                selected_delta_k[wf_fam][pno] = delta
-            end
+        for pno in config["pn_orders"]
+            pno_group = waveform_group[createSED.pnoString(pno)]
+            dphi, delta = clean_likelihood_data(
+                Float64.(read(pno_group, "selected_dphi_k")),
+                Float64.(read(pno_group, "selected_delta_k")),
+            )
+            isempty(dphi) &&
+                throw(ArgumentError("No finite selected likelihood data for waveform $(waveform_family), PN order $(pno)."))
+            selected_dphi_k[pno] = dphi
+            selected_delta_k[pno] = delta
         end
     end
 
@@ -137,28 +291,25 @@ function posterior_profile(dphi_k::Vector{Float64}, delta_k::Vector{Float64}, gr
     )
 end
 
-function build_posterior_profiles(selected_dphi_k, selected_delta_k, config::Dict)
-    profiles = Dict{String, Dict{String, NamedTuple}}()
-    for wf_fam in config["waveform_families"]
-        profiles[wf_fam] = Dict{String, NamedTuple}()
-        for pno in config["pn_orders"]
-            println("Building posterior profile for $(wf_fam), PN order $(pno)")
-            profiles[wf_fam][pno] = posterior_profile(
-                selected_dphi_k[wf_fam][pno],
-                selected_delta_k[wf_fam][pno],
-                config["fig7_grid_points"],
-            )
-        end
+function build_posterior_profiles(selected_dphi_k, selected_delta_k, source_config::Dict, source_label)
+    profiles = Dict{String, NamedTuple}()
+    for pno in source_config["pn_orders"]
+        println("Building posterior profile for $(source_label), PN order $(pno)")
+        profiles[pno] = posterior_profile(
+            selected_dphi_k[pno],
+            selected_delta_k[pno],
+            source_config["fig7_grid_points"],
+        )
     end
     return profiles
 end
 
-function panel_limits(pn_orders::AbstractVector{<:AbstractString}, profiles, waveform_families)
+function panel_limits(pn_orders::AbstractVector{<:AbstractString}, profiles, series_ids)
     y_min = Inf
     y_max = -Inf
-    for wf_fam in waveform_families
+    for series_id in series_ids
         for pno in pn_orders
-            profile = profiles[wf_fam][pno]
+            profile = profiles[series_id][pno]
             y_min = min(y_min, profile.q05)
             y_max = max(y_max, profile.q95)
         end
@@ -224,14 +375,14 @@ function add_conditioned_outline!(ax::Axis, x0::Real, y_grid::Vector{Float64}, d
     return ax
 end
 
-function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, profiles, config::Dict)
-    n_waveforms = length(config["waveform_families"])
-    for (wf_idx, wf_fam) in enumerate(config["waveform_families"])
-        color = FIG7_COLORS[mod1(wf_idx, length(FIG7_COLORS))]
-        offset = config["fig7_offset_x_axis"] * relative_x_offset(wf_idx, n_waveforms)
+function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, profiles, config::Dict, series_ids)
+    n_series = length(series_ids)
+    for (series_idx, series_id) in enumerate(series_ids)
+        color = FIG7_COLORS[mod1(series_idx, length(FIG7_COLORS))]
+        offset = config["fig7_offset_x_axis"] * relative_x_offset(series_idx, n_series)
 
         for (pno_idx, pno) in enumerate(pn_orders)
-            profile = profiles[wf_fam][pno]
+            profile = profiles[series_id][pno]
             x0 = pno_idx + offset
             add_violin_profile!(
                 ax,
@@ -256,18 +407,17 @@ function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, prof
     return ax
 end
 
-function add_fig7_legend!(fig::Figure, target_slot, waveform_families)
+function add_fig7_legend!(fig::Figure, target_slot, series_labels)
     elements = [
         PolyElement(
             color=(FIG7_COLORS[mod1(idx, length(FIG7_COLORS))], VIOLIN_ALPHA),
             strokecolor=(FIG7_COLORS[mod1(idx, length(FIG7_COLORS))], VIOLIN_EDGE_ALPHA),
             strokewidth=1.5,
         )
-        for idx in eachindex(waveform_families)
+        for idx in eachindex(series_labels)
     ]
-    labels = waveform_label.(waveform_families)
 
-    Legend(target_slot, elements, labels;
+    Legend(target_slot, elements, series_labels;
         tellwidth=false,
         tellheight=false,
         halign=:right,
@@ -289,7 +439,7 @@ function validate_fig7_grouping(config::Dict)
     return config
 end
 
-function build_figure(config::Dict, profiles)
+function build_figure(config::Dict, profiles, series_ids, series_labels)
     validate_fig7_grouping(config)
     CairoMakie.activate!()
 
@@ -303,7 +453,7 @@ function build_figure(config::Dict, profiles)
         panel_orders = grouped_orders[panel_idx]
         ax = Axis(fig[2, panel_idx], backgroundcolor=:white)
         y_limits = isnothing(config["fig7_y_limits"]) ?
-            panel_limits(panel_orders, profiles, config["waveform_families"]) :
+            panel_limits(panel_orders, profiles, series_ids) :
             config["fig7_y_limits"][panel_idx]
 
         colsize!(fig.layout, panel_idx, Relative(length(panel_orders) / total_width))
@@ -311,26 +461,59 @@ function build_figure(config::Dict, profiles)
         configure_panel_axis!(ax, panel_orders, y_limits;
             ylabel=L"\delta\varphi_p",
             show_ylabel=panel_idx == 1)
-        plot_panel!(ax, panel_orders, profiles, config)
+        plot_panel!(ax, panel_orders, profiles, config, series_ids)
     end
 
     rowsize!(fig.layout, 1, Relative(FIG7_TOP_ROW_FRACTION))
     rowsize!(fig.layout, 2, Relative(1.0 - FIG7_TOP_ROW_FRACTION))
     colgap!(fig.layout, FIG7_COL_GAP)
     rowgap!(fig.layout, FIG7_LABEL_ROW_GAP)
-    add_fig7_legend!(fig, fig[2, n_panels], config["waveform_families"])
+    add_fig7_legend!(fig, fig[2, n_panels], series_labels)
 
     return fig
 end
 
 function run_plot_fig7(config::Dict)
-    population_results_file = get_population_results_file(config)
-    isfile(population_results_file) ||
-        throw(ArgumentError("Population results file does not exist: $(population_results_file)"))
+    sources = fig7_plot_sources(config)
+    profiles = Dict{String, Dict{String, NamedTuple}}()
+    series_ids = String[]
+    series_labels = Any[]
 
-    selected_dphi_k, selected_delta_k = read_selected_likelihood_data(population_results_file, config)
-    profiles = build_posterior_profiles(selected_dphi_k, selected_delta_k, config)
-    fig = build_figure(config, profiles)
+    for (idx, source) in enumerate(sources)
+        source_config = source.config
+        use_realization = source_config["fig7_number_of_events_single_realization"] !== nothing
+
+        series_id = "series_$(idx)"
+        selected_dphi_k, selected_delta_k = if use_realization
+            fisher_results_file = get_fisher_results_file(source_config)
+            isfile(fisher_results_file) ||
+                throw(ArgumentError("Fisher results file does not exist: $(fisher_results_file)"))
+            read_realization_likelihood_data_from_fisher(
+                fisher_results_file,
+                source_config,
+                source.waveform_family,
+            )
+        else
+            population_results_file = get_population_results_file(source_config)
+            isfile(population_results_file) ||
+                throw(ArgumentError("Population results file does not exist: $(population_results_file)"))
+            read_selected_likelihood_data(
+                population_results_file,
+                source_config,
+                source.waveform_family,
+            )
+        end
+        profiles[series_id] = build_posterior_profiles(
+            selected_dphi_k,
+            selected_delta_k,
+            source_config,
+            source.label,
+        )
+        push!(series_ids, series_id)
+        push!(series_labels, source.label)
+    end
+
+    fig = build_figure(config, profiles, series_ids, series_labels)
 
     png_output_file, pdf_output_file = get_fig7_output_files(config)
     mkpath(dirname(png_output_file))
@@ -354,6 +537,19 @@ function main(args=ARGS)
 
     return run_plot_fig7(config)
 end
+
+### leave unchanged
+fontsize_theme = Theme(fontsize = 24)
+set_theme!(fontsize_theme)
+
+MT = Makie.MathTeXEngine
+mt_fonts_dir = joinpath(dirname(pathof(MT)), "..", "assets", "fonts", "NewComputerModern")
+
+set_theme!(fonts = (
+    regular = joinpath(mt_fonts_dir, "NewCM10-Regular.otf"),
+    bold = joinpath(mt_fonts_dir, "NewCM10-Bold.otf")
+))
+####
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()

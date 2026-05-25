@@ -44,11 +44,31 @@ julia --project=. C_plot_fig7.jl config_files/config_catalog_ET15km45_200k.toml
 Outputs are written to `results/plots/fig_7/` unless the config overrides
 `[plots].outdir`.
 
+For the ET network-comparison version, run the population step for the three
+single-network configs first, then run the dedicated plotting config:
+
+```
+julia --project=. B_population_analysis.jl config_files/config_catalog_ETS_200k.toml
+julia --project=. B_population_analysis.jl config_files/config_catalog_ET15km45_200k.toml
+julia --project=. B_population_analysis.jl config_files/config_catalog_ET15km0_200k.toml
+julia --project=. C_plot_fig7.jl config_files/config_fig7_ET_200k.toml
+```
+
+`config_fig7_ET_200k.toml` overlays the three ET detector networks in the same
+panels and uses only `PhenomHM`. Change `[plots.fig7].waveform_family` to
+`"PhenomD"` if you want the single-waveform comparison made with IMRPhenomD
+instead.
+
 Optional Figure 7 controls can be added under `[plots.fig7]` in the TOML config:
 
 ```
 [plots.fig7]
 grid_points = 700
+waveform_family = "PhenomHM"
+n_events = 100000
+number_of_events_single_realization = 10000
+n_events_and_number_of_events_single_realization_refer_directly_to_observed_events = false
+realization_index = 1
 plot_conditioned_distribution = true
 subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
 offset_x_axis = 0.16

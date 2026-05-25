@@ -1,0 +1,58 @@
+[general]
+seed         = 1234
+
+[catalog]
+outdir       = "./results/data/"
+catalog_tag  = "ETS_bbh_200k"
+n_events     = 200000
+z_cut        = inf
+
+[deviations]
+pn_orders    = ["-1", "0", "0.5", "1", "1.5", "2", "log(2.5)", "3", "log(3.)", "3.5"]
+mu           = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
+sigma        = [ 0.0, 0.0,   0.0, 0.0,   0.0, 0.0,        0.0, 0.0,       0.0,   0.0]
+
+[detectors]
+network      = "ETS"
+
+[fisher]
+waveform               = ["PhenomD", "PhenomHM"]
+fmin                   = 2.0
+
+[population]
+snr_threshold           = 12.0
+snr_inspiral_threshold  = 6.0
+select_before_bootstrap = false
+
+[bootstrap]
+outdir        = "./results/data/"
+bootstrap_tag = "ETS_bbh_200k_bts_10k"
+n_catalog     = 10000
+n_sample      = 1000
+
+[plots]
+outdir        = "./results/plots/"
+plot_tag      = "fig7_ET_bbh_200k_bts_10k_PhenomHM"
+
+[plots.fig7]
+grid_points = 700
+waveform_family = "PhenomHM"
+n_events = 100000
+number_of_events_single_realization = 10000
+n_events_and_number_of_events_single_realization_refer_directly_to_observed_events = false
+realization_index = 1
+plot_conditioned_distribution = true
+comparison_config_files = [
+    "config_catalog_ETS_200k.toml",
+    "config_catalog_ET15km45_200k.toml",
+    "config_catalog_ET15km0_200k.toml",
+]
+series_labels = [
+    "ET 10 km",
+    "ET 15 km, 45 deg",
+    "ET 15 km, 0 deg",
+]
+subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
+offset_x_axis = 0.18
+violin_width = 0.30
+y_axis_limits = [[-1.25e-6, 1.25e-6], [-0.008, 0.008], [-0.15, 0.15]]

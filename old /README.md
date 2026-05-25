@@ -170,7 +170,7 @@ Has the following keys:
 * "index"
 
 **single_event_measurement.h5** <br> 
-Has the estiamted error ($\Delta_k$) for the pn-order gr deviation estimated from the fisher, the true parameter-value ($\delta\phi_{Tk}$)  of the gr deviation of the signal and the expected measured value ($\delta\phi_{0k}$). 
+Has the estiamted error ($\Delta_k$) for the pn-order gr deviation estimated from the fisher, the true parameter-value ($\delta\varphi_{Tk}$)  of the gr deviation of the signal and the expected measured value ($\delta\phi_{0k}$). 
 Has the following keys:
 * "delta_k"
 * "dphit_k"
