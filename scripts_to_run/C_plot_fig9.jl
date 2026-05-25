@@ -35,19 +35,28 @@ const FIG9_Z_THRESHOLD = 0.5
 const FIG9_MC_LIMITS = (5.0, 80.0)
 const FIG9_SIZE = (1800, 760)
 const FIG9_HIST_FRACTION = 0.32
-const FIG9_COL_GAP = 6*5
-const FIG9_ROW_GAP = 4*5
-const FIG9_LABELSIZE =28
+const FIG9_TOP_HIST_FRACTION = 1.25 * FIG9_HIST_FRACTION
+const FIG9_SIDE_HIST_WIDTH_SCALE = 1.40
+const FIG9_COL_GAP = 10*5
+const FIG9_ROW_GAP = 2*5
+const FIG9_AXIS_LABELSIZE = 34
+const FIG9_AXIS_TICK_LABELSIZE = 24
+const FIG9_COLORBAR_TICK_LABELSIZE = 24
 const FIG9_MARKER_SIZE = 18
 const FIG9_MARKER_STROKE_WIDTH = 2.2
+const FIG9_LEGEND_MARKER_SIZE = 15
+const FIG9_LEGEND_LABELSIZE = 22
+const FIG9_COLORBAR_LABELSIZE = FIG9_LEGEND_LABELSIZE
+const FIG9_LEGEND_COLORBAR_PAD = 14
 const HIST_BASE_COLOR = "#D9D9D9"
 const HIST_BASE_EDGE_COLOR = "#8F8F8F"
 const HIST_LINE_WIDTH = 4
 const HIST_OBSERVABLE_LINE_WIDTH = 2
 const HIST_OUTLINE_COLOR = :black
+const LEGEND_IMPROVEMENT_VALUES = [-2.0, -1.0, 0.0]
 
 function fig9_side_width_fraction()
-    return FIG9_HIST_FRACTION * FIG9_SIZE[2] / FIG9_SIZE[1]
+    return FIG9_SIDE_HIST_WIDTH_SCALE * FIG9_HIST_FRACTION * FIG9_SIZE[2] / FIG9_SIZE[1]
 end
 
 function get_fisher_results_file(config::Dict)
@@ -273,6 +282,49 @@ function ratio_color(value::Real, color_lims::Tuple{<:Real, <:Real})
     )
 end
 
+function fig9_legend_marker_points()
+    return Point2f[(0.18, 0.5), (0.50, 0.5), (0.82, 0.5)]
+end
+
+function fig9_grouped_marker_element(marker, colors; strokecolor=:transparent, strokewidth=0)
+    return MarkerElement(
+        marker=marker,
+        color=colors,
+        markersize=FIG9_LEGEND_MARKER_SIZE,
+        strokecolor=strokecolor,
+        strokewidth=strokewidth,
+        points=fig9_legend_marker_points(),
+    )
+end
+
+function add_fig9_legend!(target_slot, color_lims)
+    improvement_colors = [ratio_color(value, color_lims) for value in LEGEND_IMPROVEMENT_VALUES]
+    elements = [
+        fig9_grouped_marker_element(:rect, reverse(CONTOUR_FILL_COLORS); strokecolor=CONTOUR_LINE_COLOR, strokewidth=1.2),
+        fig9_grouped_marker_element(:circle, improvement_colors),
+        fig9_grouped_marker_element(:circle, improvement_colors; strokecolor=:black, strokewidth=FIG9_MARKER_STROKE_WIDTH),
+    ]
+    labels = [
+        "BBH Population",
+        "Observed Events",
+        "Inspiral SNR too low",
+    ]
+
+    return Legend(
+        target_slot,
+        elements,
+        labels;
+        framevisible=false,
+        tellheight=true,
+        tellwidth=false,
+        halign=:left,
+        valign=:top,
+        patchsize=(64, 24),
+        rowgap=4,
+        labelsize=FIG9_LEGEND_LABELSIZE,
+    )
+end
+
 function scale_density_to_fisher_peak(density_values::Vector{Float64}, fisher_peak::Float64; factor::Float64=1.3)
     density_peak = maximum(density_values)
     target_peak = factor * fisher_peak
@@ -478,8 +530,10 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
     ylims!(ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
     ax.xlabel = xlabel
     ax.ylabel = ylabel
-    ax.xlabelsize = FIG9_LABELSIZE
-    ax.ylabelsize = FIG9_LABELSIZE
+    ax.xlabelsize = FIG9_AXIS_LABELSIZE
+    ax.ylabelsize = FIG9_AXIS_LABELSIZE
+    ax.xticklabelsize = FIG9_AXIS_TICK_LABELSIZE
+    ax.yticklabelsize = FIG9_AXIS_TICK_LABELSIZE
     ax.xtickalign = 1
     ax.ytickalign = 1
 
@@ -525,8 +579,8 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
         colsize!(fig.layout, col, Relative(main_width))
     end
     colsize!(fig.layout, 5, Relative(fig9_side_width_fraction()))
-    rowsize!(fig.layout, 1, Relative(FIG9_HIST_FRACTION))
-    rowsize!(fig.layout, 2, Relative(1.0 - FIG9_HIST_FRACTION))
+    rowsize!(fig.layout, 1, Relative(FIG9_TOP_HIST_FRACTION))
+    rowsize!(fig.layout, 2, Relative(1.0 - FIG9_TOP_HIST_FRACTION))
     colgap!(fig.layout, FIG9_COL_GAP)
     rowgap!(fig.layout, FIG9_ROW_GAP)
 
@@ -555,27 +609,30 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     hide_hist_axis!(side_ax; left_spine=true, hide_x=true, hide_y=true)
     ylims!(side_ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
 
+    add_fig9_legend!(colorbar_grid[1, 1], color_lims)
     Label(
-        colorbar_grid[1, 1],
+        colorbar_grid[3, 1],
         IMPROVEMENT_COLORBAR_TITLE;
-        fontsize=FIG9_LABELSIZE,
+        fontsize=FIG9_COLORBAR_LABELSIZE,
         halign=:center,
         valign=:bottom,
         tellwidth=false,
     )
     Colorbar(
-        colorbar_grid[2, 1],
+        colorbar_grid[4, 1],
         scatter_ref;
         vertical=false,
         flipaxis=false,
         labelvisible=false,
         tickalign=0,
-        ticklabelsize=18,
+        ticklabelsize=FIG9_COLORBAR_TICK_LABELSIZE,
         size=18,
     )
-    rowsize!(colorbar_grid, 1, Auto(0.35))
-    rowsize!(colorbar_grid, 2, Auto(0.65))
-    rowgap!(colorbar_grid, 4)
+    rowsize!(colorbar_grid, 1, Auto(0.50))
+    rowsize!(colorbar_grid, 2, Fixed(FIG9_LEGEND_COLORBAR_PAD))
+    rowsize!(colorbar_grid, 3, Auto(0.20))
+    rowsize!(colorbar_grid, 4, Auto(0.30))
+    rowgap!(colorbar_grid, 2)
 
     return fig
 end
