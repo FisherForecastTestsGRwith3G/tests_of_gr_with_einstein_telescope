@@ -10,6 +10,8 @@ include("../create_single_event_datasets/createSED.jl")
 
 const PHENOM_D_COLOR  = "#ff7f0e"
 const PHENOM_HM_COLOR = "#1f77b4"
+const PHENOM_D_FILL_COLOR  = "#ffcc9f"
+const PHENOM_HM_FILL_COLOR = "#a6c9e1"
 const GWTC3_COLOR     = :black
 const TITLE_FONT_SIZE = 28
 const GUIDE_FONT_SIZE = 32
@@ -19,8 +21,6 @@ const FIG1_SIZE = (1800, 760)
 const FIG1_TOP_ROW_FRACTION = 0.11
 const FIG1_COL_GAP = 20
 const FIG1_LABEL_ROW_GAP = 10
-const HIST_FILL_ALPHA = 0.4
-const HIST_EDGE_ALPHA = 0.8
 const GWTC3_REFERENCE_FILE = joinpath(@__DIR__, "lvk_gwtc_3_results_2025.json")
 
 function load_gwtc3_reference()
@@ -114,7 +114,7 @@ function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}
     return edges, counts
 end
 
-function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, color;
+function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, fill_color, edge_color;
     max_width::Float64=0.38, n_bins::Union{Nothing, Int}=nothing)
     profile = histogram_profile(samples; n_bins=n_bins)
     if profile === nothing
@@ -135,7 +135,7 @@ function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, 
         y1 = edges[idx]
         y2 = edges[idx + 1]
         poly!(ax, Point2f[(x1, y1), (x2, y1), (x2, y2), (x1, y2)];
-            color=(color, HIST_FILL_ALPHA), strokecolor=:transparent)
+            color=fill_color, strokecolor=:transparent)
     end
 
     outer_x = Float64[]
@@ -145,13 +145,13 @@ function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, 
         x_outer = side == :left ? x0 - widths[idx] : x0 + widths[idx]
         push!(outer_x, x_outer, x_outer)
     end
-    lines!(ax, outer_x, outer_y; color=(color, HIST_EDGE_ALPHA), linewidth=2)
+    lines!(ax, outer_x, outer_y; color=edge_color, linewidth=2)
     return nothing
 end
 
 function add_histogram_pair!(ax::Axis, x0::Real, data_r::Vector{Float64}, data_l::Vector{Float64})
-    mirrored_histogram_bars!(ax, x0, data_r, :right, PHENOM_D_COLOR)
-    mirrored_histogram_bars!(ax, x0, data_l, :left, PHENOM_HM_COLOR)
+    mirrored_histogram_bars!(ax, x0, data_r, :right, PHENOM_D_FILL_COLOR, PHENOM_D_COLOR)
+    mirrored_histogram_bars!(ax, x0, data_l, :left, PHENOM_HM_FILL_COLOR, PHENOM_HM_COLOR)
 
     combined = vcat(data_r, data_l)
     combined = combined[combined .> 0.0]
@@ -353,8 +353,8 @@ end
 
 function add_fig1_legend!(fig::Figure, target_slot)
     elements = [
-        PolyElement(color=(PHENOM_D_COLOR, HIST_FILL_ALPHA), strokecolor=:transparent),
-        PolyElement(color=(PHENOM_HM_COLOR, HIST_FILL_ALPHA), strokecolor=:transparent),
+        PolyElement(color=PHENOM_D_FILL_COLOR, strokecolor=PHENOM_D_COLOR),
+        PolyElement(color=PHENOM_HM_FILL_COLOR, strokecolor=PHENOM_HM_COLOR),
         MarkerElement(color=:black, marker=:circle, markersize=15, strokecolor=:white, strokewidth=1.0),
         LineElement(color=:black, linewidth=3),
         MarkerElement(color=GWTC3_COLOR, marker=:diamond, markersize=18, strokecolor=:white, strokewidth=1.0),
