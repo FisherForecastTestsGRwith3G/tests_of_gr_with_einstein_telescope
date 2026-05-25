@@ -62,7 +62,6 @@ function read_config(config_file::AbstractString)
         config["scaling_n_max"] = haskey(scaling, "n_max") ? Int(scaling["n_max"]) : config["n_catalog"]
         config["scaling_n_steps"] = haskey(scaling, "n_steps") ? Int(scaling["n_steps"]) : 10
         config["scaling_n_sample"] = haskey(scaling, "n_sample") ? Int(scaling["n_sample"]) : config["n_sample"]
-        config["scaling_method"] = haskey(scaling, "method") ? String(scaling["method"]) : "prodL"
     else
         config["scaling_outdir"] = config["outdir"]
         config["scaling_tag"] = config["bootstrap_tag"]
