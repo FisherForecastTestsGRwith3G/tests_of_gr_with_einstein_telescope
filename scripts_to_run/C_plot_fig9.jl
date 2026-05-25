@@ -34,6 +34,7 @@ const IMPROVEMENT_COLORBAR_TITLE = L"\log_{10}\!\left(\Delta k_{\mathrm{HM}} / \
 const FIG9_Z_THRESHOLD = 0.5
 const FIG9_MC_LIMITS = (5.0, 80.0)
 const FIG9_SIZE = (1800, 760)
+const FIG9_FIGURE_PADDING = (30, 50, 30, 30)
 const FIG9_HIST_FRACTION = 0.32
 const FIG9_TOP_HIST_FRACTION = 1.25 * FIG9_HIST_FRACTION
 const FIG9_SIDE_HIST_WIDTH_SCALE = 1.40
@@ -336,11 +337,11 @@ end
 
 function x_ticks_for_param(param::String)
     if param == "invq"
-        return ([0.0, 0.5, 1.0], ["0.0", "0.5", "1.0"])
+        return ([0.0, 0.5, 1.0], ["  0.0", "0.5", "1.0 "])
     elseif param == "iota"
         return ([0.0, π / 2, π], ["0", "π/2", "π"])
     elseif param == "z"
-        return ([0.0, 0.25, 0.5], ["0.00", "0.25", "0.50"])
+        return ([0.0, 0.25, 0.5], ["   0.00", "0.25", "0.50  "])
     else
         return nothing
     end
@@ -567,7 +568,7 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     max_abs_ratio = isempty(valid_ratio) ? 1.0 : maximum(abs.(valid_ratio))
     color_lims = (-max_abs_ratio, 0)
 
-    fig = Figure(size=FIG9_SIZE, backgroundcolor=:white)
+    fig = Figure(size=FIG9_SIZE, backgroundcolor=:white, figure_padding=FIG9_FIGURE_PADDING)
     main_width = (1.0 - fig9_side_width_fraction()) / 4.0
 
     top_axes = [Axis(fig[1, i], backgroundcolor=:transparent) for i in 1:4]
