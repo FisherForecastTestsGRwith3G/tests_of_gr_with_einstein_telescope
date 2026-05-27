@@ -126,13 +126,14 @@ function positive_limits!(values::Vector{Float64}, x::AbstractVector, y::Abstrac
     return values
 end
 
-function plot_scaling_band!(ax::Axis, x::AbstractVector, q05::AbstractVector, q95::AbstractVector, color)
+function plot_scaling_band!(ax::Axis, x::AbstractVector, q05::AbstractVector, q95::AbstractVector, color;
+    alpha::Real=0.3)
     positive = (x .> 0.0) .& (q05 .> 0.0) .& (q95 .> 0.0) .&
                isfinite.(x) .& isfinite.(q05) .& isfinite.(q95)
     any(positive) || return nothing
 
     band!(ax, x[positive], q05[positive], q95[positive];
-        color=(color, 0.14),
+        color=(color, alpha),
     )
 end
 
@@ -177,7 +178,10 @@ function add_fig3_legend!(fig::Figure, target_slot)
             PolyElement(color=(:gray70, 0.28), strokecolor=:transparent),
             LineElement(color=:black, linestyle=nothing, linewidth=LEGEND_POPULATION_LINE_WIDTH),
         ],
-        LineElement(color=:black, linestyle=:dash, linewidth=LEGEND_BEST_EVENT_LINE_WIDTH),
+        [
+            PolyElement(color=(:gray70, 0.18), strokecolor=:transparent),
+            LineElement(color=:black, linestyle=:dash, linewidth=LEGEND_BEST_EVENT_LINE_WIDTH),
+        ],
         LineElement(color=SQRT_N_GUIDE_COLOR, linestyle=:dashdot, linewidth=LEGEND_GUIDE_LINE_WIDTH),
         LineElement(color=CBRT_N_GUIDE_COLOR, linestyle=:dot, linewidth=LEGEND_GUIDE_LINE_WIDTH),
     ]
@@ -232,7 +236,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
     ax.xgridvisible = true
     ax.ygridvisible = true
     ax.xminorgridvisible = true
-    ax.yminorgridvisible = false
+    ax.yminorgridvisible = true
     ax.xgridcolor = (:gray70, 0.45)
     ax.ygridcolor = (:gray70, 0.45)
     ax.xminorgridcolor = (:gray70, 0.25)
@@ -274,6 +278,14 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
                 color,
                 nothing,
                 linewidth=POPULATION_LINE_WIDTH,
+            )
+            plot_scaling_band!(
+                ax,
+                result.population_sizes,
+                result.best_single.q05,
+                result.best_single.q95,
+                color;
+                alpha=0.15,
             )
             plot_scaling_line!(
                 ax,
@@ -336,7 +348,9 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
 
             positive_limits!(y_values, result.population_sizes, result.population.q05)
             positive_limits!(y_values, result.population_sizes, result.population.q95)
+            positive_limits!(y_values, result.population_sizes, result.best_single.q05)
             positive_limits!(y_values, result.population_sizes, result.best_single.median)
+            positive_limits!(y_values, result.population_sizes, result.best_single.q95)
             plotted_any = true
         end
     end
