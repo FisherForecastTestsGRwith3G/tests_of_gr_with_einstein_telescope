@@ -32,9 +32,6 @@ julia --project=. scripts_to_run/C_plot_fig2.jl \
   scripts_to_run/config_files/config_catalog_ETS_200k.toml
 ```
 
-### Figure 9
-WIP
-
 ### Figure 7
 
 Figure 7 is the CairoMakie rewrite of the old
@@ -43,13 +40,13 @@ plots for the hierarchical posterior distribution of the PN deformation
 coefficients, with an optional outline for the `sigma = 0` conditioned
 distribution.
 
-The rewritten script uses the population-analysis HDF5 output written by
-[`B_population_analysis.jl`](./B_population_analysis.jl). For each configured
-waveform family and PN order it reads `selected_dphi_k` and `selected_delta_k`,
-builds the hierarchical distribution with `HierDist.hyperparamDistTIGER`,
-marginalizes over `sigma` with `HierDist.getDistributionOnGrid`, and draws the
-posterior profiles directly in CairoMakie. The conditioned outline is evaluated
-with `HierDist.getNaiveDistributionOnGrid`.
+For each configured waveform family and PN order, the rewritten script reads
+the Fisher likelihood summaries (`dphi_k`, `delta_k`) for a catalog
+realization, or the selected population-analysis summaries when no realization
+is requested. It then evaluates the full hierarchical deviation posterior from
+Appendix C/Eq. (2.22), drawing that profile directly in CairoMakie. The
+conditioned outline is evaluated with `HierDist.getNaiveDistributionOnGrid`,
+corresponding to the `sigma = 0` distribution in Eq. (2.26).
 
 ```
 julia --project=. A_fisher_analysis.jl config_files/config_catalog_ET15km45_200k.toml
@@ -85,12 +82,55 @@ n_events = 100000
 number_of_events_single_realization = 10000
 n_events_and_number_of_events_single_realization_refer_directly_to_observed_events = false
 realization_index = 1
+use_inspiral_snr_threshold = false
 plot_conditioned_distribution = true
 subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
 offset_x_axis = 0.16
 violin_width = 0.34
 # y_axis_limits = [[-1e-5, 1e-5], [-0.05, 0.05], [-1.0, 1.0]]
 ```
+
+### Figure 8
+
+Figure 8 is the CairoMakie rewrite of the old
+`old /E_overlayed_hyperparam_dist.jl` plus
+`old /python_plots/hyperparameter_contours/B_plot_hyperparam_overlay.py`
+workflow. It reads the Fisher-analysis HDF5 output, applies the shared
+observation cuts across the requested PN orders, builds one catalog realization,
+computes the hierarchical `P(mu, sigma | D)` distribution with
+`HierDist.hyperparamDistTIGER`, and overlays the 90% credible contours directly
+in Julia.
+
+```
+julia --project=. A_fisher_analysis.jl config_files/config_fig8_ET15km45_200k.toml
+julia --project=. C_plot_fig8.jl config_files/config_fig8_ET15km45_200k.toml
+```
+
+If the ET `2L_45` Fisher file already exists, only the second command is
+needed. Outputs are written to `results/plots/fig_8/`.
+
+Optional Figure 8 controls can be added under `[plots.fig8]` in the TOML config:
+
+```
+[plots.fig8]
+waveform_family = "PhenomHM"
+grid_points = 700
+credible_interval = 0.90
+n_events = 100000
+number_of_events_single_realization = 10000
+n_events_and_number_of_events_single_realization_refer_directly_to_observed_events = false
+realization_index = 1
+use_inspiral_snr_threshold = false
+minus_one_pn_scale = 1000.0
+inset_axis_scale = 10.0
+main_x_limits = [-0.010, 0.020]
+main_y_limits = [0.0, 0.050]
+inset_x_limits = [-0.001, 0.001]
+inset_y_limits = [0.0, 0.002]
+```
+
+### Figure 9
+WIP
 
 ## Performing additional checks
 

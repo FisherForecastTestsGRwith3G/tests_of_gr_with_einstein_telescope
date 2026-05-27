@@ -2,21 +2,47 @@ using TOML
 using HDF5
 using CairoMakie
 using LaTeXStrings
+using Trapz
 
 include("_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
 include("../hierachical_combination/hierDist.jl")
 
-const FIG7_COLORS = ["#0072B2", "#D55E00", "#009E73", "#CC79A7"]
+const FIG7_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7"]
 const FIG7_SIZE = (1800, 760)
 const GUIDE_FONT_SIZE = 32
 const TICK_FONT_SIZE = 32
 const LEGEND_FONT_SIZE = 28
-const FIG7_TOP_ROW_FRACTION = 0.11
 const FIG7_COL_GAP = 20
-const FIG7_LABEL_ROW_GAP = 10
 const VIOLIN_ALPHA = 0.35
 const VIOLIN_EDGE_ALPHA = 0.85
+const VIOLIN_DENSITY_CUTOFF = 1e-4
+
+const FIG7_NETWORK_LABELS = Dict(
+    "ETS" => L"\Delta",
+    "network_45_15km" => L"\mathrm{2L\_45}",
+    "ET_45_15km" => L"\mathrm{2L\_45}",
+    "network_0_15km" => L"\mathrm{2L\_0}",
+    "ET_0_15km" => L"\mathrm{2L\_0}",
+    "LHV" => L"\mathrm{HLV}",
+    "HLV" => L"\mathrm{HLV}",
+    "HLV_O3" => L"\mathrm{HLV}",
+    "HLV_O3a" => L"\mathrm{HLV}",
+    "HLV_O3b" => L"\mathrm{HLV}",
+)
+
+const FIG7_PN_LABELS = Dict(
+    "-1" => L"\varphi_{-2}",
+    "0" => L"\varphi_{0}",
+    "0.5" => L"\varphi_{1}",
+    "1" => L"\varphi_{2}",
+    "1.5" => L"\varphi_{3}",
+    "2" => L"\varphi_{4}",
+    "log(2.5)" => L"\varphi_{5\,\ell}",
+    "3" => L"\varphi_{6}",
+    "log(3.)" => L"\varphi_{6\,\ell}",
+    "3.5" => L"\varphi_{7}",
+)
 
 function get_population_results_file(config::Dict)
     return joinpath(
@@ -58,6 +84,7 @@ function read_fig7_config(config_file::AbstractString)
         nothing
     config["fig7_realization_index"] = Int(get(fig7_config, "realization_index", 1))
     config["fig7_observed_events_direct"] = Bool(get(fig7_config, "n_events_and_number_of_events_single_realization_refer_directly_to_observed_events", false))
+    config["fig7_use_inspiral_snr_threshold"] = Bool(get(fig7_config, "use_inspiral_snr_threshold", false))
     config["fig7_grouping"] = haskey(fig7_config, "subplots_pn_order_grouping") ?
         [Int.(group) for group in fig7_config["subplots_pn_order_grouping"]] :
         default_fig7_grouping(length(config["pn_orders"]))
@@ -80,13 +107,11 @@ function resolve_config_path(path::AbstractString, base_config::Dict)
 end
 
 function network_series_label(config::Dict)
-    network_labels = Dict(
-        "ETS" => "ET 10 km",
-        "ET_45_15km" => "ET 15 km, 45 deg",
-        "ET_0_15km" => "ET 15 km, 0 deg",
-        "HLV_O3b" => "HLV O3b",
-    )
-    return get(network_labels, config["network"], config["network"])
+    return get(FIG7_NETWORK_LABELS, config["network"], config["network"])
+end
+
+function fig7_config_label(label::AbstractString)
+    return occursin("\\", label) ? latexstring(label) : label
 end
 
 function fig7_plot_sources(config::Dict)
@@ -112,13 +137,14 @@ function fig7_plot_sources(config::Dict)
         source_config["fig7_number_of_events_single_realization"] = config["fig7_number_of_events_single_realization"]
         source_config["fig7_realization_index"] = config["fig7_realization_index"]
         source_config["fig7_observed_events_direct"] = config["fig7_observed_events_direct"]
+        source_config["fig7_use_inspiral_snr_threshold"] = config["fig7_use_inspiral_snr_threshold"]
         waveform_family = config["fig7_waveform_family"]
         waveform_family in source_config["waveform_families"] ||
             throw(ArgumentError("Waveform family `$(waveform_family)` is not listed in $(config_file)."))
-        source_label = isempty(labels) ? network_series_label(source_config) : labels[idx]
+        source_label = isempty(labels) ? network_series_label(source_config) : fig7_config_label(labels[idx])
         sources[idx] = (
             config=source_config,
-            label=latexstring("\\text{$(source_label)}"),
+            label=source_label,
             waveform_family=waveform_family,
         )
     end
@@ -135,20 +161,27 @@ function relative_x_offset(index::Integer, total::Integer)
     return ((index - 1) / (total - 1)) * 2.0 - 1.0
 end
 
+function fig7_distribution_offsets(config::Dict, series_idx::Integer, n_series::Integer)
+    offset = config["fig7_offset_x_axis"] * relative_x_offset(series_idx, n_series)
+    # Match the original Figure 7: full and conditioned posteriors are overlaid.
+    return (
+        filled=offset,
+        conditioned=config["fig7_plot_conditioned_distribution"] ? offset : nothing,
+    )
+end
+
+function fig7_distribution_width(config::Dict, n_series::Integer)
+    return config["fig7_violin_width"]
+end
+
 function waveform_label(waveform_family::AbstractString)
     waveform_family == "PhenomD" && return L"\text{IMRPhenomD}"
     waveform_family == "PhenomHM" && return L"\text{IMRPhenomHM}"
     return latexstring("\\text{$(waveform_family)}")
 end
 
-function top_pno_label(pno::AbstractString)
-    if startswith(pno, "log(") && endswith(pno, ")")
-        order = chop(chop(pno; head=4); tail=1)
-        endswith(order, ".") && (order = chop(order; tail=1))
-        return latexstring(order, raw"\,\mathrm{PN}^{(\ell)}")
-    end
-
-    return latexstring(pno, raw"\,\mathrm{PN}")
+function fig7_pno_label(pno::AbstractString)
+    return get(FIG7_PN_LABELS, pno, createSED.pnoLatex(pno))
 end
 
 function waveform_summary_selection_from_fisher(file, config::Dict, waveform_family::AbstractString)
@@ -158,12 +191,17 @@ function waveform_summary_selection_from_fisher(file, config::Dict, waveform_fam
         snr = Float64.(read(wf_group, "snr"))
         isnr = Float64.(read(wf_group, "isnr"))
         invc = Bool.(read(wf_group, "invc"))
+        delta_k = Float64.(read(wf_group, "delta_k"))
 
         pno_selection = BitVector(
             (snr .> config["snr_threshold"]) .&
-            (isnr .> config["snr_inspiral_threshold"]) .&
-            invc
+            invc .&
+            isfinite.(delta_k) .&
+            (delta_k .> 0.0)
         )
+        if config["fig7_use_inspiral_snr_threshold"]
+            pno_selection .&= (isnr .> config["snr_inspiral_threshold"])
+        end
         summary_selection = isnothing(summary_selection) ? pno_selection : BitVector(summary_selection .& pno_selection)
     end
     return summary_selection
@@ -274,20 +312,93 @@ function normalized_density(values::Vector{Float64})
     return values ./ max_value
 end
 
+function density_support_range(density::Vector{Float64}; cutoff::Float64=VIOLIN_DENSITY_CUTOFF)
+    support = findall(>(cutoff), density)
+    if isempty(support)
+        center_idx = argmax(density)
+        return max(center_idx - 1, firstindex(density)):min(center_idx + 1, lastindex(density))
+    end
+
+    first_idx = max(first(support) - 1, firstindex(density))
+    last_idx = min(last(support) + 1, lastindex(density))
+    return first_idx:last_idx
+end
+
+function delta_phi_grid_from_hyper_grid(
+    mu_min::Float64,
+    mu_max::Float64,
+    sigma_max::Float64,
+    grid_points::Integer,
+)
+    delta_phi_min = min(mu_min - 4.0 * sigma_max, 0.0)
+    delta_phi_max = max(mu_max + 4.0 * sigma_max, 0.0)
+    delta_phi_min < delta_phi_max ||
+        throw(ArgumentError("Invalid Figure 7 delta-phi grid bounds."))
+    return HierDist.buildUniform1dGridWithCenter(delta_phi_min, delta_phi_max, grid_points)
+end
+
+function delta_phi_sigma_log_integrand_terms(sigma_grid::Vector{Float64}, dphi_k::Vector{Float64}, delta_k::Vector{Float64})
+    delta_k2 = delta_k .^ 2
+    dphi_k2 = dphi_k .^ 2
+    a = Vector{Float64}(undef, length(sigma_grid))
+    b = similar(a)
+    c = similar(a)
+    d = similar(a)
+
+    for (idx, sigma) in enumerate(sigma_grid)
+        denom = sigma^2 .+ delta_k2
+        a[idx] = sum(1.0 ./ denom)
+        b[idx] = sum(dphi_k ./ denom)
+        c[idx] = -0.5 * sum(dphi_k2 ./ denom)
+        d[idx] = -0.5 * sum(log1p.((sigma ./ delta_k) .^ 2))
+    end
+
+    return a, b, c, d
+end
+
+function delta_phi_posterior_density(
+    delta_phi_grid::Vector{Float64},
+    sigma_grid::Vector{Float64},
+    dphi_k::Vector{Float64},
+    delta_k::Vector{Float64},
+)
+    a, b, c, d = delta_phi_sigma_log_integrand_terms(sigma_grid, dphi_k, delta_k)
+    log_integrand = Matrix{Float64}(undef, length(delta_phi_grid), length(sigma_grid))
+
+    for (idx_sigma, sigma) in enumerate(sigma_grid)
+        denominator = 1.0 + a[idx_sigma] * sigma^2
+        sigma_b2 = (b[idx_sigma] * sigma)^2
+        base = c[idx_sigma] + d[idx_sigma] - 0.5 * log1p(a[idx_sigma] * sigma^2)
+        for (idx_delta_phi, delta_phi) in enumerate(delta_phi_grid)
+            log_integrand[idx_delta_phi, idx_sigma] =
+                -0.5 * (
+                    a[idx_sigma] * delta_phi^2 -
+                    2.0 * b[idx_sigma] * delta_phi -
+                    sigma_b2
+                ) / denominator + base
+        end
+    end
+
+    log_offset = maximum(log_integrand)
+    integrand = exp.(log_integrand .- log_offset)
+    density = [trapz(sigma_grid, integrand[idx, :]) for idx in eachindex(delta_phi_grid)]
+    return normalized_density(density)
+end
+
 function posterior_profile(dphi_k::Vector{Float64}, delta_k::Vector{Float64}, grid_points::Integer)
     hyperparam_dist = HierDist.hyperparamDistTIGER(dphi_k, delta_k)
     mu_min, mu_max, sigma_min, sigma_max = HierDist.findOptimalGrid(hyperparam_dist; verbose=false)
-    mu_grid = HierDist.buildUniform1dGridWithCenter(mu_min, mu_max, grid_points)
+    delta_phi_grid = delta_phi_grid_from_hyper_grid(mu_min, mu_max, sigma_max, grid_points)
     sigma_grid = HierDist.buildUniform1dGridWithCenter(sigma_min, sigma_max, grid_points)
-    _, _, p_mu, _, _ = HierDist.getDistributionOnGrid(mu_grid, sigma_grid, hyperparam_dist)
-    conditioned_p_mu = HierDist.getNaiveDistributionOnGrid(mu_grid, hyperparam_dist)
+    p_delta_phi = delta_phi_posterior_density(delta_phi_grid, sigma_grid, dphi_k, delta_k)
+    conditioned_p_mu = HierDist.getNaiveDistributionOnGrid(delta_phi_grid, hyperparam_dist)
 
     return (
-        mu_grid=mu_grid,
-        p_mu=normalized_density(p_mu),
+        mu_grid=delta_phi_grid,
+        p_mu=p_delta_phi,
         conditioned_p_mu=normalized_density(conditioned_p_mu),
-        q05=HierDist.quantile1dOGD(mu_grid, p_mu, 0.05),
-        q95=HierDist.quantile1dOGD(mu_grid, p_mu, 0.95),
+        q05=HierDist.quantile1dOGD(delta_phi_grid, p_delta_phi, 0.05),
+        q95=HierDist.quantile1dOGD(delta_phi_grid, p_delta_phi, 0.95),
     )
 end
 
@@ -320,27 +431,13 @@ function panel_limits(pn_orders::AbstractVector{<:AbstractString}, profiles, ser
     return (y_min - 0.45 * width, y_max + 0.45 * width)
 end
 
-function build_top_label_row!(grid::GridLayout, pn_orders::AbstractVector{<:AbstractString})
-    for (idx, pno) in enumerate(pn_orders)
-        Label(grid[1, idx], top_pno_label(pno);
-            fontsize=TICK_FONT_SIZE,
-            tellwidth=false,
-            tellheight=false,
-            halign=:center,
-            valign=:bottom)
-        colsize!(grid, idx, Relative(1.0 / length(pn_orders)))
-    end
-    rowsize!(grid, 1, Relative(1.0))
-    return grid
-end
-
 function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real};
     ylabel="", show_ylabel::Bool=true)
     ax.xlabel = "PN order"
     ax.ylabel = show_ylabel ? ylabel : ""
     ax.xlabelsize = GUIDE_FONT_SIZE
     ax.ylabelsize = GUIDE_FONT_SIZE
-    ax.xticks = (collect(1:length(pn_orders)), createSED.pnoLatex.(pn_orders))
+    ax.xticks = (collect(1:length(pn_orders)), fig7_pno_label.(pn_orders))
     ax.xticklabelsize = TICK_FONT_SIZE
     ax.yticklabelsize = TICK_FONT_SIZE
     ax.xgridvisible = true
@@ -351,55 +448,62 @@ function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractStr
     ax.yminorticks = IntervalsBetween(5)
     ax.xtickalign = 1
     ax.ytickalign = 1
-    xlims!(ax, 0.5, length(pn_orders) + 0.5)
+    xlims!(ax, 0.45, length(pn_orders) + 0.55)
     ylims!(ax, y_limits...)
     hlines!(ax, [0.0]; color=(:gray40, 0.8), linestyle=:dash, linewidth=2)
     return ax
 end
 
 function add_violin_profile!(ax::Axis, x0::Real, y_grid::Vector{Float64}, density::Vector{Float64}, color;
-    max_width::Float64, fill_alpha::Float64=VIOLIN_ALPHA, edge_alpha::Float64=VIOLIN_EDGE_ALPHA)
-    widths = max_width .* density
-    left_points = [Point2f(x0 - widths[idx], y_grid[idx]) for idx in eachindex(y_grid)]
-    right_points = [Point2f(x0 + widths[idx], y_grid[idx]) for idx in reverse(eachindex(y_grid))]
+    max_width::Float64, fill_alpha::Float64=VIOLIN_ALPHA)
+    support = density_support_range(density)
+    widths = max_width .* density[support]
+    support_y_grid = y_grid[support]
+    left_points = [Point2f(x0 - widths[idx], support_y_grid[idx]) for idx in eachindex(support_y_grid)]
+    right_points = [Point2f(x0 + widths[idx], support_y_grid[idx]) for idx in reverse(eachindex(support_y_grid))]
     points = vcat(left_points, right_points)
-    poly!(ax, points; color=(color, fill_alpha), strokecolor=(color, edge_alpha), strokewidth=1.5)
+    poly!(ax, points; color=(color, fill_alpha), strokecolor=:transparent, strokewidth=0)
     return ax
 end
 
 function add_conditioned_outline!(ax::Axis, x0::Real, y_grid::Vector{Float64}, density::Vector{Float64}, color;
     max_width::Float64)
-    widths = max_width .* density
-    lines!(ax, x0 .- widths, y_grid; color=color, linewidth=2.5)
-    lines!(ax, x0 .+ widths, y_grid; color=color, linewidth=2.5)
+    support = density_support_range(density)
+    widths = max_width .* density[support]
+    support_y_grid = y_grid[support]
+    left_points = [Point2f(x0 - widths[idx], support_y_grid[idx]) for idx in eachindex(support_y_grid)]
+    right_points = [Point2f(x0 + widths[idx], support_y_grid[idx]) for idx in reverse(eachindex(support_y_grid))]
+    points = vcat(left_points, right_points)
+    poly!(ax, points; color=(:white, 0.0), strokecolor=color, strokewidth=2.2)
     return ax
 end
 
 function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, profiles, config::Dict, series_ids)
     n_series = length(series_ids)
+    violin_width = fig7_distribution_width(config, n_series)
     for (series_idx, series_id) in enumerate(series_ids)
         color = FIG7_COLORS[mod1(series_idx, length(FIG7_COLORS))]
-        offset = config["fig7_offset_x_axis"] * relative_x_offset(series_idx, n_series)
+        offsets = fig7_distribution_offsets(config, series_idx, n_series)
 
         for (pno_idx, pno) in enumerate(pn_orders)
             profile = profiles[series_id][pno]
-            x0 = pno_idx + offset
             add_violin_profile!(
                 ax,
-                x0,
+                pno_idx + offsets.filled,
                 profile.mu_grid,
                 profile.p_mu,
                 color;
-                max_width=config["fig7_violin_width"],
+                max_width=violin_width,
             )
+
             if config["fig7_plot_conditioned_distribution"]
                 add_conditioned_outline!(
                     ax,
-                    x0,
+                    pno_idx + offsets.conditioned,
                     profile.mu_grid,
                     profile.conditioned_p_mu,
                     color;
-                    max_width=config["fig7_violin_width"],
+                    max_width=violin_width,
                 )
             end
         end
@@ -449,26 +553,22 @@ function build_figure(config::Dict, profiles, series_ids, series_labels)
 
     total_width = sum(length.(grouped_orders))
     for panel_idx in 1:n_panels
-        top_grid = GridLayout(fig[1, panel_idx])
         panel_orders = grouped_orders[panel_idx]
-        ax = Axis(fig[2, panel_idx], backgroundcolor=:white)
+        ax = Axis(fig[1, panel_idx], backgroundcolor=:white)
         y_limits = isnothing(config["fig7_y_limits"]) ?
             panel_limits(panel_orders, profiles, series_ids) :
             config["fig7_y_limits"][panel_idx]
 
         colsize!(fig.layout, panel_idx, Relative(length(panel_orders) / total_width))
-        build_top_label_row!(top_grid, panel_orders)
         configure_panel_axis!(ax, panel_orders, y_limits;
-            ylabel=L"\delta\varphi_p",
+            ylabel=L"\delta \varphi_{\!p}",
             show_ylabel=panel_idx == 1)
         plot_panel!(ax, panel_orders, profiles, config, series_ids)
     end
 
-    rowsize!(fig.layout, 1, Relative(FIG7_TOP_ROW_FRACTION))
-    rowsize!(fig.layout, 2, Relative(1.0 - FIG7_TOP_ROW_FRACTION))
+    rowsize!(fig.layout, 1, Relative(1.0))
     colgap!(fig.layout, FIG7_COL_GAP)
-    rowgap!(fig.layout, FIG7_LABEL_ROW_GAP)
-    add_fig7_legend!(fig, fig[2, n_panels], series_labels)
+    add_fig7_legend!(fig, fig[1, n_panels], series_labels)
 
     return fig
 end

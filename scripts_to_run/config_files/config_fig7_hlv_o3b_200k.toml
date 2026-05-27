@@ -36,6 +36,7 @@ plot_tag      = "fig7_hlv_o3b_bbh_200k_stb_9"
 
 [plots.fig7]
 grid_points = 700
+use_inspiral_snr_threshold = true
 plot_conditioned_distribution = true
 subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
 offset_x_axis = 0.16
