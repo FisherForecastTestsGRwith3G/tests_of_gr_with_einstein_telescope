@@ -21,6 +21,7 @@ const WAVEFORM_LINESTYLES = Dict(
     "PhenomHM" => :dash,
 )
 const FIG_SCALING_SIZE = (1800, 900)
+const FIG3_FIGURE_PADDING = (0, 40, 0, 0)
 const FIG3_LEGEND_ROW_FRACTION = 0.18
 const GUIDE_FONT_SIZE = 32
 const TICK_FONT_SIZE = 32
@@ -211,7 +212,7 @@ function add_fig3_legend!(fig::Figure, target_slot)
 end
 
 function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::Dict)
-    fig = Figure(size=FIG_SCALING_SIZE, backgroundcolor=:white)
+    fig = Figure(size=FIG_SCALING_SIZE, backgroundcolor=:white, figure_padding=FIG3_FIGURE_PADDING)
     legend_slot = fig[1, 1]
     ax = Axis(
         fig[2, 1],
@@ -240,6 +241,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
     ax.yminorticks = IntervalsBetween(9)
     ax.xtickalign = 1
     ax.ytickalign = 1
+    colsize!(fig.layout, 1, Relative(1.0))
     rowsize!(fig.layout, 1, Relative(FIG3_LEGEND_ROW_FRACTION))
     rowsize!(fig.layout, 2, Relative(1.0 - FIG3_LEGEND_ROW_FRACTION))
     rowgap!(fig.layout, 0.8)

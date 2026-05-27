@@ -329,7 +329,7 @@ function add_fig9_legend!(target_slot, color_lims)
     )
 end
 
-function scale_density_to_fisher_peak(density_values::Vector{Float64}, fisher_peak::Float64; factor::Float64=1.3)
+function scale_density_to_fisher_peak(density_values::Vector{Float64}, fisher_peak::Float64; factor::Float64=1.0)
     density_peak = maximum(density_values)
     target_peak = factor * fisher_peak
     if density_peak > 0 && target_peak > 0
