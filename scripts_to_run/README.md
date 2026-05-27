@@ -11,25 +11,42 @@ Below, we provide instruction on how to rerun scripts in order to produce the pl
 ### Figure 1
 
 ```
-julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
-julia --project=. tests_of_gr_HLV/B_population_analysis.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
-julia --project=. tests_of_gr_HLV/C_fig1.jl tests_of_gr_HLV/config_files/config_catalog_200k.toml   
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/C_fig1.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
 ```
 
 ### Figure 2
-```
-julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
-julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
-julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.toml
 
-julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
-julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
-julia --project=. tests_of_gr_HLV/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.
+```
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.toml
+
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km0_200k.toml
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ETS_200k.
 
 julia --project=. scripts_to_run/C_plot_fig2.jl \
   scripts_to_run/config_files/config_catalog_ET15km0_200k.toml \
   scripts_to_run/config_files/config_catalog_ET15km45_200k.toml \
   scripts_to_run/config_files/config_catalog_ETS_200k.toml
+```
+
+### Figure 3
+
+```
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+julia --project=. scripts_to_run/C_plot_fig3.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
+```
+
+### Figure 9
+
+```
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. julia --project=. scripts_to_run/C_plot_fig9.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml 
 ```
 
 ### Figure 7
@@ -139,9 +156,9 @@ WIP
 Checks the distribution of the samples of the 90% upper bounds, calculated from the bootstrapping analysis, resembles a log-normal distribution. Plots the distribution and  
 
 ```
-julia --project=. A_fisher_analysis config_files/config_catalog_200k.toml   
-julia --project=. B_population_analysis config_files/config_catalog_200k.toml   
-julia --project=. D_plot_log_normal_check.jl config_files/config_catalog_200k.toml   
+julia --project=. A_fisher_analysis config_files/config_catalog_*.toml   
+julia --project=. B_population_analysis config_files/config_catalog_*.toml   
+julia --project=. D_plot_log_normal_check.jl config_files/config_catalog_*.toml   
 ```
 
 ## Other useful information
