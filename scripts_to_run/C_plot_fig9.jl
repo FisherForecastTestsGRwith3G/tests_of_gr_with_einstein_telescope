@@ -35,6 +35,7 @@ const FIG9_COLORBAR_LABELSIZE = FIG9_LEGEND_LABELSIZE
 const FIG9_LEGEND_COLORBAR_PAD = 14
 const HIST_BASE_COLOR = FIG9_POPULATION_HIST_FILL_COLOR
 const HIST_BASE_EDGE_COLOR = FIG9_POPULATION_HIST_EDGE_COLOR
+const HIST_BASE_EDGE_LINE_WIDTH = 3.0
 const HIST_LINE_WIDTH = 4
 const HIST_OBSERVABLE_LINE_WIDTH = 2
 const HIST_PROBLEMATIC_PIXEL_STROKE_WIDTH = 0.65
@@ -504,14 +505,14 @@ function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_valu
         poly!(ax, points; color=HIST_BASE_COLOR, strokecolor=:transparent)
     end
 
-    base_x, base_y = step_xy(edges, base_counts)
-    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=1.4)
     draw_top_event_histogram_pixels!(ax, edges, fisher_binned_events, color_lims)
     draw_top_colored_histogram!(ax, edges, observable_binned_ratios, color_lims)
     fisher_x, fisher_y = step_xy(edges, fisher_counts)
     observable_x, observable_y = step_xy(edges, observable_counts)
     lines!(ax, fisher_x, fisher_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_LINE_WIDTH)
     lines!(ax, observable_x, observable_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_OBSERVABLE_LINE_WIDTH)
+    base_x, base_y = step_xy(edges, base_counts)
+    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=HIST_BASE_EDGE_LINE_WIDTH)
     lines!(ax, [Float64(xlim[1]), Float64(xlim[2])], [0.0, 0.0]; color=:black, linewidth=1)
     return ax
 end
@@ -540,14 +541,14 @@ function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_val
         poly!(ax, points; color=HIST_BASE_COLOR, strokecolor=:transparent)
     end
 
-    base_x, base_y = side_step_xy(edges, base_counts)
-    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=1.4)
     draw_side_event_histogram_pixels!(ax, edges, fisher_binned_events, color_lims)
     draw_side_colored_histogram!(ax, edges, observable_binned_ratios, color_lims)
     fisher_x, fisher_y = side_step_xy(edges, fisher_counts)
     observable_x, observable_y = side_step_xy(edges, observable_counts)
     lines!(ax, fisher_x, fisher_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_LINE_WIDTH)
     lines!(ax, observable_x, observable_y; color=HIST_OUTLINE_COLOR, linewidth=HIST_OBSERVABLE_LINE_WIDTH)
+    base_x, base_y = side_step_xy(edges, base_counts)
+    lines!(ax, base_x, base_y; color=HIST_BASE_EDGE_COLOR, linewidth=HIST_BASE_EDGE_LINE_WIDTH)
     lines!(ax, [0.0, 0.0], [FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2]]; color=:black, linewidth=1)
     return ax
 end
