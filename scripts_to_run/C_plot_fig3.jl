@@ -62,10 +62,22 @@ function decade_ticks(limits::Tuple{<:Real, <:Real})
     min_value, max_value = limits
     decade_min = floor(Int, log10(min_value))
     decade_max = ceil(Int, log10(max_value))
+    return decade_ticks(decade_min, decade_max)
+end
+
+function decade_ticks(decade_min::Int, decade_max::Int)
     exponents = collect(decade_min:decade_max)
     values = exp10.(exponents)
     labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
     return values, labels
+end
+
+function decade_limits_and_ticks(values::Vector{Float64})
+    y_min = minimum(values)
+    y_max = maximum(values)
+    decade_min = floor(Int, log10(y_min))
+    decade_max = ceil(Int, log10(y_max))
+    return (exp10(decade_min), exp10(decade_max)), decade_ticks(decade_min, decade_max)
 end
 
 function read_scaling_results(scaling_results_file::AbstractString, config::Dict)
@@ -219,7 +231,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
     ax.xgridvisible = true
     ax.ygridvisible = true
     ax.xminorgridvisible = true
-    ax.yminorgridvisible = true
+    ax.yminorgridvisible = false
     ax.xgridcolor = (:gray70, 0.45)
     ax.ygridcolor = (:gray70, 0.45)
     ax.xminorgridcolor = (:gray70, 0.25)
@@ -337,9 +349,9 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
     end
 
     if !isempty(y_values)
-        y_min = minimum(y_values)
-        y_max = maximum(y_values)
-        ylims!(ax, y_min / 1.5, y_max * 1.5)
+        y_limits, y_tick_spec = decade_limits_and_ticks(y_values)
+        ylims!(ax, y_limits...)
+        ax.yticks = y_tick_spec
     end
 
     return fig
