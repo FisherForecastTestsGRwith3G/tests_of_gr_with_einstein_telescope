@@ -80,7 +80,7 @@ if needToRun
             modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN_string, network, n_events)
             # run the simulation
             
-            run(`julia --project=. tests_of_gr_HLV/A_fisher_analysis.jl $(config_file_name_out)`)
+            run(`julia --project=. scripts_to_run/A_fisher_analysis.jl $(config_file_name_out)`)
             println("Simulation for index $(idx) out of $(gridSize) done!")
 
         end

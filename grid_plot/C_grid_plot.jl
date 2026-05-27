@@ -1,8 +1,10 @@
 using HDF5
+using TOML
 using LaTeXStrings
 using CairoMakie
 
 include("_config_parser_grid.jl")
+include("../scripts_to_run/_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 using .createSED: pnoString
 
@@ -66,10 +68,10 @@ for lim_i in lim
 end
 
 fig = Figure(size = (800, 600))
-ax = Axis(fig[1, 1], xlabel = L"\mu", ylabel = L"\sigma", title = "PN: " * pn_string)
+ax = Axis(fig[1, 1], xlabel = L"\mu", ylabel = L"\sigma", title = createSED.pnoLatex(pn_string))
 
 # Create a heatmap with the results
-hm = Makie.heatmap!(ax, mu_vec, sigma_vec, log10.(res), colormap = :viridis)
+hm = Makie.heatmap!(ax, mu_vec, sigma_vec, log10.(res), colormap = FIG9_IMPROVEMENT_COLORMAP)
 Makie.Colorbar(fig[1, 2], hm, size = 20,
     ticklabelsize = 20, ticks = (lim, lim_label))
 
