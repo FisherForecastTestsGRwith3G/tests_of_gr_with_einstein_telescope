@@ -26,7 +26,7 @@ const LEGEND_FONT_SIZE = 28
 const FIG7_COL_GAP = 20
 const VIOLIN_ALPHA = 0.35
 const VIOLIN_EDGE_ALPHA = 0.85
-const VIOLIN_DENSITY_CUTOFF = 1e-4
+const VIOLIN_DENSITY_CUTOFF = 1e-8 # 1e-4
 
 const FIG7_NETWORK_LABELS = Dict(
     "ETS" => L"\Delta",

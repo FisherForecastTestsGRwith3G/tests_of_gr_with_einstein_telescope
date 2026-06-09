@@ -1,0 +1,38 @@
+[deviations]
+sigma = [0.002]
+pn_orders = ["1"]
+mu = [0.002]
+
+[plots]
+plot_tag = "bbh_1k_grid"
+outdir = "./results/plots/"
+
+[detectors]
+network = "ET_45_15km"
+
+[population]
+snr_inspiral_threshold = 6.0
+snr_threshold = 12.0
+
+[general]
+seed = 1234
+
+[grid]
+grid_tag = "void"
+n_median = 150
+
+[catalog]
+catalog_tag = "bbh_1k"
+outdir = "./results/data/grid/ET_45_15km_PhenomHM/grid_PN_one_n_12_mu_0.002_sigma_0.002"
+n_events = 1000
+z_cut = 10.0
+
+[fisher]
+waveform = ["PhenomHM"]
+fmin = 2.0
+
+[bootstrap]
+n_catalog = 9
+bootstrap_tag = "bbh_200k"
+outdir = "./results/data/"
+n_sample = 1000

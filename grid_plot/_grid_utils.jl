@@ -4,27 +4,52 @@ using Statistics
 using TOML
 using Interpolations
 
-function modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN, network, n_events)
+function grid_path_component(value)
+    return replace(String(value), r"[^A-Za-z0-9_.-]" => "_")
+end
+
+function grid_run_tag(network, waveform; grid_tag="void")
+    tag = String(grid_tag)
+    if isempty(tag) || tag == "void"
+        return "$(grid_path_component(network))_$(grid_path_component(waveform))"
+    end
+
+    return grid_path_component(tag)
+end
+
+function grid_point_header(pn_tag, idx, mu, sigma)
+    return "grid_PN_$(pn_tag)_n_$(idx)_mu_$(mu)_sigma_$(sigma)"
+end
+
+function modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN, network, waveform, n_events, run_tag)
 
     # Read the TOML file into a Julia dictionary
     config_dic = TOML.parsefile(config_file_name)
 
     delete!(config_dic["deviations"], "mu_vec")
     delete!(config_dic["deviations"], "sigma_vec")
-    config_dev =config_dic["deviations"]
+    config_dev = config_dic["deviations"]
+    config_general = config_dic["general"]
     config_cat = config_dic["catalog"]
+    config_fisher = config_dic["fisher"]
+    config_detectors = config_dic["detectors"]
 
     # Modify the values
-    config_dev["mu"] = mu
-    config_dev["sigma"] = sigma
+    config_dev["pn_orders"] = [PN]
+    config_dev["mu"] = [mu]
+    config_dev["sigma"] = [sigma]
     config_cat["n_events"] = n_events
-
-    #config_dic["header"] = header
-    #config_glob["pn_waveforms"] = [PN]
-    #config_glob["network_list"] = network
-
+    base_outdir = haskey(config_general, "outdir") ? config_general["outdir"] : get(config_cat, "outdir", ".")
+    grid_outdir = joinpath(base_outdir, "grid", run_tag, header)
+    config_cat["outdir"] = grid_outdir
+    if haskey(config_general, "outdir")
+        config_general["outdir"] = grid_outdir
+    end
+    config_detectors["network"] = network
+    config_fisher["waveform"] = [waveform]
 
     # Write the modified dictionary back to the file
+    mkpath(dirname(config_file_name_out))
     open(config_file_name_out, "w") do io
         TOML.print(io, config_dic)
     end
@@ -108,7 +133,7 @@ function reshuffling_bisection(n_reshuffling, ff, dphi0_k, delta_k, mu, sigma)
         dphi0_k_shuf = dphi0_k[p]
         delta_k_shuf = delta_k[p]
 
-        res[i] = bisection_method(ff, 3, n_events, tol=1,  args_f=(dphi0_k_shuf, delta_k_shuf, sigma, mu))[1]
+        res[i] = bisection_method(ff, 3, n_events, tol=1,  args_f=(dphi0_k_shuf, delta_k_shuf, mu, sigma))[1]
     end
 
     return median(res), res
@@ -167,7 +192,7 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_mu, center_sig)
     # calculate the ranges 
     mu_values = collect(LinRange(mu_limit[1], mu_limit[2], configs_B["n_points"]))
     sig_values = collect(LinRange(sig_limit[1], sig_limit[2], configs_B["n_points"]))
-    p_mu_sig, p_sig, p_mu, n_tot, network_marg = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
+    p_mu_sig, p_sig, p_mu, n_tot, network_marg = getDistributionOnGrid(mu_values, sig_values, dphi0_k, delta_k)
 
     # 2d interpolation
     itp = interpolate((mu_values, sig_values), p_mu_sig, Gridded(Linear()))
@@ -175,7 +200,7 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_mu, center_sig)
 
     local level, p_GR
     try
-        level = calcPercentileLvl( p_mu_sig, [0.9889])
+        level = getContourLevelOGD(p_mu_sig, 0.9889)
         p_GR = p_mu_sig_interp(0., 0.)
     catch e
         println("Error in calculating percentiles: ", e)
@@ -184,9 +209,8 @@ function wrapper_3sigma(n_events_used, dphi0_k, delta_k, center_mu, center_sig)
     end
 
     # out of the 3 sigma interval if level > p_GR
-    res = level[1] - p_GR
+    res = level - p_GR
     # if res > 0 it means that (0., 0.) is outside the 3 sigma level
     return res
 
 end
-

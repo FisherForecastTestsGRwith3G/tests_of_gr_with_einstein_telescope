@@ -12,6 +12,8 @@ include("../hierachical_combination/hierarchical_distribution.jl")
 include("_config_parser_grid.jl")
 # include("_conditioned_plot_utils.jl")
 include("_grid_utils.jl")
+include("../create_single_event_datasets/createSED.jl")
+using .createSED: pnoString
 
 # obtain config file from input
 # user_configs = getUserConfigs()
@@ -46,9 +48,13 @@ configs = read_config_grid(config_file_name)
 mu_vec = configs["mu_vec"]
 sigma_vec = configs["sigma_vec"]
 PN_string = configs["pn_orders"][1]
+pn_tag = pnoString(PN_string)
 network = configs["network"]
+waveform = configs["waveform_families"][1]
+run_tag = grid_run_tag(network, waveform; grid_tag=configs["grid_tag"])
 n_events = configs["n_events"]
 gridSize = length(mu_vec) * length(sigma_vec) 
+grid_config_folder = joinpath(@__DIR__, "config_files", "grid", run_tag)
 
 if needToRun
     # run the simulation
@@ -70,14 +76,13 @@ if needToRun
             #     continue
             # end
             # modify the config file
-            header = "grid_PN_$(PN_string)_n_$(idx)_mu_" * string(mu_vec[i]) * "_sigma_" * string(sigma_vec[j])
+            header = grid_point_header(pn_tag, idx, mu_vec[i], sigma_vec[j])
 
             mu = mu_vec[i]
             sigma = sigma_vec[j]
-            mkpath("config_files/grid/")
-            config_file_name_out = "config_files/grid/config_A_"*header*".toml"
+            config_file_name_out = joinpath(grid_config_folder, "config_A_$(header).toml")
 
-            modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN_string, network, n_events)
+            modify_configs(config_file_name, config_file_name_out, header, mu, sigma, PN_string, network, waveform, n_events, run_tag)
             # run the simulation
             
             run(`julia --project=. scripts_to_run/A_fisher_analysis.jl $(config_file_name_out)`)
