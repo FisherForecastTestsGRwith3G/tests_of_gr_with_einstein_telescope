@@ -52,6 +52,16 @@ function get_plot_output_files(configs::Vector{Dict{String, Any}})
     )
 end
 
+"""
+    mirrored_histogram_bars!(ax, x0, samples, fill_color, edge_color; max_width=HIST_MAX_WIDTH, n_bins=nothing)
+
+Draw a normalized mirrored vertical histogram centered at `x0` on `ax`.
+
+The bar widths are scaled by the largest bin count so the widest bin spans
+`max_width` to each side of `x0`. When `n_bins` is provided it is passed through
+to `histogram_profile`; otherwise that helper chooses the binning. Returns
+`nothing` after mutating `ax`, including when no drawable profile is available.
+"""
 function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, fill_color, edge_color;
     max_width::Float64=HIST_MAX_WIDTH, n_bins::Union{Nothing, Int}=nothing)
     profile = histogram_profile(samples; n_bins=n_bins)
@@ -91,6 +101,12 @@ function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, 
     return nothing
 end
 
+"""
+    add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, color)
+
+Draw the 5th-to-95th percentile interval and median marker for positive
+bootstrap samples at `x0 + SUMMARY_X_OFFSET`.
+"""
 function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, color)
     positive_samples = samples[samples .> 0.0]
     isempty(positive_samples) && return nothing
@@ -105,6 +121,13 @@ function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, co
     return nothing
 end
 
+"""
+    read_detector_plot_data(population_results_file::AbstractString, config::Dict)
+
+Read single-event and bootstrap constraint vectors for one detector from
+`population_results_file`, using the detector network and PN orders in `config`.
+Returns `(single_event_constraints, bootstrap_constraints)`, keyed by PN order.
+"""
 function read_detector_plot_data(population_results_file::AbstractString, config::Dict)
     single_event_constraints = Dict{String, Vector{Float64}}()
     bootstrap_constraints = Dict{String, Vector{Float64}}()
@@ -125,6 +148,13 @@ function read_detector_plot_data(population_results_file::AbstractString, config
     return single_event_constraints, bootstrap_constraints
 end
 
+"""
+    read_all_plot_data(configs::Vector{Dict{String, Any}})
+
+Read plot data for every detector config and return
+`(single_event_by_detector, bootstrap_by_detector)`, keyed first by detector
+network and then by PN order.
+"""
 function read_all_plot_data(configs::Vector{Dict{String, Any}})
     single_event_by_detector = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_by_detector = Dict{String, Dict{String, Vector{Float64}}}()
@@ -142,6 +172,12 @@ function read_all_plot_data(configs::Vector{Dict{String, Any}})
     return single_event_by_detector, bootstrap_by_detector
 end
 
+"""
+    build_panel!(ax, pn_orders, single_event_by_detector, bootstrap_by_detector)
+
+Populate `ax` with detector-specific mirrored histograms, bootstrap summaries,
+and GWTC-3 references for each PN order. Return the modified axis.
+"""
 function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     single_event_by_detector::Dict{String, Dict{String, Vector{Float64}}},
     bootstrap_by_detector::Dict{String, Dict{String, Vector{Float64}}})
@@ -151,7 +187,15 @@ function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
             color = DETECTOR_COLORS[detector]
             fill_color = DETECTOR_FILL_COLORS[detector]
             data = get(get(single_event_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
-            boot = get(get(bootstrap_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
+            boot = get(get(bootstrap_by_detector   , detector, Dict{String, Vector{Float64}}()), pno, Float64[])
+
+            if any(data .<=0)
+                throw(ArgumentError("Constraints must all be positive! There is a 0 or negative single constraint for $(pno)."))
+            end
+            if any(boot .<=0)
+                throw(ArgumentError("Constraints must all be positive! There is a 0 or negative population constraint for $(pno)."))
+            end
+
             mirrored_histogram_bars!(ax, x0, data, fill_color, color)
             add_bootstrap_summary!(ax, x0, boot, color)
         end
@@ -160,6 +204,11 @@ function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     return ax
 end
 
+"""
+    add_fig2_legend!(fig::Figure, target_slot)
+
+Add the detector and summary legend for Figure 2 to `target_slot`, and return `fig`.
+"""
 function add_fig2_legend!(fig::Figure, target_slot)
     summary_elements = [
         MarkerElement(color=:black, marker=:circle, markersize=15, strokecolor=:white, strokewidth=1.0),
@@ -197,6 +246,18 @@ function add_fig2_legend!(fig::Figure, target_slot)
     return fig
 end
 
+"""
+    build_figure(left_orders, right_orders, single_event_by_detector,
+                 bootstrap_by_detector, left_y_limits, right_y_limits)
+
+Build the detector-comparison Figure 2 layout.
+
+`left_orders` and `right_orders` define the PN-order columns shown in each
+panel. `single_event_by_detector` and `bootstrap_by_detector` provide the
+per-detector sample dictionaries used to draw the event histograms and
+population summaries. The y-axis ranges are supplied separately for the left
+and right log-scale panels. Returns the assembled `Figure`.
+"""
 function build_figure(
     left_orders::Vector{String},
     right_orders::Vector{String},
@@ -237,14 +298,16 @@ function build_figure(
     return fig
 end
 
-function assert_same_vector(configs::Vector{Dict{String, Any}}, key::String)
-    reference = configs[1][key]
-    for config in configs[2:end]
-        config[key] == reference ||
-            throw(ArgumentError("Config mismatch: `$(key)` must agree across the three configs."))
-    end
-end
 
+"""
+    validate_detector_configs(configs)
+
+Validate the three detector configs required by Fig. 2 and return `configs`.
+
+Checks that the configs are ordered as `DETECTOR_ORDER`, each includes the
+`PHENOM_HM` waveform family, and shared sampling/selection fields match across
+all detector configs. Throws `ArgumentError` on the first mismatch.
+"""
 function validate_detector_configs(configs::Vector{Dict{String, Any}})
     length(configs) == length(DETECTOR_ORDER) ||
         throw(ArgumentError("Expected exactly three configs: ET_0_15km, ET_45_15km, ETS."))
@@ -258,6 +321,14 @@ function validate_detector_configs(configs::Vector{Dict{String, Any}})
             throw(ArgumentError("Config $(idx) must include `$(PHENOM_HM)` in `fisher.waveform`."))
     end
 
+    function assert_same_vector(configs::Vector{Dict{String, Any}}, key::String)
+        reference = configs[1][key]
+        for config in configs[2:end]
+            config[key] == reference ||
+                throw(ArgumentError("Config mismatch: `$(key)` must agree across the three configs."))
+        end
+    end
+
     for key in ("n_catalog", "n_sample", "pn_orders", "mu", "sigma")
         assert_same_vector(configs, key)
     end
@@ -269,6 +340,13 @@ function validate_detector_configs(configs::Vector{Dict{String, Any}})
     return configs
 end
 
+"""
+    run_plot_fig2(configs::Vector{Dict{String, Any}})
+
+Validate detector configs, load Figure 2 inputs, build the two-panel comparison
+figure, and save it to the configured PDF and PNG output paths. Returns the
+assembled `Figure`.
+"""
 function run_plot_fig2(configs::Vector{Dict{String, Any}})
     validate_detector_configs(configs)
     single_event_by_detector, bootstrap_by_detector = read_all_plot_data(configs)
