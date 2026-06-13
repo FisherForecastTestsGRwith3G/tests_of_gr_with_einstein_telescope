@@ -147,7 +147,12 @@ inset_y_limits = [0.0, 0.002]
 ```
 
 ### Figure 9
-WIP
+
+```
+julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/C_plot_fig9.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+```
 
 ## Performing additional checks
 

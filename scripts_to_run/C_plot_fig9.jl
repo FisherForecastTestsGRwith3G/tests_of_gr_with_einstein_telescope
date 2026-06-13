@@ -79,6 +79,14 @@ function build_labels()
     )
 end
 
+"""
+    read_catalog(fisher_results_file)
+
+Read binary black hole catalog parameters from `fisher_results_file`.
+
+Returns a dictionary mapping each catalog parameter name to its vector of
+values, read from `bbh_catalog/parameter`.
+"""
 function read_catalog(fisher_results_file::AbstractString)
     catalog = Dict{String, Vector{Float64}}()
 
@@ -92,6 +100,15 @@ function read_catalog(fisher_results_file::AbstractString)
     return catalog
 end
 
+"""
+    read_results(fisher_results_file, config, pno)
+
+Read Fisher results for the configured detector network and post-Newtonian
+order `pno` from `fisher_results_file`.
+
+Returns a dictionary keyed by waveform name (`"PhenomD"` and `"PhenomHM"`),
+with each value containing the `snr`, `isnr`, `delta_k`, and `invc` vectors.
+"""
 function read_results(fisher_results_file::AbstractString, config::Dict, pno::String)
     results = Dict{String, Dict{String, Vector}}()
     pno_group_name = createSED.pnoString(pno)
@@ -111,6 +128,14 @@ function read_results(fisher_results_file::AbstractString, config::Dict, pno::St
     return results
 end
 
+"""
+    extend_catalog!(catalog::Dict{String, Vector{Float64}})
+
+Add derived mass and spin quantities to `catalog` in place.
+
+Uses `mc`, `eta`, `chi_1`, and `chi_2` to add `m1`, `m2`, `invq`, and `chi_eff`,
+then returns the mutated `catalog`.
+"""
 function extend_catalog!(catalog::Dict{String, Vector{Float64}})
     mass_ratio_term = sqrt.(max.(1.0 .- 4.0 .* catalog["eta"], 0.0))
     total_mass = catalog["mc"] ./ (catalog["eta"] .^ (3.0 / 5.0))
@@ -125,6 +150,17 @@ function extend_catalog!(catalog::Dict{String, Vector{Float64}})
     return catalog
 end
 
+"""
+    build_selection_indices(results, config)
+
+Build boolean masks for Fisher-selected and observable events.
+
+For each waveform, an event is Fisher-selected when it has a valid covariance,
+finite positive `delta_k`, and SNR above `config["snr_threshold"]`. Observable
+events additionally require inspiral SNR above `config["snr_inspiral_threshold"]`.
+Returns waveform-specific masks and combined masks for events selected or
+observable in both waveforms or only one waveform.
+"""
 function build_selection_indices(results::Dict{String, Dict{String, Vector}}, config::Dict)
     fisher_valid = Dict{String, BitVector}()
     fisher_selected = Dict{String, BitVector}()
@@ -160,13 +196,30 @@ function build_selection_indices(results::Dict{String, Dict{String, Vector}}, co
     )
 end
 
+"""
+    delta_ratio(results)
+
+Compute the base-10 logarithm of the ratio between the `"PhenomHM"` and
+`"PhenomD"` `delta_k` values in `results`. The values are typically 
+negative and its magnitude indicate how much constraints improve when
+going from PhenomHM to PhenomD.
+"""
 function delta_ratio(results::Dict{String, Dict{String, Vector}})
     delta_hm = Float64.(results["PhenomHM"]["delta_k"])
     delta_d = Float64.(results["PhenomD"]["delta_k"])
     return log10.(delta_hm ./ delta_d)
 end
 
-function contour_levels_from_density(density::AbstractMatrix{<:Real}, enclosed_masses=(0.98, 0.90, 0.30))
+"""
+    contour_levels_from_density(density, enclosed_masses=(0.98, 0.90, 0.30))
+
+Return contour levels for `density` that enclose each requested probability mass.
+The density values are sorted from high to low, cumulatively summed, and the
+threshold at each enclosed mass (quantile) is used as the corresponding contour level. A
+final level just above the maximum density is appended for plotting routines.
+Returns `[0.0, 1.0]` when the density has zero total weight.
+"""
+function contour_levels_from_density(density::AbstractMatrix{<:Real}, quantiles=(0.98, 0.90, 0.30))
     weights = vec(Float64.(density))
     total = sum(weights)
     total == 0.0 && return [0.0, 1.0]
@@ -180,16 +233,26 @@ function contour_levels_from_density(density::AbstractMatrix{<:Real}, enclosed_m
         return sorted_weights[idx]
     end
 
-    levels = [max(0.0, level_for_mass(mass)) for mass in enclosed_masses]
+    levels = [max(0.0, level_for_mass(mass)) for mass in quantiles]
     return vcat(levels, maximum(sorted_weights) + eps())
 end
 
+"""
+    kde_catalog_contours(catalog, x_key; z_threshold=FIG9_Z_THRESHOLD,
+        npoints=70, enclosed_masses=(0.98, 0.90, 0.30), y_key="mc")
+
+Select catalog events with redshift below `z_threshold`, estimate the 2D KDE
+for `x_key` versus `y_key`, and return `(x_grid, y_grid, density, levels)`.
+The contour `levels` enclose the requested `enclosed_masses`.
+
+Throws an `ArgumentError` when no catalog events pass the redshift selection.
+"""
 function kde_catalog_contours(catalog::Dict{String, Vector{Float64}}, x_key::String;
-    z_threshold::Float64=FIG9_Z_THRESHOLD, npoints::Int=70, enclosed_masses=(0.98, 0.90, 0.30))
+    z_threshold::Float64=FIG9_Z_THRESHOLD, npoints::Int=70, enclosed_masses=(0.98, 0.90, 0.30), y_key::String="mc")
 
     selected = BitVector(catalog["z"] .< z_threshold)
     x = Float64.(catalog[x_key][selected])
-    y = Float64.(catalog["mc"][selected])
+    y = Float64.(catalog[y_key][selected])
     isempty(x) && throw(ArgumentError("No catalog events satisfy z < $(z_threshold)."))
 
     kde_result = kde((x, y); npoints=(npoints, npoints))
@@ -199,6 +262,13 @@ function kde_catalog_contours(catalog::Dict{String, Vector{Float64}}, x_key::Str
     return kde_result.x, kde_result.y, density, levels
 end
 
+"""
+    histogram_bin_counts(values, limits; nbins=20)
+
+Count finite `values` in `nbins` equally spaced bins spanning `limits`.
+Values outside the closed interval are ignored, and values equal to the upper
+limit are included in the final bin. Returns `(edges, counts)`.
+"""
 function histogram_bin_counts(values::Vector{Float64}, limits::Tuple{<:Real, <:Real}; nbins::Int=20)
     xmin = Float64(limits[1])
     xmax = Float64(limits[2])
@@ -217,6 +287,15 @@ function histogram_bin_counts(values::Vector{Float64}, limits::Tuple{<:Real, <:R
     return edges, counts
 end
 
+"""
+    histogram_bin_densities(values, limits; nbins=20)
+
+Estimate a one-dimensional histogram density for finite `values` in `nbins`
+equally spaced bins spanning `limits`. Values outside the closed interval are
+ignored, and values equal to the upper limit are included in the final bin.
+Returns `(edges, densities)`, where densities integrate to one when at least
+one value falls inside the limits.
+"""
 function histogram_bin_densities(values::Vector{Float64}, limits::Tuple{<:Real, <:Real}; nbins::Int=20)
     edges, counts = histogram_bin_counts(values, limits; nbins=nbins)
     bin_width = (Float64(limits[2]) - Float64(limits[1])) / nbins
@@ -227,6 +306,13 @@ function histogram_bin_densities(values::Vector{Float64}, limits::Tuple{<:Real, 
     return edges, counts
 end
 
+"""
+    bin_index(value, edges, limits)
+
+Return the one-based histogram bin index for `value` using sorted bin `edges`
+and inclusive `limits`, or `nothing` for non-finite or out-of-range values.
+Values exactly equal to the upper limit are assigned to the final bin.
+"""
 function bin_index(value::Real, edges::Vector{Float64}, limits::Tuple{<:Real, <:Real})
     xmin = Float64(limits[1])
     xmax = Float64(limits[2])
@@ -238,6 +324,14 @@ function bin_index(value::Real, edges::Vector{Float64}, limits::Tuple{<:Real, <:
     return clamp(idx, 1, nbins)
 end
 
+"""
+    histogram_bin_ratios(values, ratios, edges, limits)
+
+Group finite `ratios` (quantifying the improvement in GR constraints when going from 
+PhenomD to PhenomHM)into histogram bins determined by the corresponding `values`, 
+sorted `edges`, and inclusive `limits`. Values outside the limits are ignored, and 
+each bin is sorted by increasing absolute ratio.
+"""
 function histogram_bin_ratios(values::Vector{Float64}, ratios::Vector{Float64}, edges::Vector{Float64},
     limits::Tuple{<:Real, <:Real})
 
@@ -252,6 +346,14 @@ function histogram_bin_ratios(values::Vector{Float64}, ratios::Vector{Float64}, 
     return binned_ratios
 end
 
+"""
+Group finite `ratios` (quantifying the improvement in GR constraints when going from 
+PhenomD to PhenomHM) and their `outline_flags` (which is the index that tells if the 
+event considered has enough SNR in the inspiral) into histogram bins determined by
+the corresponding `values`, sorted `edges`, and inclusive `limits`. Values outside
+the limits are ignored, and each bin is sorted with filled events first and then by
+increasing absolute ratio.
+"""
 function histogram_bin_events(values::Vector{Float64}, ratios::Vector{Float64}, outline_flags::Vector{Bool},
     edges::Vector{Float64}, limits::Tuple{<:Real, <:Real})
 
@@ -269,6 +371,11 @@ function histogram_bin_events(values::Vector{Float64}, ratios::Vector{Float64}, 
     return binned_events
 end
 
+"""
+Map `value` to an `RGB{Float64}` color by linearly interpolating across
+`IMPROVEMENT_COLORS` over `color_lims`. Values outside `color_lims` are
+clamped to the nearest endpoint color; equal limits use the palette midpoint.
+"""
 function ratio_color(value::Real, color_lims::Tuple{<:Real, <:Real})
     lo = Float64(color_lims[1])
     hi = Float64(color_lims[2])
@@ -286,6 +393,9 @@ function ratio_color(value::Real, color_lims::Tuple{<:Real, <:Real})
     )
 end
 
+"""
+Return the three normalized points used to draw grouped markers in the Fig. 9 legend.
+"""
 function fig9_legend_marker_points()
     return Point2f[(0.18, 0.5), (0.50, 0.5), (0.82, 0.5)]
 end
@@ -301,6 +411,9 @@ function fig9_grouped_marker_element(marker, colors; strokecolor=:transparent, s
     )
 end
 
+"""
+Add the Fig. 9 legend to `target_slot` using `color_lims` for observed-event colors.
+"""
 function add_fig9_legend!(target_slot, color_lims)
     improvement_colors = [ratio_color(value, color_lims) for value in LEGEND_IMPROVEMENT_VALUES]
     elements = [
@@ -338,6 +451,13 @@ function scale_density_to_fisher_peak(density_values::Vector{Float64}, fisher_pe
     return zeros(length(density_values))
 end
 
+"""
+    x_ticks_for_param(param)
+
+Return custom x-axis tick positions and labels for figure 9 parameter panels.
+
+Returns `nothing` when `param` does not need special tick formatting.
+"""
 function x_ticks_for_param(param::String)
     if param == "invq"
         return ([0.0, 0.5, 1.0], ["  0.0", "0.5", "1.0 "])
@@ -350,10 +470,21 @@ function x_ticks_for_param(param::String)
     end
 end
 
+"""
+    mc_ticks()
+
+Return tick positions and labels for Monte Carlo sample count axes in figure 9.
+"""
 function mc_ticks()
     return ([5.0, 20.0, 35.0, 50.0, 65.0, 80.0], ["5", "20", "35", "50", "65", "80"])
 end
 
+"""
+    hide_hist_axis!(ax; bottom_spine=true, left_spine=false, hide_x=true, hide_y=true)
+
+Hide histogram axis decorations and spines in-place, keeping only the requested
+bottom or left spine when enabled.
+"""
 function hide_hist_axis!(ax::Axis; bottom_spine::Bool=true, left_spine::Bool=false, hide_x::Bool=true, hide_y::Bool=true)
     hidedecorations!(ax; label=hide_x && hide_y, ticklabels=hide_x && hide_y, ticks=hide_x && hide_y)
     if hide_x
@@ -372,6 +503,12 @@ function hide_hist_axis!(ax::Axis; bottom_spine::Bool=true, left_spine::Bool=fal
     return ax
 end
 
+"""
+    step_xy(edges, counts)
+
+Return x and y coordinates for drawing a step histogram from bin `edges` and
+bin `counts`, including zero-height endpoints to close the outline.
+"""
 function step_xy(edges::Vector{Float64}, counts::Vector{Float64})
     xcoords = Float64[]
     ycoords = Float64[]
@@ -384,6 +521,12 @@ function step_xy(edges::Vector{Float64}, counts::Vector{Float64})
     return xcoords, ycoords
 end
 
+"""
+    side_step_xy(edges, counts)
+
+Return x and y coordinates for drawing a horizontal step histogram from bin
+`edges` and bin `counts`, including zero-width endpoints to close the outline.
+"""
 function side_step_xy(edges::Vector{Float64}, counts::Vector{Float64})
     xcoords = Float64[]
     ycoords = Float64[]
@@ -396,6 +539,13 @@ function side_step_xy(edges::Vector{Float64}, counts::Vector{Float64})
     return xcoords, ycoords
 end
 
+"""
+    draw_top_colored_histogram!(ax, edges, binned_ratios, color_lims)
+
+Draw stacked, colored histogram bins on the top histogram axis. Each ratio in
+`binned_ratios` is rendered as one unit-height rectangle in its bin and colored
+with `ratio_color` using `color_lims`.
+"""
 function draw_top_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_ratios::Vector{Vector{Float64}}, color_lims)
     for (bin_idx, ratios) in enumerate(binned_ratios)
         for (stack_idx, ratio) in enumerate(ratios)
@@ -413,6 +563,13 @@ function draw_top_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_ra
     return ax
 end
 
+"""
+    draw_top_event_histogram_pixels!(ax, edges, binned_events, color_lims)
+
+Draw stacked, colored histogram bins on the top histogram axis. Each event is a
+`(ratio, outline_flag)` tuple: `ratio` controls the fill color through
+`ratio_color`, and `outline_flag` draws a black stroke for highlighted events.
+"""
 function draw_top_event_histogram_pixels!(ax::Axis, edges::Vector{Float64}, binned_events::Vector{Vector{Tuple{Float64, Bool}}},
     color_lims)
 
@@ -438,6 +595,13 @@ function draw_top_event_histogram_pixels!(ax::Axis, edges::Vector{Float64}, binn
     return ax
 end
 
+"""
+    draw_side_colored_histogram!(ax, edges, binned_ratios, color_lims)
+
+Draw stacked, colored histogram bins on the side histogram axis. Each ratio in
+`binned_ratios` is rendered as one unit-width rectangle in its bin and colored
+with `ratio_color` using `color_lims`.
+"""
 function draw_side_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_ratios::Vector{Vector{Float64}}, color_lims)
     for (bin_idx, ratios) in enumerate(binned_ratios)
         for (stack_idx, ratio) in enumerate(ratios)
@@ -455,6 +619,13 @@ function draw_side_colored_histogram!(ax::Axis, edges::Vector{Float64}, binned_r
     return ax
 end
 
+"""
+    draw_side_event_histogram_pixels!(ax, edges, binned_events, color_lims)
+
+Draw stacked, colored histogram bins on the side histogram axis. Each event is a
+`(ratio, outline_flag)` tuple: `ratio` controls the fill color through
+`ratio_color`, and `outline_flag` draws a black stroke for highlighted events.
+"""
 function draw_side_event_histogram_pixels!(ax::Axis, edges::Vector{Float64}, binned_events::Vector{Vector{Tuple{Float64, Bool}}},
     color_lims)
 
@@ -480,10 +651,18 @@ function draw_side_event_histogram_pixels!(ax::Axis, edges::Vector{Float64}, bin
     return ax
 end
 
+"""
+    draw_top_histogram!(ax, base_values, fisher_values, observable_values,
+        fisher_ratios, observable_ratios, fisher_outline_flags, xlim, color_lims; nbins=20)
+
+Draw the top marginal histogram for `xlim`, overlaying the scaled catalog
+baseline, Fisher-selected counts, observable-selected counts, and color-coded
+improvement-ratio bins on `ax`.
+"""
 function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_values::Vector{Float64},
     observable_values::Vector{Float64}, fisher_ratios::Vector{Float64}, observable_ratios::Vector{Float64},
-    fisher_outline_flags::Vector{Bool},
-    xlim::Tuple{<:Real, <:Real}, color_lims; nbins::Int=20)
+    fisher_outline_flags::Vector{Bool}, xlim::Tuple{<:Real, <:Real}, color_lims; nbins::Int=20)
+
     edges, base_density = histogram_bin_densities(base_values, xlim; nbins=nbins)
     _, fisher_counts = histogram_bin_counts(fisher_values, xlim; nbins=nbins)
     _, observable_counts = histogram_bin_counts(observable_values, xlim; nbins=nbins)
@@ -517,6 +696,14 @@ function draw_top_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_valu
     return ax
 end
 
+"""
+    draw_side_histogram!(ax, base_values, fisher_values, observable_values,
+        fisher_ratios, observable_ratios, fisher_outline_flags, color_lims; nbins=20)
+
+Draw the right-side marginal histogram for `FIG9_MC_LIMITS`, overlaying the scaled
+catalog baseline, Fisher-selected counts, observable-selected counts, and
+color-coded improvement-ratio bins on `ax`.
+"""
 function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_values::Vector{Float64},
     observable_values::Vector{Float64}, fisher_ratios::Vector{Float64}, observable_ratios::Vector{Float64},
     fisher_outline_flags::Vector{Bool}, color_lims; nbins::Int=20)
@@ -553,11 +740,29 @@ function draw_side_histogram!(ax::Axis, base_values::Vector{Float64}, fisher_val
     return ax
 end
 
+"""
+    build_main_panel!(ax, catalog, results, indices, x_key, xlim, ratio, color_lims; xlabel, ylabel="", show_yticks=true, show_yticklabels=true, y_key="mc")
+
+Draw the main Figure 9 scatter/contour panel on `ax` and return the scatter plot object used for the colorbar.
+
+Arguments:
+- `ax`: Makie axis to draw into.
+- `catalog`: catalog columns keyed by name; must include `x_key`, `y_key`, and `"z"`.
+- `results`: Fisher/result vectors keyed by event and quantity; retained for the shared panel-building interface.
+- `indices`: boolean selection masks keyed by name; must include `"both_fisher_selected"` and `"potentially_problematic"`.
+- `x_key`: catalog column used for the horizontal axis.
+- `xlim`: horizontal axis limits.
+- `ratio`: per-event color values, indexed consistently with `catalog`.
+- `color_lims`: color range passed to the improvement colormap.
+- `xlabel`, `ylabel`: axis labels.
+- `show_yticks`, `show_yticklabels`: control y-axis tick and tick-label visibility.
+- `y_key`: catalog column used for the vertical axis, defaulting to `"mc"`.
+"""
 function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, results::Dict{String, Dict{String, Vector}},
     indices::Dict{String, BitVector}, x_key::String, xlim::Tuple{<:Real, <:Real}, ratio::Vector{Float64}, color_lims;
-    xlabel, ylabel="", show_yticks::Bool=true, show_yticklabels::Bool=true)
+    xlabel, ylabel="", show_yticks::Bool=true, show_yticklabels::Bool=true, y_key::String="mc")
 
-    x_grid, y_grid, density, levels = kde_catalog_contours(catalog, x_key; z_threshold=FIG9_Z_THRESHOLD)
+    x_grid, y_grid, density, levels = kde_catalog_contours(catalog, x_key; z_threshold=FIG9_Z_THRESHOLD, y_key=y_key)
 
     contourf!(ax, x_grid, y_grid, density; levels=levels, colormap=CONTOUR_FILL_COLORS)
     contour!(ax, x_grid, y_grid, density; levels=levels[1:end-1], color=CONTOUR_LINE_COLOR, linewidth=1.2)
@@ -566,13 +771,13 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
     problematic = BitVector((catalog["z"] .< FIG9_Z_THRESHOLD) .& indices["potentially_problematic"])
 
     xvals = catalog[x_key][selected]
-    yvals = catalog["mc"][selected]
+    yvals = catalog[y_key][selected]
     cvals = ratio[selected]
     scatterplot = scatter!(ax, xvals, yvals; color=cvals, colormap=IMPROVEMENT_COLORMAP, colorrange=color_lims, markersize=FIG9_MARKER_SIZE)
     scatter!(
         ax,
         catalog[x_key][problematic],
-        catalog["mc"][problematic];
+        catalog[y_key][problematic];
         color=ratio[problematic],
         colormap=IMPROVEMENT_COLORMAP,
         colorrange=color_lims,
@@ -609,17 +814,54 @@ function build_main_panel!(ax::Axis, catalog::Dict{String, Vector{Float64}}, res
     return scatterplot
 end
 
+"""
+    build_plot(catalog, results, indices, y_key="mc")
+
+Construct and return the complete Makie figure used for Figure 9.
+
+The plot combines four main scatter/contour panels, one for each horizontal
+catalog quantity (`"invq"`, `"iota"`, `"chi_eff"`, and `"z"`), with matching
+top histograms and a side histogram for the vertical catalog quantity `"mc"`.
+Events are restricted to the redshift range `catalog["z"] < FIG9_Z_THRESHOLD`.
+The background contours show the KDE-smoothed catalog distribution, while the
+scatter points and colored histogram pixels show the per-event higher-mode
+improvement ratio returned by [`delta_ratio`](@ref). Potentially problematic 
+events, due to a too low inspiral SNR are outlined with the same flags used 
+elsewhere in the Figure 9 helpers.
+
+Arguments:
+- `catalog`: dictionary of catalog columns keyed by parameter name. It must
+  contain at least `"mc"`, `"eta"`, `"chi_1"`, `"chi_2"`, `"iota"`, and `"z"`.
+  The function calls [`extend_catalog!`](@ref), so derived columns such as
+  `"m1"`, `"m2"`, `"invq"`, and `"chi_eff"` are added or refreshed in place.
+- `results`: nested dictionary of waveform result vectors, keyed by waveform
+  name and quantity. It must contain the quantities required by
+  [`delta_ratio`](@ref), and all vectors must be indexed consistently with
+  `catalog`.
+- `indices`: dictionary of selection masks from [`build_selection_indices`](@ref).
+  The masks `"both_fisher_selected"`, `"both_observable"`, and
+  `"potentially_problematic"` are used to decide which events appear in the
+  panels, histograms, and outlined marker overlay.
+- `y_key`: catalog column used on the shared vertical axis and side histogram.
+  It defaults to `"mc"` and is expected to have limits compatible with
+  `FIG9_MC_LIMITS`, since those limits are applied to the main and side axes.
+
+Returns a `Figure` with the CairoMakie backend activated, all panel layout
+sizing applied, linked main-panel y axes, a legend, and a horizontal colorbar.
+No files are written by this function; callers are responsible for saving the
+returned figure.
+"""
 function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String, Dict{String, Vector}}, indices::Dict{String, BitVector})
     CairoMakie.activate!()
     extend_catalog!(catalog)
     labels = build_labels()
+    y_key = "mc"
     kde_selected = BitVector(catalog["z"] .< FIG9_Z_THRESHOLD)
     ratio = delta_ratio(results)
     fisher_hist_selected = BitVector(kde_selected .& indices["both_fisher_selected"])
     observable_hist_selected = BitVector(kde_selected .& indices["both_observable"])
     fisher_hist_outline_flags = Vector{Bool}(indices["potentially_problematic"][fisher_hist_selected])
-    scatter_selected = BitVector(kde_selected .& indices["both_fisher_selected"])
-    valid_ratio = ratio[scatter_selected]
+    valid_ratio = ratio[fisher_hist_selected]
     max_abs_ratio = isempty(valid_ratio) ? 1.0 : maximum(abs.(valid_ratio))
     color_lims = (-max_abs_ratio, 0)
 
@@ -651,7 +893,7 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
     foreach(ax -> hide_hist_axis!(ax; bottom_spine=true), top_axes)
 
     scatter_ref = build_main_panel!(main_axes[1], catalog, results, indices, "invq", (0.0, 1.0), ratio, color_lims;
-        xlabel=labels["invq"], ylabel=labels["mc"], show_yticks=true, show_yticklabels=true)
+        xlabel=labels["invq"], ylabel=labels[y_key], show_yticks=true, show_yticklabels=true)
     build_main_panel!(main_axes[2], catalog, results, indices, "iota", (0.0, π), ratio, color_lims;
         xlabel=labels["iota"], show_yticks=true, show_yticklabels=false)
     build_main_panel!(main_axes[3], catalog, results, indices, "chi_eff", (-1.0, 1.0), ratio, color_lims;
@@ -660,7 +902,7 @@ function build_plot(catalog::Dict{String, Vector{Float64}}, results::Dict{String
         xlabel=labels["z"], show_yticks=true, show_yticklabels=false)
     linkyaxes!(main_axes...)
 
-    draw_side_histogram!(side_ax, catalog["mc"][kde_selected], catalog["mc"][fisher_hist_selected], catalog["mc"][observable_hist_selected],
+    draw_side_histogram!(side_ax, catalog[y_key][kde_selected], catalog[y_key][fisher_hist_selected], catalog[y_key][observable_hist_selected],
         ratio[fisher_hist_selected], ratio[observable_hist_selected], fisher_hist_outline_flags, color_lims)
     hide_hist_axis!(side_ax; left_spine=true, hide_x=true, hide_y=true)
     ylims!(side_ax, FIG9_MC_LIMITS[1], FIG9_MC_LIMITS[2])
