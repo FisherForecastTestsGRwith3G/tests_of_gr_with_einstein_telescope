@@ -133,15 +133,38 @@ function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::R
     )
 end
 
-function decade_ticks(y_limits::Tuple{<:Real, <:Real})
+function decade_ticks(decade_min::Int, decade_max::Int)
+    exponents = collect(decade_min:decade_max)
+    values = exp10.(exponents)
+    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
+    return values, labels
+end
+
+function decade_ticks(y_limits::Tuple{<:Real, <:Real}; trim_outer::Bool=true)
     y_min, y_max = y_limits
     decade_min = floor(Int, log10(y_min))
     decade_max = ceil(Int, log10(y_max))
     exponents = collect(decade_min:decade_max)
-    length(exponents) > 2 && (exponents = exponents[2:end-1])
+    trim_outer && length(exponents) > 2 && (exponents = exponents[2:end-1])
     values = exp10.(exponents)
     labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
     return values, labels
+end
+
+function positive_finite_mask(arrays::AbstractVector...)
+    isempty(arrays) && return BitVector()
+
+    mask = trues(length(first(arrays)))
+    for values in arrays
+        mask .&= (values .> 0.0) .& isfinite.(values)
+    end
+    return mask
+end
+
+function append_positive_finite_values!(values::Vector{Float64}, x::AbstractVector, y::AbstractVector)
+    mask = positive_finite_mask(x, y)
+    append!(values, Float64.(y[mask]))
+    return values
 end
 
 function top_pno_label(pno::AbstractString)

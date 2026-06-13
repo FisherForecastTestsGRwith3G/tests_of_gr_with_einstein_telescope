@@ -2,10 +2,12 @@ using TOML
 using HDF5
 using CairoMakie
 using LaTeXStrings
+import JSON
 
 include("_config_parser.jl")
 include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
+include("_plotting_utils.jl")
 
 ## WARNING: NOT HUMAN CONTROLLED YET! 
 
@@ -23,9 +25,6 @@ const WAVEFORM_LINESTYLES = Dict(
 const FIG_SCALING_SIZE = (1800, 900)
 const FIG3_FIGURE_PADDING = (0, 40, 0, 0)
 const FIG3_LEGEND_ROW_FRACTION = 0.18
-const GUIDE_FONT_SIZE = 32
-const TICK_FONT_SIZE = 32
-const LEGEND_FONT_SIZE = 28
 const SQRT_N_GUIDE_COLOR = (:gray35, 0.65)
 const CBRT_N_GUIDE_COLOR = (:gray45, 0.65)
 const POPULATION_LINE_WIDTH = 3.5
@@ -59,20 +58,6 @@ function pno_plot_label(pno::AbstractString)
     return latexstring(raw"\varphi_{", pno, "}")
 end
 
-function decade_ticks(limits::Tuple{<:Real, <:Real})
-    min_value, max_value = limits
-    decade_min = floor(Int, log10(min_value))
-    decade_max = ceil(Int, log10(max_value))
-    return decade_ticks(decade_min, decade_max)
-end
-
-function decade_ticks(decade_min::Int, decade_max::Int)
-    exponents = collect(decade_min:decade_max)
-    values = exp10.(exponents)
-    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
-    return values, labels
-end
-
 function decade_limits_and_ticks(values::Vector{Float64})
     y_min = minimum(values)
     y_max = maximum(values)
@@ -81,55 +66,57 @@ function decade_limits_and_ticks(values::Vector{Float64})
     return (exp10(decade_min), exp10(decade_max)), decade_ticks(decade_min, decade_max)
 end
 
+"""
+    read_scaling_results(scaling_results_file::AbstractString, config::Dict)
+
+Read the Fig. 3 scaling-analysis results for `config["network"]` from the HDF5
+file at `scaling_results_file`.
+
+Returns a dictionary keyed by PN order string. Each value contains the population
+sizes and the median, 5th percentile, and 95th percentile curves for the
+population and best-single-detector selections. Returns `nothing` when the
+target waveform family is absent.
+"""
 function read_scaling_results(scaling_results_file::AbstractString, config::Dict)
-    results = Dict{String, Dict{String, Any}}()
+    results = Dict{String, Any}()
 
     h5open(scaling_results_file, "r") do file
         network_group = file[config["network"]]
 
-        for wf_fam in [TARGET_WAVEFORM_FAMILY]
-            results[wf_fam] = Dict{String, Any}()
-            haskey(network_group, wf_fam) || continue
-            wf_group = network_group[wf_fam]
+        haskey(network_group, TARGET_WAVEFORM_FAMILY) || return nothing
+        wf_group = network_group[TARGET_WAVEFORM_FAMILY]
 
-            for pno in TARGET_PN_ORDERS
-                haskey(wf_group, createSED.pnoString(pno)) || continue
-                pno_group = wf_group[createSED.pnoString(pno)]
+        for pno in TARGET_PN_ORDERS
+            haskey(wf_group, createSED.pnoString(pno)) || continue
+            pno_group = wf_group[createSED.pnoString(pno)]
 
-                results[wf_fam][pno] = (
-                    population_sizes=read(pno_group, "population_sizes"),
-                    population=(
-                        median=read(pno_group["population"], "median"),
-                        q05=read(pno_group["population"], "q05"),
-                        q95=read(pno_group["population"], "q95"),
-                    ),
-                    best_single=(
-                        median=read(pno_group["best_single"], "median"),
-                        q05=read(pno_group["best_single"], "q05"),
-                        q95=read(pno_group["best_single"], "q95"),
-                    ),
-                )
-            end
+            results[pno] = (
+                population_sizes=read(pno_group, "population_sizes"),
+                population=(
+                    median=read(pno_group["population"], "median"),
+                    q05=read(pno_group["population"], "q05"),
+                    q95=read(pno_group["population"], "q95"),
+                ),
+                best_single=(
+                    median=read(pno_group["best_single"], "median"),
+                    q05=read(pno_group["best_single"], "q05"),
+                    q95=read(pno_group["best_single"], "q95"),
+                ),
+            )
         end
     end
 
     return results
 end
 
-function positive_limits!(values::Vector{Float64}, x::AbstractVector, y::AbstractVector)
-    for idx in eachindex(x, y)
-        if x[idx] > 0.0 && y[idx] > 0.0 && isfinite(x[idx]) && isfinite(y[idx])
-            push!(values, Float64(y[idx]))
-        end
-    end
+"""
+    plot_scaling_band!(ax::Axis, x::AbstractVector, q05::AbstractVector, q95::AbstractVector, color; alpha=0.3)
 
-    return values
-end
-
+Plot the positive finite entries of the 5%-95% quantile band on `ax`.
+"""
 function plot_scaling_band!(ax::Axis, x::AbstractVector, q05::AbstractVector, q95::AbstractVector, color;
     alpha::Real=0.3)
-    positive = (x .> 0.0) .& (q05 .> 0.0) .& (q95 .> 0.0) .&
-               isfinite.(x) .& isfinite.(q05) .& isfinite.(q95)
+    positive = positive_finite_mask(x, q05, q95)
     any(positive) || return nothing
 
     band!(ax, x[positive], q05[positive], q95[positive];
@@ -137,9 +124,14 @@ function plot_scaling_band!(ax::Axis, x::AbstractVector, q05::AbstractVector, q9
     )
 end
 
+"""
+    plot_scaling_line!(ax::Axis, x::AbstractVector, y::AbstractVector, color, linestyle; linewidth=3.0)
+
+Plot the positive finite entries of `y` against `x` on `ax`.
+"""
 function plot_scaling_line!(ax::Axis, x::AbstractVector, y::AbstractVector, color, linestyle;
     linewidth::Real=3.0)
-    positive = (x .> 0.0) .& (y .> 0.0) .& isfinite.(x) .& isfinite.(y)
+    positive = positive_finite_mask(x, y)
     any(positive) || return nothing
 
     lines!(ax, x[positive], y[positive];
@@ -149,8 +141,15 @@ function plot_scaling_line!(ax::Axis, x::AbstractVector, y::AbstractVector, colo
     )
 end
 
+"""
+    reference_power_law_curve(x::AbstractVector, y::AbstractVector, exponent::Real; extension_decades=0.18)
+
+Return `(x_guide, y_guide, x_positive)` for a reference power-law curve anchored
+at the final positive finite point in `x` and `y`, or `nothing` if no such
+point exists.
+"""
 function reference_power_law_curve(x::AbstractVector, y::AbstractVector, exponent::Real; extension_decades::Real=0.18)
-    positive = (x .> 0.0) .& (y .> 0.0) .& isfinite.(x) .& isfinite.(y)
+    positive = positive_finite_mask(x, y)
     any(positive) || return nothing
 
     x_positive = Float64.(x[positive])
@@ -164,6 +163,13 @@ function reference_power_law_curve(x::AbstractVector, y::AbstractVector, exponen
     return x_guide, amplitude ./ (x_guide .^ exponent), x_positive
 end
 
+"""
+    add_fig3_legend!(fig::Figure, target_slot)
+
+Add the Fig. 3 PN-order and constraint-type legend to `target_slot`.
+
+Returns `fig`.
+"""
 function add_fig3_legend!(fig::Figure, target_slot)
     pn_elements = [
         LineElement(color=PN_COLORS[pno], linestyle=nothing, linewidth=5)
@@ -215,7 +221,7 @@ function add_fig3_legend!(fig::Figure, target_slot)
     return fig
 end
 
-function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::Dict)
+function build_scaling_figure(results::Dict{String, Any}, config::Dict)
     fig = Figure(size=FIG_SCALING_SIZE, backgroundcolor=:white, figure_padding=FIG3_FIGURE_PADDING)
     legend_slot = fig[1, 1]
     ax = Axis(
@@ -257,102 +263,99 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
     x_max = -Inf
     y_values = Float64[]
 
-    for wf_fam in [TARGET_WAVEFORM_FAMILY]
-        waveform_results = get(results, wf_fam, Dict{String, Any}())
-        for pno in TARGET_PN_ORDERS
-            haskey(waveform_results, pno) || continue
-            result = waveform_results[pno]
-            color = PN_COLORS[pno]
+    for pno in TARGET_PN_ORDERS
+        haskey(results, pno) || continue
+        result = results[pno]
+        color = PN_COLORS[pno]
 
-            plot_scaling_band!(
-                ax,
-                result.population_sizes,
-                result.population.q05,
-                result.population.q95,
-                color,
-            )
-            plot_scaling_line!(
-                ax,
-                result.population_sizes,
-                result.population.median,
-                color,
-                nothing,
-                linewidth=POPULATION_LINE_WIDTH,
-            )
-            plot_scaling_band!(
-                ax,
-                result.population_sizes,
-                result.best_single.q05,
-                result.best_single.q95,
-                color;
-                alpha=0.15,
-            )
-            plot_scaling_line!(
-                ax,
-                result.population_sizes,
-                result.best_single.median,
-                color,
-                :dash,
-                linewidth=BEST_EVENT_LINE_WIDTH,
-            )
+        plot_scaling_band!(
+            ax,
+            result.population_sizes,
+            result.population.q05,
+            result.population.q95,
+            color,
+        )
+        plot_scaling_line!(
+            ax,
+            result.population_sizes,
+            result.population.median,
+            color,
+            nothing,
+            linewidth=POPULATION_LINE_WIDTH,
+        )
+        plot_scaling_band!(
+            ax,
+            result.population_sizes,
+            result.best_single.q05,
+            result.best_single.q95,
+            color;
+            alpha=0.15,
+        )
+        plot_scaling_line!(
+            ax,
+            result.population_sizes,
+            result.best_single.median,
+            color,
+            :dash,
+            linewidth=BEST_EVENT_LINE_WIDTH,
+        )
 
-            sqrt_guide_curve = reference_power_law_curve(result.population_sizes, result.population.median, 0.5)
-            if sqrt_guide_curve !== nothing
-                guide_x, guide_y, guide_data_x = sqrt_guide_curve
-                x_min = min(x_min, minimum(guide_data_x))
-                x_max = max(x_max, maximum(guide_data_x))
-                lines!(ax, guide_x, guide_y;
+        sqrt_guide_curve = reference_power_law_curve(result.population_sizes, result.population.median, 0.5)
+        if sqrt_guide_curve !== nothing
+            guide_x, guide_y, guide_data_x = sqrt_guide_curve
+            x_min = min(x_min, minimum(guide_data_x))
+            x_max = max(x_max, maximum(guide_data_x))
+            lines!(ax, guide_x, guide_y;
+                color=SQRT_N_GUIDE_COLOR,
+                linestyle=:dashdot,
+                linewidth=GUIDE_LINE_WIDTH,
+            )
+            if !sqrt_guide_label_added
+                text!(
+                    ax,
+                    guide_x[end],
+                    guide_y[end];
+                    text=L"N_{\mathrm{obs}}^{-1/2}",
+                    fontsize=LEGEND_FONT_SIZE,
                     color=SQRT_N_GUIDE_COLOR,
-                    linestyle=:dashdot,
-                    linewidth=GUIDE_LINE_WIDTH,
+                    align=(:right, :bottom),
+                    offset=(-8, 8),
                 )
-                if !sqrt_guide_label_added
-                    text!(
-                        ax,
-                        guide_x[end],
-                        guide_y[end];
-                        text=L"N_{\mathrm{obs}}^{-1/2}",
-                        fontsize=LEGEND_FONT_SIZE,
-                        color=SQRT_N_GUIDE_COLOR,
-                        align=(:right, :bottom),
-                        offset=(-8, 8),
-                    )
-                    sqrt_guide_label_added = true
-                end
+                sqrt_guide_label_added = true
             end
-
-            cbrt_guide_curve = reference_power_law_curve(result.population_sizes, result.best_single.median, 1 / 3)
-            if cbrt_guide_curve !== nothing
-                guide_x, guide_y, guide_data_x = cbrt_guide_curve
-                x_min = min(x_min, minimum(guide_data_x))
-                x_max = max(x_max, maximum(guide_data_x))
-                lines!(ax, guide_x, guide_y;
-                    color=CBRT_N_GUIDE_COLOR,
-                    linestyle=:dot,
-                    linewidth=GUIDE_LINE_WIDTH,
-                )
-                if !cbrt_guide_label_added
-                    text!(
-                        ax,
-                        guide_x[end],
-                        guide_y[end];
-                        text=L"N_{\mathrm{obs}}^{-1/3}",
-                        fontsize=LEGEND_FONT_SIZE,
-                        color=CBRT_N_GUIDE_COLOR,
-                        align=(:right, :bottom),
-                        offset=(-8, 8),
-                    )
-                    cbrt_guide_label_added = true
-                end
-            end
-
-            positive_limits!(y_values, result.population_sizes, result.population.q05)
-            positive_limits!(y_values, result.population_sizes, result.population.q95)
-            positive_limits!(y_values, result.population_sizes, result.best_single.q05)
-            positive_limits!(y_values, result.population_sizes, result.best_single.median)
-            positive_limits!(y_values, result.population_sizes, result.best_single.q95)
-            plotted_any = true
         end
+
+        cbrt_guide_curve = reference_power_law_curve(result.population_sizes, result.best_single.median, 1 / 3)
+        if cbrt_guide_curve !== nothing
+            guide_x, guide_y, guide_data_x = cbrt_guide_curve
+            x_min = min(x_min, minimum(guide_data_x))
+            x_max = max(x_max, maximum(guide_data_x))
+            lines!(ax, guide_x, guide_y;
+                color=CBRT_N_GUIDE_COLOR,
+                linestyle=:dot,
+                linewidth=GUIDE_LINE_WIDTH,
+            )
+            if !cbrt_guide_label_added
+                text!(
+                    ax,
+                    guide_x[end],
+                    guide_y[end];
+                    text=L"N_{\mathrm{obs}}^{-1/3}",
+                    fontsize=LEGEND_FONT_SIZE,
+                    color=CBRT_N_GUIDE_COLOR,
+                    align=(:right, :bottom),
+                    offset=(-8, 8),
+                )
+                cbrt_guide_label_added = true
+            end
+        end
+
+        append_positive_finite_values!(y_values, result.population_sizes, result.population.q05)
+        append_positive_finite_values!(y_values, result.population_sizes, result.population.q95)
+        append_positive_finite_values!(y_values, result.population_sizes, result.best_single.q05)
+        append_positive_finite_values!(y_values, result.population_sizes, result.best_single.median)
+        append_positive_finite_values!(y_values, result.population_sizes, result.best_single.q95)
+        plotted_any = true
     end
 
     plotted_any || throw(ArgumentError("No scaling results found for target PN orders: $(join(TARGET_PN_ORDERS, ", "))"))
@@ -361,7 +364,7 @@ function build_scaling_figure(results::Dict{String, Dict{String, Any}}, config::
 
     if isfinite(x_min) && isfinite(x_max)
         xlims!(ax, x_min, x_max)
-        ax.xticks = decade_ticks((x_min, x_max))
+        ax.xticks = decade_ticks((x_min, x_max); trim_outer=false)
     end
 
     if !isempty(y_values)
