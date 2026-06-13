@@ -93,16 +93,18 @@ function plot_masked_runs!(ax::Axis, x::AbstractVector, y::AbstractVector, mask:
 end
 
 function plot_curve_segments!(ax::Axis, data::AbstractMatrix{<:Real}, selected::AbstractVector{Bool};
-    label=nothing, color, linewidth::Real=CURVE_LINE_WIDTH, faded_alpha::Real=0.4, transform_y=identity)
+    label=nothing, color, linewidth::Real=CURVE_LINE_WIDTH, faded_alpha::Real=0.4,
+    transform_y=identity, min_frequency::Real=-Inf)
 
     x = view(data, :, 1)
     y = transform_y.(view(data, :, 2))
+    plotted = x .>= min_frequency
 
     plot_masked_runs!(
         ax,
         x,
         y,
-        selected;
+        selected .& plotted;
         color=(color, 1.0),
         linewidth=linewidth,
         label=label,
@@ -111,7 +113,7 @@ function plot_curve_segments!(ax::Axis, data::AbstractMatrix{<:Real}, selected::
         ax,
         x,
         y,
-        .!selected;
+        .!selected .& plotted;
         color=(color, faded_alpha),
         linewidth=linewidth,
     )
@@ -199,6 +201,7 @@ function build_plot()
         (asd_data[:V1][:, 1] .> LVK_FMIN) .& (asd_data[:V1][:, 1] .< LVK_FMAX);
         label=CURVE_LABELS[:V1],
         color=CURVE_COLORS[:V1],
+        min_frequency=10,
     )
     plot_curve_segments!(
         ax,
