@@ -8,38 +8,16 @@ import JSON
 include("_config_parser.jl")
 include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
+include("_plotting_utils.jl")
 
 const PHENOM_D_COLOR  = FIG9_IMPROVEMENT_LOW_COLOR
 const PHENOM_HM_COLOR = FIG9_IMPROVEMENT_HIGH_COLOR
 const PHENOM_D_FILL_COLOR  = FIG9_LIGHT_IMPROVEMENT_LOW_COLOR
 const PHENOM_HM_FILL_COLOR = FIG9_LIGHT_IMPROVEMENT_HIGH_COLOR
-const GWTC3_COLOR     = :black
-const TITLE_FONT_SIZE = 28
-const GUIDE_FONT_SIZE = 32
-const TICK_FONT_SIZE  = 32
-const LEGEND_FONT_SIZE = 28
 const FIG1_SIZE = (1800, 760)
 const FIG1_TOP_ROW_FRACTION = 0.11
 const FIG1_COL_GAP = 20
 const FIG1_LABEL_ROW_GAP = 10
-const GWTC3_REFERENCE_FILE = joinpath(@__DIR__, "lvk_gwtc_3_results_2025.json")
-
-function load_gwtc3_reference()
-    all_results = JSON.parsefile(GWTC3_REFERENCE_FILE; dicttype=Dict{String, Any})
-    reference = get(all_results, "GWTC-3 (SEOB)", nothing)
-    reference === nothing && throw(ArgumentError("Missing `GWTC-3 (SEOB)` in $(GWTC3_REFERENCE_FILE)"))
-    return Dict{String, Float64}(key => Float64(value) for (key, value) in reference)
-end
-
-const GWTC3_REFERENCE = load_gwtc3_reference()
-
-function get_population_results_file(config::Dict)
-    return joinpath(
-        @__DIR__,
-        config["bootstrap_outdir"],
-        "population_results_$(config["bootstrap_tag"]).h5"
-    )
-end
 
 function get_plot_output_file(config::Dict)
     return joinpath(
@@ -62,54 +40,6 @@ end
 #----------------------------------------------------------------------------#
 # Auxiliary functions
 #----------------------------------------------------------------------------#
-"""
-    get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-
-Return logarithmically spaced histogram bin edges for the positive entries in
-`samples`. Throws an error if not all samples are positive.
-Lower (upper) bound of the bins is given by the smallest (largest) sample handed.
-"""
-function get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-
-    y_min = minimum(samples)
-    y_max = maximum(samples)
-    if y_min == y_max
-        return exp10.(range(log10(y_min) - 0.25, log10(y_max) + 0.25, length=11))
-    end
-
-    if isnothing(n_bins)
-        n_bins = clamp(round(Int, sqrt(length(samples))), 8, 40)
-    end
-
-    return exp10.(range(log10(y_min), log10(y_max), length=n_bins + 1))
-end
-
-"""
-    histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-
-Build histogram bin counts for the positive entries in `samples` using logarithmically
-spaced bin edges from [`get_histogram_edges`](@ref). Returns `nothing` when no positive
-samples are available, otherwise returns `(edges, counts)`.
-"""
-function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-    edges = get_histogram_edges(samples; n_bins=n_bins)
-    if edges === nothing
-        return nothing
-    end
-
-    counts = zeros(Int, length(edges) - 1)
-    for value in samples
-        idx = searchsortedlast(edges, value)
-        idx = clamp(idx, 1, length(edges) - 1)
-        if value == edges[end]
-            idx = length(edges) - 1
-        end
-        counts[idx] += 1
-    end
-
-    return edges, counts
-end
-
 """
     mirrored_histogram_bars!(ax, x0, samples, side, fill_color, edge_color; max_width=0.38, n_bins=nothing)
 
@@ -190,20 +120,6 @@ function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, si
 end
 
 """
-    add_gwtc3_reference!(ax::Axis, x0::Real, pno::String)
-
-Add the GWTC-3 reference value for `pno` as a diamond marker at `x0`, when a
-reference value is available.
-"""
-function add_gwtc3_reference!(ax::Axis, x0::Real, pno::String)
-    haskey(GWTC3_REFERENCE, pno) || return nothing
-    scatter!(ax, [x0], [GWTC3_REFERENCE[pno]];
-        color=GWTC3_COLOR, marker=:diamond, markersize=18,
-        strokecolor=:white, strokewidth=1.0)
-    return nothing
-end
-
-"""
     read_plot_data(population_results_file, config)
 
 Read the per-waveform, per-post-Newtonian-order single-event and bootstrap
@@ -232,177 +148,6 @@ function read_plot_data(population_results_file::AbstractString, config::Dict)
     end
 
     return single_event_constraints, bootstrap_constraints
-end
-
-"""
-    histogram_limits(pn_orders, single_event_constraints, waveform_families)
-
-Return the combined lower and upper histogram-edge limits across all requested
-PN orders and waveform families. Missing waveform families or PN orders are skipped;
-returns `nothing` when no finite limits can be determined.
-"""
-function histogram_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    waveform_families::AbstractVector{<:AbstractString},
-)
-    y_min = Inf
-    y_max = 0.0
-
-    for pno in pn_orders
-        for wf_fam in waveform_families
-            samples = get(
-                get(
-                    single_event_constraints, 
-                    wf_fam, 
-                    Dict{String, Vector{Float64}}()
-                    )     , 
-                pno       ,  
-                Float64[]
-                )
-            edges = get_histogram_edges(samples)
-            edges === nothing && continue
-            y_min = min(y_min, first(edges))
-            y_max = max(y_max, last(edges))
-        end
-    end
-
-    isfinite(y_min) || return nothing
-    return (y_min, y_max)
-end
-
-"""
-    panel_data_limits(pn_orders, single_event_constraints, bootstrap_constraints, waveform_families)
-
-Return the positive lower and upper data limits used to scale a panel across
-the requested PN orders and waveform families. Single-event samples, bootstrap
-5/50/95 percentiles, and positive GWTC-3 reference values are included; returns
-`nothing` when no positive values are available.
-"""
-function panel_data_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    waveform_families::AbstractVector{<:AbstractString},
-)
-    values = Float64[]
-
-    for pno in pn_orders
-        for wf_fam in waveform_families
-            single_event = get(get(single_event_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
-            append!(values, single_event[single_event .> 0.0])
-
-            bootstrap = get(get(bootstrap_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
-            positive_bootstrap = bootstrap[bootstrap .> 0.0]
-            if !isempty(positive_bootstrap)
-                append!(values, quantile(positive_bootstrap, [0.05, 0.50, 0.95]))
-            end
-        end
-
-        if haskey(GWTC3_REFERENCE, pno) && GWTC3_REFERENCE[pno] > 0.0
-            push!(values, GWTC3_REFERENCE[pno])
-        end
-    end
-
-    isempty(values) && return nothing
-    return (minimum(values), maximum(values))
-end
-
-"""
-    expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.08, upper_pad_decades::Real=0.08)
-
-Expand positive y-axis limits by padding them in base-10 log space. The lower
-limit is divided by `10^lower_pad_decades`, and the upper limit is multiplied by
-`10^upper_pad_decades`.
-"""
-function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.08, upper_pad_decades::Real=0.08)
-    y_min, y_max = y_limits
-    log_y_min = log10(y_min)
-    log_y_max = log10(y_max)
-    return (
-        exp10(log_y_min - lower_pad_decades),
-        exp10(log_y_max + upper_pad_decades),
-    )
-end
-
-"""
-    decade_ticks(y_limits::Tuple{<:Real, <:Real})
-
-Return base-10 tick values and LaTeX labels for the decades inside `y_limits`.
-If more than two decades are spanned, drop the outermost ticks so labels stay
-inside the padded log-axis limits.
-"""
-function decade_ticks(y_limits::Tuple{<:Real, <:Real})
-    y_min, y_max = y_limits
-    decade_min = floor(Int, log10(y_min))
-    decade_max = ceil(Int, log10(y_max))
-    exponents = collect(decade_min:decade_max)
-    if length(exponents) > 2
-        exponents = exponents[2:end-1]
-    end
-    values = exp10.(exponents)
-    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
-    return values, labels
-end
-
-"""
-    top_pno_label(pno::AbstractString)
-
-Return the LaTeX top-axis label for a PN-order string. Plain orders are rendered
-as ``<order>\\,\\mathrm{PN}``, while values written as `log(<order>)` are
-rendered as ``<order>\\,\\mathrm{PN}^{(\\ell)}``.
-"""
-function top_pno_label(pno::AbstractString)
-    if startswith(pno, "log(") && endswith(pno, ")")
-        order = chop(chop(pno; head=4); tail=1)
-        endswith(order, ".") && (order = chop(order; tail=1))
-        return latexstring(order, raw"\,\mathrm{PN}^{(\ell)}")
-    end
-
-    return latexstring(pno, raw"\,\mathrm{PN}")
-end
-
-function build_top_label_row!(grid::GridLayout, pn_orders::AbstractVector{<:AbstractString})
-    for (idx, pno) in enumerate(pn_orders)
-        Label(grid[1, idx], top_pno_label(pno);
-            fontsize=TICK_FONT_SIZE,
-            tellwidth=false,
-            tellheight=false,
-            halign=:center,
-            valign=:bottom)
-        colsize!(grid, idx, Relative(1.0 / length(pn_orders)))
-    end
-    rowsize!(grid, 1, Relative(1.0))
-    return grid
-end
-
-"""
-    configure_panel_axis!(ax, pn_orders, y_limits, y_tick_spec; ylabel="", show_ylabel=true)
-
-Configure labels, ticks, grids, and x/y limits for a PN-order panel axis.
-Returns the modified axis.
-"""
-function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real}, y_tick_spec;
-    ylabel="", show_ylabel::Bool=true)
-    ax.xlabel = "PN order"
-    ax.ylabel = show_ylabel ? ylabel : ""
-    ax.xlabelsize = GUIDE_FONT_SIZE
-    ax.ylabelsize = GUIDE_FONT_SIZE
-    ax.xticks = (collect(1:length(pn_orders)), createSED.pnoLatex.(pn_orders))
-    ax.yticks = y_tick_spec
-    ax.xticklabelsize = TICK_FONT_SIZE
-    ax.yticklabelsize = TICK_FONT_SIZE
-    ax.xgridvisible = true
-    ax.ygridvisible = true
-    ax.xminorgridvisible = false
-    ax.yminorgridvisible = true
-    ax.yminorgridcolor = (:gray70, 0.35)
-    ax.yminorticks = IntervalsBetween(9)
-    ax.xtickalign = 1
-    ax.ytickalign = 1
-    xlims!(ax, 0.5, length(pn_orders) + 0.5)
-    ylims!(ax, y_limits...)
-    return ax
 end
 
 """
