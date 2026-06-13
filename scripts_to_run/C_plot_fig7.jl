@@ -5,10 +5,20 @@ using LaTeXStrings
 using Trapz
 
 include("_config_parser.jl")
+include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 include("../hierachical_combination/hierDist.jl")
 
-const FIG7_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7"]
+const PHENOM_D_COLOR = FIG9_IMPROVEMENT_LOW_COLOR
+const PHENOM_HM_COLOR = FIG9_IMPROVEMENT_HIGH_COLOR
+const FIG7_FALLBACK_COLORS = FIG9_IMPROVEMENT_COLORS
+const FIG7_NETWORK_COLORS = Dict(
+    "ET_0_15km" => FIG9_IMPROVEMENT_HIGH_COLOR,
+    "network_0_15km" => FIG9_IMPROVEMENT_HIGH_COLOR,
+    "ET_45_15km" => FIG9_IMPROVEMENT_MIDDLE_COLOR,
+    "network_45_15km" => FIG9_IMPROVEMENT_MIDDLE_COLOR,
+    "ETS" => FIG9_IMPROVEMENT_LOW_COLOR,
+)
 const FIG7_SIZE = (1800, 760)
 const GUIDE_FONT_SIZE = 32
 const TICK_FONT_SIZE = 32
@@ -16,7 +26,7 @@ const LEGEND_FONT_SIZE = 28
 const FIG7_COL_GAP = 20
 const VIOLIN_ALPHA = 0.35
 const VIOLIN_EDGE_ALPHA = 0.85
-const VIOLIN_DENSITY_CUTOFF = 1e-4
+const VIOLIN_DENSITY_CUTOFF = 1e-8 # 1e-4
 
 const FIG7_NETWORK_LABELS = Dict(
     "ETS" => L"\Delta",
@@ -29,19 +39,6 @@ const FIG7_NETWORK_LABELS = Dict(
     "HLV_O3" => L"\mathrm{HLV}",
     "HLV_O3a" => L"\mathrm{HLV}",
     "HLV_O3b" => L"\mathrm{HLV}",
-)
-
-const FIG7_PN_LABELS = Dict(
-    "-1" => L"\varphi_{-2}",
-    "0" => L"\varphi_{0}",
-    "0.5" => L"\varphi_{1}",
-    "1" => L"\varphi_{2}",
-    "1.5" => L"\varphi_{3}",
-    "2" => L"\varphi_{4}",
-    "log(2.5)" => L"\varphi_{5\,\ell}",
-    "3" => L"\varphi_{6}",
-    "log(3.)" => L"\varphi_{6\,\ell}",
-    "3.5" => L"\varphi_{7}",
 )
 
 function get_population_results_file(config::Dict)
@@ -110,6 +107,20 @@ function network_series_label(config::Dict)
     return get(FIG7_NETWORK_LABELS, config["network"], config["network"])
 end
 
+function fig7_waveform_color(waveform_family::AbstractString)
+    waveform_family == "PhenomD" && return PHENOM_D_COLOR
+    waveform_family == "PhenomHM" && return PHENOM_HM_COLOR
+    return nothing
+end
+
+function fig7_source_color(config::Dict, waveform_family::AbstractString, index::Integer; use_waveform_color::Bool)
+    waveform_color = fig7_waveform_color(waveform_family)
+    if use_waveform_color && waveform_color !== nothing
+        return waveform_color
+    end
+    return get(FIG7_NETWORK_COLORS, config["network"], FIG7_FALLBACK_COLORS[mod1(index, length(FIG7_FALLBACK_COLORS))])
+end
+
 function fig7_config_label(label::AbstractString)
     return occursin("\\", label) ? latexstring(label) : label
 end
@@ -122,8 +133,9 @@ function fig7_plot_sources(config::Dict)
             config=config,
             label=waveform_label(wf_fam),
             waveform_family=wf_fam,
+            color=fig7_source_color(config, wf_fam, idx; use_waveform_color=true),
         )
-        for wf_fam in config["waveform_families"]
+        for (idx, wf_fam) in enumerate(config["waveform_families"])
     ]
 
     isempty(labels) || length(labels) == length(comparison_files) ||
@@ -146,6 +158,7 @@ function fig7_plot_sources(config::Dict)
             config=source_config,
             label=source_label,
             waveform_family=waveform_family,
+            color=fig7_source_color(source_config, waveform_family, idx; use_waveform_color=false),
         )
     end
     return sources
@@ -181,7 +194,7 @@ function waveform_label(waveform_family::AbstractString)
 end
 
 function fig7_pno_label(pno::AbstractString)
-    return get(FIG7_PN_LABELS, pno, createSED.pnoLatex(pno))
+    return createSED.pnoLatex(pno)
 end
 
 function waveform_summary_selection_from_fisher(file, config::Dict, waveform_family::AbstractString)
@@ -478,11 +491,11 @@ function add_conditioned_outline!(ax::Axis, x0::Real, y_grid::Vector{Float64}, d
     return ax
 end
 
-function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, profiles, config::Dict, series_ids)
+function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, profiles, config::Dict, series_ids, series_colors)
     n_series = length(series_ids)
     violin_width = fig7_distribution_width(config, n_series)
     for (series_idx, series_id) in enumerate(series_ids)
-        color = FIG7_COLORS[mod1(series_idx, length(FIG7_COLORS))]
+        color = series_colors[series_idx]
         offsets = fig7_distribution_offsets(config, series_idx, n_series)
 
         for (pno_idx, pno) in enumerate(pn_orders)
@@ -511,11 +524,11 @@ function plot_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, prof
     return ax
 end
 
-function add_fig7_legend!(fig::Figure, target_slot, series_labels)
+function add_fig7_legend!(fig::Figure, target_slot, series_labels, series_colors)
     elements = [
         PolyElement(
-            color=(FIG7_COLORS[mod1(idx, length(FIG7_COLORS))], VIOLIN_ALPHA),
-            strokecolor=(FIG7_COLORS[mod1(idx, length(FIG7_COLORS))], VIOLIN_EDGE_ALPHA),
+            color=(series_colors[idx], VIOLIN_ALPHA),
+            strokecolor=(series_colors[idx], VIOLIN_EDGE_ALPHA),
             strokewidth=1.5,
         )
         for idx in eachindex(series_labels)
@@ -543,7 +556,7 @@ function validate_fig7_grouping(config::Dict)
     return config
 end
 
-function build_figure(config::Dict, profiles, series_ids, series_labels)
+function build_figure(config::Dict, profiles, series_ids, series_labels, series_colors)
     validate_fig7_grouping(config)
     CairoMakie.activate!()
 
@@ -563,12 +576,12 @@ function build_figure(config::Dict, profiles, series_ids, series_labels)
         configure_panel_axis!(ax, panel_orders, y_limits;
             ylabel=L"\delta \varphi_{\!p}",
             show_ylabel=panel_idx == 1)
-        plot_panel!(ax, panel_orders, profiles, config, series_ids)
+        plot_panel!(ax, panel_orders, profiles, config, series_ids, series_colors)
     end
 
     rowsize!(fig.layout, 1, Relative(1.0))
     colgap!(fig.layout, FIG7_COL_GAP)
-    add_fig7_legend!(fig, fig[1, n_panels], series_labels)
+    add_fig7_legend!(fig, fig[1, n_panels], series_labels, series_colors)
 
     return fig
 end
@@ -578,6 +591,7 @@ function run_plot_fig7(config::Dict)
     profiles = Dict{String, Dict{String, NamedTuple}}()
     series_ids = String[]
     series_labels = Any[]
+    series_colors = Any[]
 
     for (idx, source) in enumerate(sources)
         source_config = source.config
@@ -611,9 +625,10 @@ function run_plot_fig7(config::Dict)
         )
         push!(series_ids, series_id)
         push!(series_labels, source.label)
+        push!(series_colors, source.color)
     end
 
-    fig = build_figure(config, profiles, series_ids, series_labels)
+    fig = build_figure(config, profiles, series_ids, series_labels, series_colors)
 
     png_output_file, pdf_output_file = get_fig7_output_files(config)
     mkpath(dirname(png_output_file))

@@ -10,7 +10,9 @@ include("../hierachical_combination/hierarchical_distribution.jl")
 include("../hierachical_combination/stat_utils.jl")
 include("_config_parser_grid.jl")
 include("_grid_utils.jl")
+include("../scripts_to_run/_config_parser.jl")
 include("../create_single_event_datasets/createSED.jl")
+include("../scripts_to_run/_population_utils.jl")
 using .createSED: pnoString
 
 const N_POINTS_HYPER = 2000
@@ -35,7 +37,7 @@ function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center
     mu_values = collect(LinRange(mu_limit[1], mu_limit[2], N_POINTS_HYPER))
     sig_values = collect(LinRange(sig_limit[1], sig_limit[2], N_POINTS_HYPER))
 
-    p_mu_sig, _, _, _, _ = hyperparamDistTIGER(mu_values, sig_values, dphi0_k, delta_k)
+    p_mu_sig, _, _, _, _ = getDistributionOnGrid(mu_values, sig_values, dphi0_k, delta_k)
 
     itp = interpolate((mu_values, sig_values), p_mu_sig, Gridded(Linear()))
     p_mu_sig_interp = extrapolate(itp, 0.0)
@@ -52,42 +54,6 @@ function wrapper_3sigma_local(n_events_used, dphi0_k, delta_k, center_mu, center
     return level - p_GR
 end
 
-function resolve_grid_result_file(base_data_dir::String, header::String, catalog_tag::String)
-    candidates = [
-        joinpath(base_data_dir, header, "fisher_results_$(catalog_tag).h5"),
-        joinpath(base_data_dir, "fisher_results_$(header).h5"),
-        joinpath(base_data_dir, "fisher_results_$(catalog_tag).h5"),
-    ]
-
-    for candidate in candidates
-        if isfile(candidate)
-            return candidate
-        end
-    end
-
-    throw(ArgumentError("No Fisher result file found for grid point $(header). Checked: $(join(candidates, ", "))"))
-end
-
-function load_filtered_measurements(file_name::String, pn_tag::String, network::String, waveform::String, snr_threshold::Float64, isnr_threshold::Float64)
-    h5open(file_name, "r") do file
-        pno_grp = file[pn_tag]
-        wf_grp = pno_grp[network][waveform]
-
-        invc = read(wf_grp, "invc")
-        snr = read(wf_grp, "snr")
-        isnr = read(wf_grp, "isnr")
-        dphi_k = read(wf_grp, "dphi_k")
-        delta_k = read(wf_grp, "delta_k")
-
-        valid_mask = (invc .!= 0) .& (snr .>= snr_threshold) .& (isnr .>= isnr_threshold)
-        valid_idx = findall(valid_mask)
-
-        length(valid_idx) > 0 || throw(ArgumentError("No valid events passed selection for $(file_name)"))
-
-        return dphi_k[valid_idx], delta_k[valid_idx]
-    end
-end
-
 # obtain config file from input
 config_file_name = ARGS[1]
 println("Using config file: $(config_file_name)\n")
@@ -100,11 +66,10 @@ pn_string = configs["pn_orders"][1]
 pn_tag = pnoString(pn_string)
 network = configs["network"]
 waveform = configs["waveform_families"][1]
+run_tag = grid_run_tag(network, waveform; grid_tag=configs["grid_tag"])
 n_median = configs["n_median"]
 grid_size = length(mu_vec) * length(sigma_vec)
 
-# set up folder names
-data_folder_name = abspath(joinpath(@__DIR__, "..", "tests_of_gr_HLV", configs["outdir"]))
 output_folder_name = abspath(joinpath(@__DIR__, configs["outdir"], "grid", network, pn_tag))
 plot_folder_name = abspath(joinpath(@__DIR__, configs["plot_outdir"], "grid", network, pn_tag))
 
@@ -126,19 +91,33 @@ for i in eachindex(mu_vec)
 
         mu = mu_vec[i]
         sigma = sigma_vec[j]
-        header = "grid_PN_$(pn_tag)_n_$(idx)_mu_$(mu)_sigma_$(sigma)"
+        header = grid_point_header(pn_tag, idx, mu, sigma)
 
         println("Mu: ", mu, " Sigma: ", sigma)
 
-        fisher_file = resolve_grid_result_file(data_folder_name, header, configs["catalog_tag"])
-        dphi0_k, delta_k = load_filtered_measurements(
-            fisher_file,
-            pn_tag,
-            network,
-            waveform,
-            configs["snr_threshold"],
-            configs["snr_inspiral_threshold"],
-        )
+        grid_config_file = joinpath(@__DIR__, "config_files", "grid", run_tag, "config_A_$(header).toml")
+        if !isfile(grid_config_file)
+            @warn "Skipping missing grid config: $(grid_config_file)"
+            continue
+        end
+        grid_config = read_config(grid_config_file)
+        fisher_file = get_fisher_results_file(grid_config)
+
+        if !isfile(fisher_file)
+            @warn "Skipping missing Fisher file: $(fisher_file)"
+            continue
+        end
+
+        dphi0_k, delta_k = h5open(fisher_file, "r") do file
+            if !haskey(file, pn_tag)
+                @warn "Skipping incomplete Fisher file without PN group $(pn_tag): $(fisher_file)"
+                return Float64[], Float64[]
+            end
+            _, summary_indices, _, delta_k_data, dphi_k_data = collect_population_inputs(file, grid_config)
+            return dphi_k_data[waveform][pn_string][summary_indices[waveform]],
+                   delta_k_data[waveform][pn_string][summary_indices[waveform]]
+        end
+        isempty(dphi0_k) && continue
         println("Number of valid events for this grid point: ", length(dphi0_k))
 
         res[i, j] = reshuffling_bisection(n_median, wrapper_3sigma_local, dphi0_k, delta_k, mu, sigma)[1]

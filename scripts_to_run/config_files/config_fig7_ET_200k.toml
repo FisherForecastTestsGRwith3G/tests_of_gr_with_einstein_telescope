@@ -51,4 +51,4 @@ comparison_config_files = [
 subplots_pn_order_grouping = [[1], [2, 3, 4, 5], [6, 7, 8, 9, 10]]
 offset_x_axis = 0.18
 violin_width = 0.30
-y_axis_limits = [[-1.25e-6, 1.25e-6], [-0.008, 0.008], [-0.15, 0.15]]
+y_axis_limits = [[-5e-7, 5e-7], [-0.004, 0.004], [-0.1, 0.1]]

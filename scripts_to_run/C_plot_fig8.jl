@@ -6,6 +6,7 @@ using Colors
 using Printf
 
 include("_config_parser.jl")
+include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
 include("../hierachical_combination/hierDist.jl")
 
@@ -32,29 +33,21 @@ const FIG8_INSET_LIMITS = (
 )
 
 const FIG8_PN_LABELS = Dict(
-    "-1" => L"1000\times\varphi_{-2}",
-    "0" => L"\varphi_{0}",
-    "0.5" => L"\varphi_{1}",
-    "1" => L"\varphi_{2}",
-    "1.5" => L"\varphi_{3}",
-    "2" => L"\varphi_{4}",
-    "log(2.5)" => L"\varphi_{5\ell}",
-    "3" => L"\varphi_{6}",
-    "log(3.)" => L"\varphi_{6\ell}",
-    "3.5" => L"\varphi_{7}",
+    "-1" => L"1000\times\delta \varphi_{-2}",
+    "0" => L"\delta \varphi_{0}",
+    "0.5" => L"\delta \varphi_{1}",
+    "1" => L"\delta \varphi_{2}",
+    "1.5" => L"\delta \varphi_{3}",
+    "2" => L"\delta \varphi_{4}",
+    "log(2.5)" => L"\delta \varphi_{5\ell}",
+    "3" => L"\delta \varphi_{6}",
+    "log(3.)" => L"\delta \varphi_{6\ell}",
+    "3.5" => L"\delta \varphi_{7}",
 )
-
+const FIG8_PN_COLOR_VALUES = reverse(FIG9_IMPROVEMENT_COLORS)
 const FIG8_PN_COLORS = Dict(
-    "-1" => "#3B4CC0",
-    "0" => "#5F7FE8",
-    "0.5" => "#86A9FC",
-    "1" => "#ADC9FD",
-    "1.5" => "#CFDAEA",
-    "2" => "#E8D3C5",
-    "3" => "#F2A17F",
-    "3.5" => "#E66C53",
-    "log(2.5)" => "#D1493F",
-    "log(3.)" => "#B40426",
+    pno => FIG8_PN_COLOR_VALUES[idx]
+    for (idx, pno) in enumerate(FIG8_PN_ORDERS)
 )
 
 const FIG8_DEFAULT_MU_LIMITS = Dict{String, Union{Nothing, Tuple{Float64, Float64}}}(
@@ -305,7 +298,7 @@ end
 
 function add_fig8_contours!(ax::Axis, contours, config::Dict; add_labels::Bool=false)
     for pno in config["fig8_pn_orders"]
-        color = parse(Colorant, FIG8_PN_COLORS[pno])
+        color = FIG8_PN_COLORS[pno]
         for contour in contours[pno]
             mu_values, sigma_values = fig8_scaled_contour(contour, pno, config)
             lines!(
@@ -435,7 +428,7 @@ end
 function add_fig8_legend!(fig::Figure, target_slot, config::Dict)
     elements = [
         LineElement(
-            color=parse(Colorant, FIG8_PN_COLORS[pno]),
+            color=FIG8_PN_COLORS[pno],
             linewidth=FIG8_LINEWIDTH,
             linestyle=fig8_line_style(pno),
         )
