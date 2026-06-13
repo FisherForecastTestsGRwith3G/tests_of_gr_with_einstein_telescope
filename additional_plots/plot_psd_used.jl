@@ -55,24 +55,63 @@ function loadtxt(path::AbstractString)
     return Matrix{Float64}(readdlm(path, Float64))
 end
 
+function plot_masked_runs!(ax::Axis, x::AbstractVector, y::AbstractVector, mask::AbstractVector{Bool};
+    label=nothing, color, linewidth::Real=CURVE_LINE_WIDTH)
+
+    run_label = label
+    run_start = nothing
+
+    for i in eachindex(mask)
+        if mask[i] && run_start === nothing
+            run_start = i
+        elseif !mask[i] && run_start !== nothing
+            lines!(
+                ax,
+                x[run_start:i-1],
+                y[run_start:i-1];
+                color=color,
+                linewidth=linewidth,
+                label=run_label,
+            )
+            run_label = nothing
+            run_start = nothing
+        end
+    end
+
+    if run_start !== nothing
+        lines!(
+            ax,
+            x[run_start:end],
+            y[run_start:end];
+            color=color,
+            linewidth=linewidth,
+            label=run_label,
+        )
+    end
+
+    return nothing
+end
+
 function plot_curve_segments!(ax::Axis, data::AbstractMatrix{<:Real}, selected::AbstractVector{Bool};
     label=nothing, color, linewidth::Real=CURVE_LINE_WIDTH, faded_alpha::Real=0.4, transform_y=identity)
 
     x = view(data, :, 1)
     y = transform_y.(view(data, :, 2))
 
-    lines!(
+    plot_masked_runs!(
         ax,
-        x[selected],
-        y[selected];
+        x,
+        y,
+        selected;
         color=(color, 1.0),
         linewidth=linewidth,
         label=label,
     )
-    lines!(
+    plot_masked_runs!(
         ax,
-        x[.!selected],
-        y[.!selected];
+        x,
+        y,
+        .!selected;
         color=(color, faded_alpha),
         linewidth=linewidth,
     )
