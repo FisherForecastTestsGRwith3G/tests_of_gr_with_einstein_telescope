@@ -13,7 +13,7 @@ Below, we provide instruction on how to rerun scripts in order to produce the pl
 ```
 julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
 julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
-julia --project=. scripts_to_run/C_fig1.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
+julia --project=. scripts_to_run/C_plot_fig1.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
 ```
 
 ### Figure 2
