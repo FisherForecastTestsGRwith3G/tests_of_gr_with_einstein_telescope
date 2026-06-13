@@ -10,6 +10,7 @@ import JSON
 include("_config_parser.jl")
 include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
+include("_plotting_utils.jl")
 
 const PHENOM_HM = "PhenomHM"
 const DETECTOR_ORDER = ["ET_0_15km", "ET_45_15km", "ETS"]
@@ -28,10 +29,6 @@ const DETECTOR_FILL_COLORS = Dict(
     "ET_45_15km" => FIG9_LIGHT_IMPROVEMENT_MIDDLE_COLOR,
     "ETS" => FIG9_LIGHT_IMPROVEMENT_LOW_COLOR,
 )
-const GWTC3_COLOR = :black
-const GUIDE_FONT_SIZE = 32
-const TICK_FONT_SIZE = 32
-const LEGEND_FONT_SIZE = 28
 const FIG2_SIZE = (1800, 900)
 const FIG2_TOP_ROW_FRACTION = 0.11
 const FIG2_COL_GAP = 20
@@ -44,24 +41,6 @@ const DETECTOR_OFFSETS = Dict(
     "ET_45_15km" => 0.0,
     "ETS" => 0.13,
 )
-const GWTC3_REFERENCE_FILE = joinpath(@__DIR__, "lvk_gwtc_3_results_2025.json")
-
-function load_gwtc3_reference()
-    all_results = JSON.parsefile(GWTC3_REFERENCE_FILE; dicttype=Dict{String, Any})
-    reference = get(all_results, "GWTC-3 (SEOB)", nothing)
-    reference === nothing && throw(ArgumentError("Missing `GWTC-3 (SEOB)` in $(GWTC3_REFERENCE_FILE)"))
-    return Dict{String, Float64}(key => Float64(value) for (key, value) in reference)
-end
-
-const GWTC3_REFERENCE = load_gwtc3_reference()
-
-function get_population_results_file(config::Dict)
-    return joinpath(
-        @__DIR__,
-        config["bootstrap_outdir"],
-        "population_results_$(config["bootstrap_tag"]).h5"
-    )
-end
 
 function get_plot_output_files(configs::Vector{Dict{String, Any}})
     first_config = configs[1]
@@ -73,39 +52,16 @@ function get_plot_output_files(configs::Vector{Dict{String, Any}})
     )
 end
 
-function get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-    positive_samples = samples[samples .> 0.0]
-    isempty(positive_samples) && return nothing
+"""
+    mirrored_histogram_bars!(ax, x0, samples, fill_color, edge_color; max_width=HIST_MAX_WIDTH, n_bins=nothing)
 
-    y_min = minimum(positive_samples)
-    y_max = maximum(positive_samples)
-    if y_min == y_max
-        return exp10.(range(log10(y_min) - 0.25, log10(y_max) + 0.25, length=11))
-    end
+Draw a normalized mirrored vertical histogram centered at `x0` on `ax`.
 
-    if isnothing(n_bins)
-        n_bins = clamp(round(Int, sqrt(length(positive_samples))), 8, 40)
-    end
-
-    return exp10.(range(log10(y_min), log10(y_max), length=n_bins + 1))
-end
-
-function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-    edges = get_histogram_edges(samples; n_bins=n_bins)
-    edges === nothing && return nothing
-
-    counts = zeros(Int, length(edges) - 1)
-    for value in samples
-        value <= 0.0 && continue
-        idx = searchsortedlast(edges, value)
-        idx = clamp(idx, 1, length(edges) - 1)
-        value == edges[end] && (idx = length(edges) - 1)
-        counts[idx] += 1
-    end
-
-    return edges, counts
-end
-
+The bar widths are scaled by the largest bin count so the widest bin spans
+`max_width` to each side of `x0`. When `n_bins` is provided it is passed through
+to `histogram_profile`; otherwise that helper chooses the binning. Returns
+`nothing` after mutating `ax`, including when no drawable profile is available.
+"""
 function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, fill_color, edge_color;
     max_width::Float64=HIST_MAX_WIDTH, n_bins::Union{Nothing, Int}=nothing)
     profile = histogram_profile(samples; n_bins=n_bins)
@@ -145,6 +101,12 @@ function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, 
     return nothing
 end
 
+"""
+    add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, color)
+
+Draw the 5th-to-95th percentile interval and median marker for positive
+bootstrap samples at `x0 + SUMMARY_X_OFFSET`.
+"""
 function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, color)
     positive_samples = samples[samples .> 0.0]
     isempty(positive_samples) && return nothing
@@ -159,14 +121,13 @@ function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, co
     return nothing
 end
 
-function add_gwtc3_reference!(ax::Axis, x0::Real, pno::String)
-    haskey(GWTC3_REFERENCE, pno) || return nothing
-    scatter!(ax, [x0], [GWTC3_REFERENCE[pno]];
-        color=GWTC3_COLOR, marker=:diamond, markersize=18,
-        strokecolor=:white, strokewidth=1.0)
-    return nothing
-end
+"""
+    read_detector_plot_data(population_results_file::AbstractString, config::Dict)
 
+Read single-event and bootstrap constraint vectors for one detector from
+`population_results_file`, using the detector network and PN orders in `config`.
+Returns `(single_event_constraints, bootstrap_constraints)`, keyed by PN order.
+"""
 function read_detector_plot_data(population_results_file::AbstractString, config::Dict)
     single_event_constraints = Dict{String, Vector{Float64}}()
     bootstrap_constraints = Dict{String, Vector{Float64}}()
@@ -187,6 +148,13 @@ function read_detector_plot_data(population_results_file::AbstractString, config
     return single_event_constraints, bootstrap_constraints
 end
 
+"""
+    read_all_plot_data(configs::Vector{Dict{String, Any}})
+
+Read plot data for every detector config and return
+`(single_event_by_detector, bootstrap_by_detector)`, keyed first by detector
+network and then by PN order.
+"""
 function read_all_plot_data(configs::Vector{Dict{String, Any}})
     single_event_by_detector = Dict{String, Dict{String, Vector{Float64}}}()
     bootstrap_by_detector = Dict{String, Dict{String, Vector{Float64}}}()
@@ -204,121 +172,12 @@ function read_all_plot_data(configs::Vector{Dict{String, Any}})
     return single_event_by_detector, bootstrap_by_detector
 end
 
-function histogram_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_by_detector::Dict{String, Dict{String, Vector{Float64}}},
-)
-    y_min = Inf
-    y_max = 0.0
+"""
+    build_panel!(ax, pn_orders, single_event_by_detector, bootstrap_by_detector)
 
-    for pno in pn_orders
-        for detector in DETECTOR_ORDER
-            samples = get(get(single_event_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
-            edges = get_histogram_edges(samples)
-            edges === nothing && continue
-            y_min = min(y_min, first(edges))
-            y_max = max(y_max, last(edges))
-        end
-    end
-
-    isfinite(y_min) || return nothing
-    return (y_min, y_max)
-end
-
-function panel_data_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_by_detector::Dict{String, Dict{String, Vector{Float64}}},
-    bootstrap_by_detector::Dict{String, Dict{String, Vector{Float64}}},
-)
-    values = Float64[]
-
-    for pno in pn_orders
-        for detector in DETECTOR_ORDER
-            single_event = get(get(single_event_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
-            append!(values, single_event[single_event .> 0.0])
-
-            bootstrap = get(get(bootstrap_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
-            positive_bootstrap = bootstrap[bootstrap .> 0.0]
-            isempty(positive_bootstrap) || append!(values, quantile(positive_bootstrap, [0.05, 0.50, 0.95]))
-        end
-
-        if haskey(GWTC3_REFERENCE, pno) && GWTC3_REFERENCE[pno] > 0.0
-            push!(values, GWTC3_REFERENCE[pno])
-        end
-    end
-
-    isempty(values) && return nothing
-    return (minimum(values), maximum(values))
-end
-
-function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.5, upper_pad_decades::Real=0.08)
-    y_min, y_max = y_limits
-    log_y_min = log10(y_min)
-    log_y_max = log10(y_max)
-    return (
-        exp10(log_y_min - lower_pad_decades),
-        exp10(log_y_max + upper_pad_decades),
-    )
-end
-
-function decade_ticks(y_limits::Tuple{<:Real, <:Real})
-    y_min, y_max = y_limits
-    decade_min = floor(Int, log10(y_min))
-    decade_max = ceil(Int, log10(y_max))
-    exponents = collect(decade_min:decade_max)
-    length(exponents) > 2 && (exponents = exponents[2:end-1])
-    values = exp10.(exponents)
-    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
-    return values, labels
-end
-
-function top_pno_label(pno::AbstractString)
-    if startswith(pno, "log(") && endswith(pno, ")")
-        order = chop(chop(pno; head=4); tail=1)
-        endswith(order, ".") && (order = chop(order; tail=1))
-        return latexstring(order, raw"\,\mathrm{PN}^{(\ell)}")
-    end
-
-    return latexstring(pno, raw"\,\mathrm{PN}")
-end
-
-function build_top_label_row!(grid::GridLayout, pn_orders::AbstractVector{<:AbstractString})
-    for (idx, pno) in enumerate(pn_orders)
-        Label(grid[1, idx], top_pno_label(pno);
-            fontsize=TICK_FONT_SIZE,
-            tellwidth=false,
-            tellheight=false,
-            halign=:center,
-            valign=:bottom)
-        colsize!(grid, idx, Relative(1.0 / length(pn_orders)))
-    end
-    rowsize!(grid, 1, Relative(1.0))
-    return grid
-end
-
-function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real}, y_tick_spec;
-    ylabel="", show_ylabel::Bool=true)
-    ax.xlabel = "PN order"
-    ax.ylabel = show_ylabel ? ylabel : ""
-    ax.xlabelsize = GUIDE_FONT_SIZE
-    ax.ylabelsize = GUIDE_FONT_SIZE
-    ax.xticks = (collect(1:length(pn_orders)), createSED.pnoLatex.(pn_orders))
-    ax.yticks = y_tick_spec
-    ax.xticklabelsize = TICK_FONT_SIZE
-    ax.yticklabelsize = TICK_FONT_SIZE
-    ax.xgridvisible = true
-    ax.ygridvisible = true
-    ax.xminorgridvisible = false
-    ax.yminorgridvisible = true
-    ax.yminorgridcolor = (:gray70, 0.35)
-    ax.yminorticks = IntervalsBetween(9)
-    ax.xtickalign = 1
-    ax.ytickalign = 1
-    xlims!(ax, 0.5, length(pn_orders) + 0.5)
-    ylims!(ax, y_limits...)
-    return ax
-end
-
+Populate `ax` with detector-specific mirrored histograms, bootstrap summaries,
+and GWTC-3 references for each PN order. Return the modified axis.
+"""
 function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     single_event_by_detector::Dict{String, Dict{String, Vector{Float64}}},
     bootstrap_by_detector::Dict{String, Dict{String, Vector{Float64}}})
@@ -328,7 +187,15 @@ function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
             color = DETECTOR_COLORS[detector]
             fill_color = DETECTOR_FILL_COLORS[detector]
             data = get(get(single_event_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
-            boot = get(get(bootstrap_by_detector, detector, Dict{String, Vector{Float64}}()), pno, Float64[])
+            boot = get(get(bootstrap_by_detector   , detector, Dict{String, Vector{Float64}}()), pno, Float64[])
+
+            if any(data .<=0)
+                throw(ArgumentError("Constraints must all be positive! There is a 0 or negative single constraint for $(pno)."))
+            end
+            if any(boot .<=0)
+                throw(ArgumentError("Constraints must all be positive! There is a 0 or negative population constraint for $(pno)."))
+            end
+
             mirrored_histogram_bars!(ax, x0, data, fill_color, color)
             add_bootstrap_summary!(ax, x0, boot, color)
         end
@@ -337,6 +204,11 @@ function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     return ax
 end
 
+"""
+    add_fig2_legend!(fig::Figure, target_slot)
+
+Add the detector and summary legend for Figure 2 to `target_slot`, and return `fig`.
+"""
 function add_fig2_legend!(fig::Figure, target_slot)
     summary_elements = [
         MarkerElement(color=:black, marker=:circle, markersize=15, strokecolor=:white, strokewidth=1.0),
@@ -374,6 +246,18 @@ function add_fig2_legend!(fig::Figure, target_slot)
     return fig
 end
 
+"""
+    build_figure(left_orders, right_orders, single_event_by_detector,
+                 bootstrap_by_detector, left_y_limits, right_y_limits)
+
+Build the detector-comparison Figure 2 layout.
+
+`left_orders` and `right_orders` define the PN-order columns shown in each
+panel. `single_event_by_detector` and `bootstrap_by_detector` provide the
+per-detector sample dictionaries used to draw the event histograms and
+population summaries. The y-axis ranges are supplied separately for the left
+and right log-scale panels. Returns the assembled `Figure`.
+"""
 function build_figure(
     left_orders::Vector{String},
     right_orders::Vector{String},
@@ -414,14 +298,16 @@ function build_figure(
     return fig
 end
 
-function assert_same_vector(configs::Vector{Dict{String, Any}}, key::String)
-    reference = configs[1][key]
-    for config in configs[2:end]
-        config[key] == reference ||
-            throw(ArgumentError("Config mismatch: `$(key)` must agree across the three configs."))
-    end
-end
 
+"""
+    validate_detector_configs(configs)
+
+Validate the three detector configs required by Fig. 2 and return `configs`.
+
+Checks that the configs are ordered as `DETECTOR_ORDER`, each includes the
+`PHENOM_HM` waveform family, and shared sampling/selection fields match across
+all detector configs. Throws `ArgumentError` on the first mismatch.
+"""
 function validate_detector_configs(configs::Vector{Dict{String, Any}})
     length(configs) == length(DETECTOR_ORDER) ||
         throw(ArgumentError("Expected exactly three configs: ET_0_15km, ET_45_15km, ETS."))
@@ -435,6 +321,14 @@ function validate_detector_configs(configs::Vector{Dict{String, Any}})
             throw(ArgumentError("Config $(idx) must include `$(PHENOM_HM)` in `fisher.waveform`."))
     end
 
+    function assert_same_vector(configs::Vector{Dict{String, Any}}, key::String)
+        reference = configs[1][key]
+        for config in configs[2:end]
+            config[key] == reference ||
+                throw(ArgumentError("Config mismatch: `$(key)` must agree across the three configs."))
+        end
+    end
+
     for key in ("n_catalog", "n_sample", "pn_orders", "mu", "sigma")
         assert_same_vector(configs, key)
     end
@@ -446,6 +340,13 @@ function validate_detector_configs(configs::Vector{Dict{String, Any}})
     return configs
 end
 
+"""
+    run_plot_fig2(configs::Vector{Dict{String, Any}})
+
+Validate detector configs, load Figure 2 inputs, build the two-panel comparison
+figure, and save it to the configured PDF and PNG output paths. Returns the
+assembled `Figure`.
+"""
 function run_plot_fig2(configs::Vector{Dict{String, Any}})
     validate_detector_configs(configs)
     single_event_by_detector, bootstrap_by_detector = read_all_plot_data(configs)

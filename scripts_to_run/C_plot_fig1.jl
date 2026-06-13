@@ -8,38 +8,16 @@ import JSON
 include("_config_parser.jl")
 include("_plot_style.jl")
 include("../create_single_event_datasets/createSED.jl")
+include("_plotting_utils.jl")
 
 const PHENOM_D_COLOR  = FIG9_IMPROVEMENT_LOW_COLOR
 const PHENOM_HM_COLOR = FIG9_IMPROVEMENT_HIGH_COLOR
 const PHENOM_D_FILL_COLOR  = FIG9_LIGHT_IMPROVEMENT_LOW_COLOR
 const PHENOM_HM_FILL_COLOR = FIG9_LIGHT_IMPROVEMENT_HIGH_COLOR
-const GWTC3_COLOR     = :black
-const TITLE_FONT_SIZE = 28
-const GUIDE_FONT_SIZE = 32
-const TICK_FONT_SIZE  = 32
-const LEGEND_FONT_SIZE = 28
 const FIG1_SIZE = (1800, 760)
 const FIG1_TOP_ROW_FRACTION = 0.11
 const FIG1_COL_GAP = 20
 const FIG1_LABEL_ROW_GAP = 10
-const GWTC3_REFERENCE_FILE = joinpath(@__DIR__, "lvk_gwtc_3_results_2025.json")
-
-function load_gwtc3_reference()
-    all_results = JSON.parsefile(GWTC3_REFERENCE_FILE; dicttype=Dict{String, Any})
-    reference = get(all_results, "GWTC-3 (SEOB)", nothing)
-    reference === nothing && throw(ArgumentError("Missing `GWTC-3 (SEOB)` in $(GWTC3_REFERENCE_FILE)"))
-    return Dict{String, Float64}(key => Float64(value) for (key, value) in reference)
-end
-
-const GWTC3_REFERENCE = load_gwtc3_reference()
-
-function get_population_results_file(config::Dict)
-    return joinpath(
-        @__DIR__,
-        config["bootstrap_outdir"],
-        "population_results_$(config["bootstrap_tag"]).h5"
-    )
-end
 
 function get_plot_output_file(config::Dict)
     return joinpath(
@@ -63,58 +41,11 @@ end
 # Auxiliary functions
 #----------------------------------------------------------------------------#
 """
-    get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
+    mirrored_histogram_bars!(ax, x0, samples, side, fill_color, edge_color; max_width=0.38, n_bins=nothing)
 
-Return logarithmically spaced histogram bin edges for the positive entries in
-`samples`. Returns `nothing` when no positive samples are present.
-Lower (upper) bound of the bins is given by the smallest (largest) sample handed.
+Draw a normalized vertical histogram on `ax`, anchored at `x0` and extending to
+`:left` or `:right`. Returns `nothing` when `samples` cannot produce a histogram.
 """
-function get_histogram_edges(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-    positive_samples = samples[samples .> 0.0]
-    if isempty(positive_samples)
-        return nothing
-    end
-
-    y_min = minimum(positive_samples)
-    y_max = maximum(positive_samples)
-    if y_min == y_max
-        return exp10.(range(log10(y_min) - 0.25, log10(y_max) + 0.25, length=11))
-    end
-
-    if isnothing(n_bins)
-        n_bins = clamp(round(Int, sqrt(length(positive_samples))), 8, 40)
-    end
-
-    return exp10.(range(log10(y_min), log10(y_max), length=n_bins + 1))
-end
-
-"""
-    histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-
-Build histogram bin counts for the positive entries in `samples` using logarithmically
-spaced bin edges from [`get_histogram_edges`](@ref). Returns `nothing` when no positive
-samples are available, otherwise returns `(edges, counts)`.
-"""
-function histogram_profile(samples::Vector{Float64}; n_bins::Union{Nothing, Int}=nothing)
-    edges = get_histogram_edges(samples; n_bins=n_bins)
-    if edges === nothing
-        return nothing
-    end
-
-    counts = zeros(Int, length(edges) - 1)
-    for value in samples
-        value <= 0.0 && continue
-        idx = searchsortedlast(edges, value)
-        idx = clamp(idx, 1, length(edges) - 1)
-        if value == edges[end]
-            idx = length(edges) - 1
-        end
-        counts[idx] += 1
-    end
-
-    return edges, counts
-end
-
 function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, fill_color, edge_color;
     max_width::Float64=0.38, n_bins::Union{Nothing, Int}=nothing)
     profile = histogram_profile(samples; n_bins=n_bins)
@@ -150,6 +81,12 @@ function mirrored_histogram_bars!(ax::Axis, x0::Real, samples::Vector{Float64}, 
     return nothing
 end
 
+"""
+    add_histogram_pair!(ax::Axis, x0::Real, data_r::Vector{Float64}, data_l::Vector{Float64})
+
+Draw mirrored histograms for the right (`data_r`) and left (`data_l`) datasets at
+`x0`, then add a vertical center line spanning the positive combined data range.
+"""
 function add_histogram_pair!(ax::Axis, x0::Real, data_r::Vector{Float64}, data_l::Vector{Float64})
     mirrored_histogram_bars!(ax, x0, data_r, :right, PHENOM_D_FILL_COLOR, PHENOM_D_COLOR)
     mirrored_histogram_bars!(ax, x0, data_l, :left, PHENOM_HM_FILL_COLOR, PHENOM_HM_COLOR)
@@ -162,6 +99,12 @@ function add_histogram_pair!(ax::Axis, x0::Real, data_r::Vector{Float64}, data_l
     return nothing
 end
 
+"""
+    add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, color)
+
+Add a side-offset bootstrap interval summary for the positive `samples`: a
+vertical 5th-95th percentile line and a median marker.
+"""
 function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, side::Symbol, color)
     positive_samples = samples[samples .> 0.0]
     isempty(positive_samples) && return nothing
@@ -173,14 +116,6 @@ function add_bootstrap_summary!(ax::Axis, x0::Real, samples::Vector{Float64}, si
 
     lines!(ax, [x_pos, x_pos], [q05, q95]; color=color, linewidth=3)
     scatter!(ax, [x_pos], [q50]; color=color, markersize=16, strokecolor=:white, strokewidth=1.0)
-    return nothing
-end
-
-function add_gwtc3_reference!(ax::Axis, x0::Real, pno::String)
-    haskey(GWTC3_REFERENCE, pno) || return nothing
-    scatter!(ax, [x0], [GWTC3_REFERENCE[pno]];
-        color=GWTC3_COLOR, marker=:diamond, markersize=18,
-        strokecolor=:white, strokewidth=1.0)
     return nothing
 end
 
@@ -215,135 +150,25 @@ function read_plot_data(population_results_file::AbstractString, config::Dict)
     return single_event_constraints, bootstrap_constraints
 end
 
-function histogram_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    waveform_families::AbstractVector{<:AbstractString},
-)
-    y_min = Inf
-    y_max = 0.0
-
-    for pno in pn_orders
-        for wf_fam in waveform_families
-            samples = get(get(single_event_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
-            edges = get_histogram_edges(samples)
-            edges === nothing && continue
-            y_min = min(y_min, first(edges))
-            y_max = max(y_max, last(edges))
-        end
-    end
-
-    isfinite(y_min) || return nothing
-    return (y_min, y_max)
-end
-
-function panel_data_limits(
-    pn_orders::AbstractVector{<:AbstractString},
-    single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}},
-    waveform_families::AbstractVector{<:AbstractString},
-)
-    values = Float64[]
-
-    for pno in pn_orders
-        for wf_fam in waveform_families
-            single_event = get(get(single_event_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
-            append!(values, single_event[single_event .> 0.0])
-
-            bootstrap = get(get(bootstrap_constraints, wf_fam, Dict{String, Vector{Float64}}()), pno, Float64[])
-            positive_bootstrap = bootstrap[bootstrap .> 0.0]
-            if !isempty(positive_bootstrap)
-                append!(values, quantile(positive_bootstrap, [0.05, 0.50, 0.95]))
-            end
-        end
-
-        if haskey(GWTC3_REFERENCE, pno) && GWTC3_REFERENCE[pno] > 0.0
-            push!(values, GWTC3_REFERENCE[pno])
-        end
-    end
-
-    isempty(values) && return nothing
-    return (minimum(values), maximum(values))
-end
-
-function expand_log_limits(y_limits::Tuple{<:Real, <:Real}; lower_pad_decades::Real=0.08, upper_pad_decades::Real=0.08)
-    y_min, y_max = y_limits
-    log_y_min = log10(y_min)
-    log_y_max = log10(y_max)
-    return (
-        exp10(log_y_min - lower_pad_decades),
-        exp10(log_y_max + upper_pad_decades),
-    )
-end
-
-function decade_ticks(y_limits::Tuple{<:Real, <:Real})
-    y_min, y_max = y_limits
-    decade_min = floor(Int, log10(y_min))
-    decade_max = ceil(Int, log10(y_max))
-    exponents = collect(decade_min:decade_max)
-    if length(exponents) > 2
-        exponents = exponents[2:end-1]
-    end
-    values = exp10.(exponents)
-    labels = [latexstring("10^{", exponent, "}") for exponent in exponents]
-    return values, labels
-end
-
-function top_pno_label(pno::AbstractString)
-    if startswith(pno, "log(") && endswith(pno, ")")
-        order = chop(chop(pno; head=4); tail=1)
-        endswith(order, ".") && (order = chop(order; tail=1))
-        return latexstring(order, raw"\,\mathrm{PN}^{(\ell)}")
-    end
-
-    return latexstring(pno, raw"\,\mathrm{PN}")
-end
-
-function build_top_label_row!(grid::GridLayout, pn_orders::AbstractVector{<:AbstractString})
-    for (idx, pno) in enumerate(pn_orders)
-        Label(grid[1, idx], top_pno_label(pno);
-            fontsize=TICK_FONT_SIZE,
-            tellwidth=false,
-            tellheight=false,
-            halign=:center,
-            valign=:bottom)
-        colsize!(grid, idx, Relative(1.0 / length(pn_orders)))
-    end
-    rowsize!(grid, 1, Relative(1.0))
-    return grid
-end
-
-function configure_panel_axis!(ax::Axis, pn_orders::AbstractVector{<:AbstractString}, y_limits::Tuple{<:Real, <:Real}, y_tick_spec;
-    ylabel="", show_ylabel::Bool=true)
-    ax.xlabel = "PN order"
-    ax.ylabel = show_ylabel ? ylabel : ""
-    ax.xlabelsize = GUIDE_FONT_SIZE
-    ax.ylabelsize = GUIDE_FONT_SIZE
-    ax.xticks = (collect(1:length(pn_orders)), createSED.pnoLatex.(pn_orders))
-    ax.yticks = y_tick_spec
-    ax.xticklabelsize = TICK_FONT_SIZE
-    ax.yticklabelsize = TICK_FONT_SIZE
-    ax.xgridvisible = true
-    ax.ygridvisible = true
-    ax.xminorgridvisible = false
-    ax.yminorgridvisible = true
-    ax.yminorgridcolor = (:gray70, 0.35)
-    ax.yminorticks = IntervalsBetween(9)
-    ax.xtickalign = 1
-    ax.ytickalign = 1
-    xlims!(ax, 0.5, length(pn_orders) + 0.5)
-    ylims!(ax, y_limits...)
-    return ax
-end
-
+"""
+Populate a figure panel with PN-order histograms, bootstrap summaries, and GWTC-3 references.
+Returns the modified axis.
+"""
 function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     single_event_constraints::Dict{String, Dict{String, Vector{Float64}}},
     bootstrap_constraints::Dict{String, Dict{String, Vector{Float64}}})
     for (idx, pno) in enumerate(pn_orders)
-        data_d = get(get(single_event_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
+        data_d  = get(get(single_event_constraints, "PhenomD" , Dict{String, Vector{Float64}}()), pno, Float64[])
         data_hm = get(get(single_event_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
-        boot_d = get(get(bootstrap_constraints, "PhenomD", Dict{String, Vector{Float64}}()), pno, Float64[])
-        boot_hm = get(get(bootstrap_constraints, "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
+        boot_d  = get(get(bootstrap_constraints   , "PhenomD" , Dict{String, Vector{Float64}}()), pno, Float64[])
+        boot_hm = get(get(bootstrap_constraints   , "PhenomHM", Dict{String, Vector{Float64}}()), pno, Float64[])
+        
+        for data in [data_d, data_hm, boot_d, boot_hm]
+            if any(data .<=0)
+                throw(ArgumentError("Constraints must all be positive! There is a 0 or negative constraint."))
+            end
+        end
+        
         add_histogram_pair!(ax, idx, data_d, data_hm)
         add_bootstrap_summary!(ax, idx, boot_d, :right, PHENOM_D_COLOR)
         add_bootstrap_summary!(ax, idx, boot_hm, :left, PHENOM_HM_COLOR)
@@ -352,6 +177,11 @@ function build_panel!(ax::Axis, pn_orders::AbstractVector{<:AbstractString},
     return ax
 end
 
+"""
+    add_fig1_legend!(fig::Figure, target_slot)
+
+Add the shared Figure 1 legend to `target_slot` and return the modified `fig`.
+"""
 function add_fig1_legend!(fig::Figure, target_slot)
     elements = [
         PolyElement(color=PHENOM_D_FILL_COLOR, strokecolor=PHENOM_D_COLOR),
@@ -379,6 +209,17 @@ function add_fig1_legend!(fig::Figure, target_slot)
     return fig
 end
 
+"""
+    build_figure(left_orders, right_orders, single_event_constraints,
+                 bootstrap_constraints, aligned_left_limits, right_scale)
+
+Construct and return the Figure 1 Makie figure.
+
+The figure uses a dedicated left panel for `left_orders` and a right panel for
+`right_orders`. Both panels share the same constraint dictionaries, while the
+right panel's logarithmic y-axis limits are scaled from `aligned_left_limits`
+by `right_scale`.
+"""
 function build_figure(
     left_orders::Vector{String},
     right_orders::Vector{String},
@@ -454,6 +295,7 @@ function run_plot_fig1(config::Dict)
         isempty(positive_samples) || (bootstrap_medians[pno] = median(positive_samples))
     end
 
+    # IMPROVEME: Maybe its better to set right_scale and the overall panel limits by hand
     right_scale = 1.0
     if haskey(bootstrap_medians, "-1") && haskey(bootstrap_medians, "0")
         median_ratio = bootstrap_medians["-1"] / bootstrap_medians["0"]
