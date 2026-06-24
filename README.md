@@ -1,7 +1,31 @@
 # Code Tests of GR with ET
 
-This repository contains Julia workflows for producing the results of http://arxiv.org/abs/2511.07520
-products and plots for HLV and Einstein Telescope detector networks.
+This repository contains Julia workflows for producing the results of
+https://arxiv.org/abs/2511.07520 and plots for HLV and Einstein Telescope
+detector networks.
+
+## Citing Our Work
+
+If you use this code or the associated results, please cite:
+
+```bibtex
+@article{Begnoni:2025mtz,
+    author = "Begnoni, Andrea and Del Pozzo, Walter and Pegorin, Matteo and Pomper, Joachim and Ricciardone, Angelo",
+    title = "{Tests of General Relativity with Einstein Telescope}",
+    eprint = "2511.07520",
+    archivePrefix = "arXiv",
+    primaryClass = "gr-qc",
+    month = "11",
+    year = "2025"
+}
+```
+
+The INSPIRE record is available at https://inspirehep.net/literature/3081766.
+
+See [AUTHORS.md](AUTHORS.md) for the author list. This repository is released
+under the MIT license; see [LICENSE](LICENSE).
+
+## Workflow
 
 Run every command below from the repository root:
 
