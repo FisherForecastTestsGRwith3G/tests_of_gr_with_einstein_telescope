@@ -9,3 +9,4 @@ config_files/grid/*
 **/plot/*
 **/logs/*
 chats/
+Manifest.toml
