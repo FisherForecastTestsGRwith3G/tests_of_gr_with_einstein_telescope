@@ -1,30 +1,27 @@
 # Additional Plots
 
-This directory contains the helper script for reproducing the HLV amplitude
-spectral density comparison plot.
+This directory contains standalone plotting scripts for figures that do not
+depend on the main HDF5 analysis pipeline.
 
-## HLV ASD Comparison
+## Figure 5: PSD/ASD Curves Used in the Analysis
 
-Run the script from the repository root:
+Figure 5 is produced by [`plot_psd_used.jl`](./plot_psd_used.jl). Run the script
+from the repository root:
 
 ```bash
-cd /home/joachim-pomper/Desktop/dumpyard/tests_of_gr_with_einstein_telescope
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
-julia --project=. additional_plots/plot_hlv_asd_comparisons.jl
+julia --project=. additional_plots/plot_psd_used.jl
 ```
 
-The script reads the H1, L1, and V1 ASD curves for O3a, O3b, and the O4
-pre-observing estimates from:
+The script reads the detector sensitivity curves from:
+
+- [`create_single_event_datasets/psd_data/hlv_curves/O3b/`](../create_single_event_datasets/psd_data/hlv_curves/O3b/)
+- [`create_single_event_datasets/psd_data/et_curves/`](../create_single_event_datasets/psd_data/et_curves/)
+
+It writes the figure to:
 
 ```text
-create_single_event_datasets/psd_data/hlv_curves/
+additional_plots/results/psds_used.pdf
 ```
 
-It writes both PNG and PDF outputs to:
-
-```text
-additional_plots/results/hlv_asd_comparisons.png
-additional_plots/results/hlv_asd_comparisons.pdf
-```
-
-The output directory is created automatically if it does not already exist.
+No catalog generation, Fisher analysis, or population-analysis output is
+required for this plot.
