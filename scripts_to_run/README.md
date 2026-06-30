@@ -1,12 +1,12 @@
-# Tests of GR with HLV
+# Reproducing Figures 1,2,3,7,8 & 9
 
-This pipeline generates a BBH catalog, injects beyond-GR post-Newtonian deviations, runs the Fisher analysis for the requested detector networks and waveform families, and stores the resulting summary products in an HDF5 file.
+The pipeline generates a BBH catalog, injects beyond-GR post-Newtonian deviations, runs the Fisher analysis for the requested detector networks and waveform families, and stores the resulting summary products in an HDF5 file.
 
-The code can be used to produce Figure 1 of our paper. 
+The code can be used to produce Figure 1,2,3,7,8 and 9 of our paper. 
 
 ## Reproducing results
 
-Below, we provide instruction on how to rerun scripts in order to produce the plots in our paper. If a script with `A_` or `B_` has already been executed for a plot, it does not need to be run again. 
+Below, we provide instruction on how to rerun scripts in order to produce the plots in our paper. If a script with `A_` or `B_` has already been executed for another plot, it does not need to be run again. 
 
 ### Figure 1
 
@@ -41,29 +41,7 @@ julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_
 julia --project=. scripts_to_run/C_plot_fig3.jl scripts_to_run/config_files/config_catalog_ET15km45_200k.toml 
 ```
 
-### Figure 9
-
-```
-julia --project=. scripts_to_run/A_fisher_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
-julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
-julia --project=. julia --project=. scripts_to_run/C_plot_fig9.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml 
-```
-
 ### Figure 7
-
-Figure 7 is the CairoMakie rewrite of the old
-`old /D_delta_phi_dist_plot.jl` workflow. The old script produced grouped violin
-plots for the hierarchical posterior distribution of the PN deformation
-coefficients, with an optional outline for the `sigma = 0` conditioned
-distribution.
-
-For each configured waveform family and PN order, the rewritten script reads
-the Fisher likelihood summaries (`dphi_k`, `delta_k`) for a catalog
-realization, or the selected population-analysis summaries when no realization
-is requested. It then evaluates the full hierarchical deviation posterior from
-Appendix C/Eq. (2.22), drawing that profile directly in CairoMakie. The
-conditioned outline is evaluated with `HierDist.getNaiveDistributionOnGrid`,
-corresponding to the `sigma = 0` distribution in Eq. (2.26).
 
 ```
 julia --project=. A_fisher_analysis.jl config_files/config_catalog_ET15km45_200k.toml
@@ -109,22 +87,10 @@ violin_width = 0.34
 
 ### Figure 8
 
-Figure 8 is the CairoMakie rewrite of the old
-`old /E_overlayed_hyperparam_dist.jl` plus
-`old /python_plots/hyperparameter_contours/B_plot_hyperparam_overlay.py`
-workflow. It reads the Fisher-analysis HDF5 output, applies the shared
-observation cuts across the requested PN orders, builds one catalog realization,
-computes the hierarchical `P(mu, sigma | D)` distribution with
-`HierDist.hyperparamDistTIGER`, and overlays the 90% credible contours directly
-in Julia.
-
 ```
 julia --project=. A_fisher_analysis.jl config_files/config_fig8_ET15km45_200k.toml
 julia --project=. C_plot_fig8.jl config_files/config_fig8_ET15km45_200k.toml
 ```
-
-If the ET `2L_45` Fisher file already exists, only the second command is
-needed. Outputs are written to `results/plots/fig_8/`.
 
 Optional Figure 8 controls can be added under `[plots.fig8]` in the TOML config:
 
@@ -154,21 +120,10 @@ julia --project=. scripts_to_run/B_population_analysis.jl scripts_to_run/config_
 julia --project=. scripts_to_run/C_plot_fig9.jl scripts_to_run/config_files/config_catalog_hlv_o3b_200k.toml   
 ```
 
-## Performing additional checks
-
-### Gaussianity of bootstrap samples in log-space
-
-Checks the distribution of the samples of the 90% upper bounds, calculated from the bootstrapping analysis, resembles a log-normal distribution. Plots the distribution and  
-
-```
-julia --project=. A_fisher_analysis config_files/config_catalog_*.toml   
-julia --project=. B_population_analysis config_files/config_catalog_*.toml   
-julia --project=. D_plot_log_normal_check.jl config_files/config_catalog_*.toml   
-```
-
 ## Other useful information
 
 ### Storage of results and script outputs.
 The output folder is always documented in the config files. 
-The results of the [fisher analysis](./A_fisher_analysis.jl)) are stored as `.h5` files and their keys to access the data are documented in the docstring of the functions [`write_catalog_to_hdf5()`](./A_fisher_analysis.jl#L31) and [`write_pn_results_to_hdf5()`](./A_fisher_analysis.jl#L74). 
-The results of the [population analysis](./B_population_analysis.jl) are stored as `.h5` files and their keys to access the data are documented in the docstring of [`write_population_results_hdf5()`](./B_population_analysis.jl#L76). d
+The results of [`A_fisher_analysis.jl`](./A_fisher_analysis.jl) are stored as `.h5` files and their keys to access the data are documented in the docstring of the functions [`write_catalog_to_hdf5()`](./A_fisher_analysis.jl#L31) and [`write_pn_results_to_hdf5()`](./A_fisher_analysis.jl#L74). 
+The results of [`B_population_analysis.jl`](./B_population_analysis.jl) are stored as `.h5` files and their keys to access the data are documented in the docstring of [`write_population_results_hdf5()`](./B_population_analysis.jl#L76). 
+The results of [`B_scaling_analysis.jl`](./B_scaling_analysis.jl) are stored as `.h5` files and their keys to access the data are documented in the docstring of [`write_scaling_results_hdf5()`](./B_scaling_analysis.jl#L22). 
