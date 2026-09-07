@@ -1,6 +1,6 @@
-# Grid Plot
+# Grid Plot (Figure 4)
 
-This folder produces the grid plot showing how many observed events are needed
+This folder produces the grid plot (Figure 4 in the paper) showing how many observed events are needed
 for GR to fall outside the 3-sigma hyperparameter contour at each injected
 `(mu, sigma)` point.
 
